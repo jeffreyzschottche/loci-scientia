@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic==2.*
+PySide6
+qasync
+websockets
+psutil
+requests
