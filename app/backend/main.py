@@ -4,6 +4,7 @@ import json
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from .apiAsk import handle_ask
 from .schemas import ApiRouteCreate, ChatRequest
 from .settings import settings
 from .store import Store
@@ -47,9 +48,9 @@ def delete_route(rid: str):
     return {"ok": True}
 
 
-@app.post("/chat")
-async def chat(req: ChatRequest):
-    return {"text": f"Echo: {req.prompt}"}
+@app.post("/api/v1/ask")
+async def api_ask(req: ChatRequest):
+    return handle_ask(req)
 
 
 @app.websocket(settings.ws_path)

@@ -8,9 +8,16 @@ from .net.ws_client import WSClient
 from .theme import DARK_QSS
 from .widgets.api_page import ApiPage
 from .widgets.chat_page import ChatPage
+from .widgets.contacts_page import ContactsPage
+from .widgets.devices_page import DevicesPage
+from .widgets.faq_page import FAQPage
 from .widgets.headerbar import HeaderBar
+from .widgets.knowledge_page import KnowledgePage
+from .widgets.llm_page import LLMManagementPage
+from .widgets.maps_page import MapsPage
+from .widgets.network_page import NetworkStatusPage
 from .widgets.sidebar import Sidebar
-from .widgets.ssd_monitor import SSDMonitor
+from .widgets.settings_page import SettingsPage
 
 BACKEND_WS = "ws://127.0.0.1:8000/ws"
 
@@ -44,7 +51,14 @@ class MainWindow(QMainWindow):
         self.pages = {
             "chat": ChatPage(self.ws_client),
             "api": ApiPage(),
-            "net": SSDMonitor("/" if sys.platform != "win32" else "C:\\"),
+            "kb": KnowledgePage(),
+            "maps": MapsPage(),
+            "contacts": ContactsPage(),
+            "net": NetworkStatusPage(),
+            "llm": LLMManagementPage(),
+            "devices": DevicesPage(),
+            "settings": SettingsPage(),
+            "faq": FAQPage(),
         }
 
         self.content = QWidget()
@@ -56,6 +70,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self.center, 1)
 
         self.sidebar.navigate.connect(self.show_page)
+        self.sidebar.set_current("chat")
         self.show_page("chat")
         self.setStyleSheet(DARK_QSS)
 
@@ -65,7 +80,14 @@ class MainWindow(QMainWindow):
         titles = {
             "chat": "Chat Assistant",
             "api": "API Management",
+            "kb": "Kennisbank",
+            "maps": "Maps",
+            "contacts": "Contacten",
             "net": "Netwerk Status",
+            "llm": "LLM Management",
+            "devices": "Connected Devices",
+            "settings": "Instellingen",
+            "faq": "FAQ",
         }
         self.header.set_title(titles.get(key, "Loci"))
 

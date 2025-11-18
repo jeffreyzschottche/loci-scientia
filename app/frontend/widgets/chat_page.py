@@ -1,5 +1,6 @@
 import asyncio
 
+import requests
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import (
     QFrame,
@@ -10,6 +11,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+API_BASE = "http://127.0.0.1:8000"
 
 
 class ChatSignals(QObject):
@@ -55,21 +58,52 @@ class ChatPage(QWidget):
         if not text:
             return
         self.history.append(f"<b>YOU:</b> {text}")
-        self.history.append("<b>AI:</b> ")
         self.input.clear()
         asyncio.create_task(self._stream(text))
 
     async def _stream(self, prompt: str):
-        async for token in self.ws_client.stream_echo(prompt):
-            self.signals.token.emit(token)
+        endpoints = ["/api/v1/ask", "/chat"]
+
+        def _post():
+            last_error: Exception | None = None
+            for suffix in endpoints:
+                url = f"{API_BASE}{suffix}"
+                try:
+                    resp = requests.post(
+                        url,
+                        json={"prompt": prompt},
+                        timeout=5,
+                    )
+                except Exception as exc:  # pragma: no cover - UI feedback only
+                    last_error = exc
+                    continue
+                if resp.status_code == 404 and suffix != endpoints[-1]:
+                    # probeer legacy endpoint als /api/v1/ask nog niet bestaat
+                    continue
+                try:
+                    resp.raise_for_status()
+                except Exception as exc:  # pragma: no cover - UI feedback only
+                    last_error = exc
+                    continue
+                try:
+                    data = resp.json()
+                except ValueError:
+                    return resp.text.strip() or "<leeg antwoord>"
+                if isinstance(data, dict):
+                    return data.get("message") or data.get("text") or str(data)
+                return str(data)
+            raise last_error or RuntimeError("Geen geldig antwoord van backend")
+
+        try:
+            message = await asyncio.to_thread(_post)
+        except Exception as exc:
+            message = f"[fout] {exc}"
+        self.signals.token.emit(message)
         self.signals.done.emit()
 
     @Slot(str)
     def _on_token(self, token: str):
-        cursor = self.history.textCursor()
-        cursor.movePosition(cursor.End)
-        self.history.setTextCursor(cursor)
-        self.history.insertPlainText(token)
+        self.history.append(f"<b>Loci:</b> {token}")
 
     @Slot()
     def _on_done(self):

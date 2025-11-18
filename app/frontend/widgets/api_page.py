@@ -118,16 +118,44 @@ class ApiPage(QWidget):
         card.setObjectName("Card")
         return card
 
+    def _show_error(self, message: str):
+        err = QLabel(message)
+        err.setWordWrap(True)
+        err.setStyleSheet("color:#f87171;")
+        self.grid.addWidget(err, 0, 0)
+
     def _reload(self):
         while self.grid.count():
             widget = self.grid.takeAt(0).widget()
             if widget:
                 widget.deleteLater()
         try:
-            data = requests.get(f"{API_BASE}/routes", timeout=3).json()
-        except Exception as exc:  # pragma: no cover - UI feedback only
-            err = QLabel(f"Kan routes niet laden: {exc}")
-            self.grid.addWidget(err, 0, 0)
+            resp = requests.get(f"{API_BASE}/routes", timeout=3)
+            resp.raise_for_status()
+        except requests.RequestException as exc:  # pragma: no cover - UI feedback only
+            self._show_error(f"Kan routes niet laden: {exc}")
+            return
+
+        if not resp.content.strip():
+            data = []
+        else:
+            try:
+                data = resp.json()
+            except ValueError:  # pragma: no cover - UI feedback only
+                snippet = resp.text.strip().splitlines()
+                body = snippet[0] if snippet else ""
+                if len(body) > 120:
+                    body = body[:117] + "..."
+                self._show_error(
+                    "Kan routes niet laden: ongeldige JSON van backend "
+                    f"(status {resp.status_code}): {body or '<leeg antwoord>'}"
+                )
+                return
+
+        if not isinstance(data, list):  # pragma: no cover - UI feedback only
+            self._show_error(
+                "Kan routes niet laden: onverwacht antwoordtype ontvangen."
+            )
             return
 
         for idx, route in enumerate(data):

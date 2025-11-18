@@ -20,4 +20,21 @@ QProgressBar {
   background: #111827; border: 1px solid #1f2937; border-radius: 8px; text-align: center;
 }
 QProgressBar::chunk { background: #2563eb; border-radius: 8px; }
+QTableWidget {
+  background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; gridline-color: #1f2937;
+}
+QTableWidget::item { padding: 8px; }
+QListWidget {
+  background: #0f172a; border: 1px solid #1f2937; border-radius: 12px;
+}
+QTabWidget::pane {
+  border: 1px solid #1f2937; border-radius: 12px; margin-top: 6px;
+}
+QTabBar::tab {
+  background: #111827; border: 1px solid #1f2937; border-radius: 8px;
+  padding: 6px 12px; color: #9ca3af; margin-right: 6px;
+}
+QTabBar::tab:selected {
+  background: #2563eb; color: white; border-color: #2563eb;
+}
 """

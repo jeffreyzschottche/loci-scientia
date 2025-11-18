@@ -1,0 +1,213 @@
+Feature #1: Client dashboard op apparaat:::Op het apparaat zelf (Jetson Orin Nano) moet een dashboard draaien dat fungeert als gebruikersinterface (volgens het Figma-ontwerp). Dit dashboard bevat de volgende pagina’s:
+
+    Chat
+
+    API-beheer
+
+    Kennisbank
+
+    Kaarten
+
+    Contacten
+
+    Netwerkstatus
+
+    LLM-beheer
+
+    Verbonden apparaten
+
+    Instellingen
+
+    FAQ
+
+Elke pagina moet als aparte sectie werken en gebruikers in staat stellen de betreffende functionaliteit te gebruiken. Implementeer een navigatiemenu om tussen deze pagina’s te wisselen en bouw de lay-out conform het Figma-ontwerp. Zet stub- of lege pagina’s op voor bovengenoemde secties zodat later alle functionaliteit kan worden toegevoegd.
+
+Feature #2: Desktop client applicatie:::Ontwikkel een Electron-gebaseerde desktopapplicatie waarmee gebruikers vanaf een andere computer in het lokale netwerk kunnen inloggen. Deze client-app biedt een interface die lijkt op het dashboard op het apparaat, maar beperkt tot de pagina’s Chat, Kaarten en Contacten. De client moet verbinding maken met het apparaat via het netwerk (bijv. via een IP-adres). Gebruikers loggen in via het /auth-endpoint en ontvangen een token. Alle gebruikersaccounts en wachtwoorden worden beheerd via de admin-sectie op het apparaat. Zorg dat de desktop-app als zelfstandig installatiebestand beschikbaar is (mogelijk via een installatieprogramma of gedistribueerd pakket).
+
+Feature #3: API endpoints /ask en /auth:::Op het apparaat moet een FastAPI-backend draaien met ten minste de volgende routes:
+
+    /ask (POST): accepteert een vraag en retourneert het antwoord van de lokale LLM.
+
+    /auth (POST): beheert inloggen en registratie van gebruikers en geeft tokens uit bij succesvolle authenticatie.
+
+Zorg voor token-gebaseerde authenticatie en veilige wachtwoordopslag (hashing). Sla gebruikersaccounts op in een lokale database of bestand. De desktop client en het lokale dashboard moeten via deze endpoints met het apparaat kunnen communiceren. Implementeer tevens een request-queue zodat meerdere /ask-verzoeken efficiënt achtereenvolgens kunnen worden verwerkt door de LLM.
+
+Feature #4: Marketing website:::Maak een marketing-website voor het product. De site moet minimaal de volgende pagina’s bevatten:
+
+    Home: overzicht van het product met nadruk op kernbegrippen zoals “Loci Scientia”, lokale kennis, offline LLM, geen cloud/internet.
+
+    Kenmerken: opsomming van kernfuncties (privacy, lokale verwerking, gebruiksgemak, geen internetverbinding nodig).
+
+    Over Ons: informatie over het team/bedrijf en onze missie.
+
+    Contact/FAQ: contactformulier en veelgestelde vragen.
+
+Zorg voor een strak, minimalistisch design met consistente branding (logo, kleuren). Leg de nadruk op unieke verkoopargumenten: lokale kennisbeheer, privacybescherming en zelfstandigheid van het systeem.
+
+Chore #5: Embedding model kiezen:::Onderzoek welk embedding-model het meest geschikt is voor onze kennisbank. Overweeg:
+
+    Modelopties: bijvoorbeeld Sentence-BERT, FastText, of andere open-source embeddings die goed werken op een Jetson GPU.
+
+    Prestaties: meet snelheid (embeddings per seconde), geheugenverbruik en vectordimensies.
+
+    Kwaliteit: evalueer hoe goed de embeddings zoekqueries in Wikipedia-achtige teksten ondersteunen.
+
+Test een aantal modellen op voorbeeldteksten (bijvoorbeeld Wikipedia-artikelen) en noteer de resultaten. Maak een aanbeveling voor het beste model op basis van deze tests.
+
+Chore #6: LLM keuze en integratie:::Onderzoek en selecteer de meest geschikte LLM voor het apparaat. We gebruiken momenteel Qwen, maar overweeg alternatieven. Taken:
+
+    TensorLLM: configureer TensorLLM om het Qwen-model (of een alternatief) op de Jetson Orin Nano te laten draaien.
+
+    Fallback LLM: stel Ollama in als reserve-optie of voor gebruik op desktop.
+
+    Benchmarking: meet inference-latentie en geheugengebruik van Qwen en eventuele alternatieve LLM’s.
+
+    Integratie: zorg dat het gekozen LLM via het /ask-endpoint aangesproken kan worden.
+
+Documenteer de prestaties en maak een keuzeadvies voor het beste LLM voor onze toepassing.
+
+Chore #7: Kennis chunken en embedden:::Ontwikkel een pipeline om grote hoeveelheden kennis te verwerken en embedden. Overweeg:
+
+    Kennisbron: gebruik bijvoorbeeld Wikipedia via Kiwix (offline dumps) of andere betrouwbare data.
+
+    Chunking: splits artikelen op in kleinere stukken (bijv. per sectie of paragraaf) voor betere embeddings.
+
+    Embeddings: genereer vector-embeddings voor elk chunk met het gekozen model (zie issue #5).
+
+    Opslag: sla de chunks en embeddings op in een zoekbare database of vector store.
+
+Streef naar ongeveer 150–200 GB aan ge-embedde kennisbasis. Zorg dat de pipeline schaalbaar is en later kan worden uitgebreid met extra bronnen.
+
+Feature #8: Zelf kennis toevoegen:::Implementeer in de desktop-app (en eventueel het lokale dashboard) een functie waarmee gebruikers eigen kennisbestanden kunnen uploaden en embedden. Workflow:
+
+    Gebruiker selecteert bestanden (bijv. PDF, tekstbestand) of URLs om toe te voegen.
+
+    De app splitst de tekst in chunks en genereert embeddings (zoals in issue #7).
+
+    De nieuwe embeddings worden toegevoegd aan de kennisdatabase op het apparaat.
+
+Geef de gebruiker feedback tijdens het proces (bijv. voortgangsbalk) en bevestiging als het embedden is voltooid.
+
+Chore #9: SSD-selectie:::Bepaal de beste SSD voor het Jetson Orin Nano-apparaat. Let op:
+
+    Capaciteit: minimaal 512 GB (met ongeveer 200 GB voor kennisgegevens) of meer.
+
+    Snelheid: voorkeur voor NVMe SSD met hoge lees- en schrijfsnelheid.
+
+    Betrouwbaarheid: kijk naar TBW (total bytes written) en garantievoorwaarden.
+
+    Prijs/Kwaliteit: vergelijk populaire modellen (bijv. Samsung 970 EVO, WD Black, Kingston, etc.).
+
+Voer benchmarks of onderzoek uit en geef een concrete aanbeveling (merk en model) inclusief geschatte kosten.
+
+Chore #10: Behuizing en stickers:::Regel een passende behuizing en brandingmateriaal:
+
+    Behuizing: kies een case die de Jetson Orin Nano en SSD goed beschermt. Kijk naar bestaande oplossingen (bijv. aluminium behuizingen, 3D-geprinte cases) en betrouwbare leveranciers of voorbeelden.
+
+    Stickers/branding: vind een leverancier voor op maat gemaakte stickers (logo/branding) voor de behuizing. Vergelijk opties (bijv. Vistaprint, Sticker Mule, lokale printshops) en noteer prijzen en levertijden.
+
+Chore #11: Handmatige testcases:::Beschrijf uitgebreide handmatige tests voor de applicatie:
+
+    Authenticatie: test correcte en onjuiste loginpogingen via /auth en controleer token-verstrekking of foutmeldingen.
+
+    Navigatie: controleer alle dashboard-pagina’s (chat, kaarten, etc.) op fouten en juiste weergave.
+
+    Chat-functionaliteit: stel vragen via de chat en verifieer dat de LLM een antwoord geeft en foutafhandeling werkt.
+
+    Kennisbeheer: upload een document (zie issue #8) en controleer dat deze doorzoekbaar wordt na embedding.
+
+    API: test /ask en /auth met een tool (bijv. Postman) en controleer time-outs en fouten.
+
+Noteer per test de stappen en het verwachte resultaat.
+
+Chore #12: KvK-registratie:::Beschrijf de stappen voor inschrijving bij de Kamer van Koophandel:
+
+    Kies een rechtsvorm (bijv. eenmanszaak of BV) en zorg dat oprichters akkoord zijn.
+
+    Verzamel documenten: identiteitsbewijs, adresgegevens, bedrijfsplan/omschrijving, etc.
+
+    Maak afspraak bij KvK of ga langs op kantoor.
+
+    Vul het inschrijfformulier in en laat alle betrokkenen ondertekenen (indien nodig).
+
+    Betaal de inschrijfkosten en ontvang je KvK-nummer (en eventueel BTW-nummer).
+
+Noem aandachtspunten zoals kosten, benodigde voorbereiding en doorlooptijd.
+
+Feature #13: AI-ondersteunde FAQ:::Implementeer een FAQ-sectie op het apparaatdashboard en in de desktopapp:
+
+    Gestructureerde FAQ: verdeel in categorieën/subcategorieën met veelgestelde vragen en duidelijke antwoorden.
+
+    AI-vragen: koppel het LLM (/ask) zodat gebruikers eigen vragen kunnen stellen en een samenvattend antwoord krijgen op basis van de kennisbasis.
+
+    UI: zorg voor een invoerveld of zoekfunctie, en toon de antwoorden overzichtelijk.
+
+Feature #14: Businessmodel en prijzen:::Werk het businessmodel en de prijsstrategie uit:
+
+    Pakketten: definieer verschillende product- of dienstpakketten (hardwarebasis, plus contract, onderhoud etc.) met bijbehorende prijzen.
+
+    Services: omschrijf inbegrepen diensten (support, updates, installatie, training).
+
+    Kosten en marges: bereken de kostprijs van hardware en bepaal verkoopprijzen met marge.
+
+    Garantie: stel garantieperiode en -voorwaarden vast; onderscheid onze en klantverantwoordelijkheden; leg uit hoe logs bij problemen als bewijs dienen.
+
+Zet deze punten duidelijk op papier zodat het team de aanbodstructuur kent.
+
+Feature #15: Marketing CMS-tool:::Ontwikkel een intern beheerinstrument voor marketing en communicatie:
+
+    Social media planning: interface om geplande posts en campagnes op platforms (Instagram, TikTok, etc.) te beheren.
+
+    Inbox/tickets: verzamel inkomende berichten (e-mail, contactformulieren) en koppel ze aan tickets.
+
+    Analytics: toon basisstatistieken (bijv. volgersaantallen, aantal posts, responspercentages).
+
+    Integratie: koppel dit systeem aan het ticketsysteem uit issue #16.
+
+Chore #16: Ticketsysteem op website:::Voeg een ticketsysteem toe op de website zodat klanten supportvragen kunnen indienen:
+
+    Formulier: een webformulier met velden voor vraag, categorie/urgentie, contactinformatie.
+
+    Opslag: sla tickets op in een database of stuur ze per e-mail naar het supportteam.
+
+    Bevestiging: stuur automatisch een ontvangstbevestiging naar de klant per e-mail.
+
+    Backend: zorg voor een admin-interface om openstaande tickets te bekijken en te verwerken.
+
+Chore #17: Social media accounts:::Maak de volgende bedrijfsprofielen aan:
+
+    Reddit (bijv. eigen subreddit of bedrijfspagina), Instagram, TikTok, X (Twitter), LinkedIn en WhatsApp Business.
+
+Zorg voor consistente branding (gebruik hetzelfde logo en naam) en vul de profielinformatie in (omschrijving, website-link). Maak ten minste één introductiepost of bericht op elk kanaal.
+
+Chore #18: Bulk inkoop strategie:::Bereid een plan voor om componenten in bulk in te kopen bij succes:
+
+    Leveranciers: identificeer groothandels of fabrikanten voor Jetson Orin Nano-modules, SSD's en behuizingen.
+
+    Volume deals: onderzoek volumekortingen en langetermijncontracten bij leveranciers.
+
+    Tweedehands/Refurbished: overweeg betrouwbare bronnen voor gebruikte hardware om kosten te besparen.
+
+    Voorraadbeheer: bedenk hoe je aankopen plant en voorraad bijhoudt naarmate de vraag stijgt.
+
+Chore #19: Garantievoorwaarden:::Formuleer de garantievoorwaarden voor het product:
+
+    Dekking: definieer wat onder garantie valt (hardwarefouten, softwarebugs) en wat niet (gebruikersfouten, fysieke schade).
+
+    Looptijd: bepaal de duur van de garantieperiode (bijv. 1 jaar).
+
+    Procedure: beschrijf het claimproces (ticket indienen, logs aanleveren) en wat je van de klant nodig hebt.
+
+    Aansprakelijkheidsbeperking: leg grenzen vast (bv. geen extra vergoedingen voor gevolgschade).
+
+Chore #20: Roadmap:::Stel een productroadmap op:
+
+    Versie 1 (MVP): beschrijf basisfeatures die we nu bouwen (bijv. lokaal dashboard, /ask API, basiskennisfunctie).
+
+    Versie 2 (uitbreidingen): schets toekomstige functies voor latere releases (bv. cloud-syncoptie, extra LLM-integraties, geavanceerdere UI).
+
+    Prioriteiten: stel vragen om te bepalen welke functies het belangrijkst zijn (zoals gebruikersbehoeften en logistieke haalbaarheid).
+
+    Visualisatie: gebruik tools (bijv. Trello, Roadmunk) om de roadmap visueel weer te geven.
+
+Vergeet niet deze roadmap ook op de marketingwebsite te publiceren (bijvoorbeeld als aparte pagina).
