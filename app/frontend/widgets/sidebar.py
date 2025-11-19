@@ -32,7 +32,6 @@ class Sidebar(QWidget):
             ("maps", "🗺", "Maps"),
             ("contacts", "👥", "Contacten"),
             ("net", "🌐", "Netwerk Status"),
-            ("llm", "🧠", "LLM Management"),
             ("devices", "📱", "Connected Devices"),
             ("settings", "⚡", "Instellingen"),
             ("faq", "❓", "FAQ"),

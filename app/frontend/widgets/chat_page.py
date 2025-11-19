@@ -49,6 +49,7 @@ class ChatPage(QWidget):
         layout.addWidget(input_card)
 
         self.send_btn.clicked.connect(self._on_send)
+        self.input.returnPressed.connect(self._on_send)
         self.signals.token.connect(self._on_token)
         self.signals.done.connect(self._on_done)
 

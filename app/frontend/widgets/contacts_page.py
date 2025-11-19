@@ -1,40 +1,29 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
+import requests
+
+BACKEND_HTTP = "http://127.0.0.1:8000"
+
 
 class ContactsPage(QWidget):
     def __init__(self):
         super().__init__()
-        self.contacts = [
-            {
-                "name": "Jan de Vries",
-                "company": "Tech Solutions BV",
-                "email": "jan@techsolutions.nl",
-                "phone": "+31 6 1234 5678",
-            },
-            {
-                "name": "Maria Janssen",
-                "company": "Data Insights",
-                "email": "maria@data-insights.io",
-                "phone": "+31 6 8765 4321",
-            },
-            {
-                "name": "Pieter Bakker",
-                "company": "Innovation Labs",
-                "email": "pieter@innovationlabs.nl",
-                "phone": "+31 6 9999 2222",
-            },
-        ]
+        self.contacts = []
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
@@ -42,8 +31,7 @@ class ContactsPage(QWidget):
         layout.addWidget(self._build_list(), 0)
         self.detail = self._build_detail_card()
         layout.addWidget(self.detail, 1)
-        self.list_widget.setCurrentRow(0)
-        self._update_detail(0)
+        self._reload_contacts()
 
     def _build_list(self) -> QFrame:
         panel = QFrame()
@@ -58,6 +46,7 @@ class ContactsPage(QWidget):
         add_btn = QPushButton("+")
         add_btn.setFixedSize(32, 32)
         add_btn.setStyleSheet("background:#2563eb; color:white; border-radius:8px;")
+        add_btn.clicked.connect(self._open_add_dialog)
         header.addWidget(add_btn, 0, Qt.AlignRight)
         panel_layout.addLayout(header)
 
@@ -66,14 +55,10 @@ class ContactsPage(QWidget):
         panel_layout.addWidget(search)
 
         self.list_widget = QListWidget()
-        for person in self.contacts:
-            item = QListWidgetItem(person["name"])
-            self.list_widget.addItem(item)
         self.list_widget.currentRowChanged.connect(self._update_detail)
         panel_layout.addWidget(self.list_widget, 1)
-        panel_layout.addWidget(
-            QLabel(f"{len(self.contacts)} contacten"), 0, Qt.AlignRight
-        )
+        self.count_label = QLabel("0 contacten")
+        panel_layout.addWidget(self.count_label, 0, Qt.AlignRight)
         return panel
 
     def _build_detail_card(self) -> QFrame:
@@ -95,25 +80,10 @@ class ContactsPage(QWidget):
         layout.addWidget(self.email)
         layout.addWidget(self.phone)
 
-        buttons = QHBoxLayout()
-        mail_btn = QPushButton("E-mail sturen")
-        mail_btn.setStyleSheet(
-            "border:1px solid #374151; border-radius:8px; padding:6px 12px;"
-        )
-        call_btn = QPushButton("Bellen")
-        call_btn.setStyleSheet(
-            "background:#2563eb; color:white; border-radius:8px; padding:6px 12px;"
-        )
-        buttons.addWidget(mail_btn)
-        buttons.addWidget(call_btn)
-        layout.addLayout(buttons)
-
-        notes = QLabel(
-            "Laatste interactie: Demo ingepland voor volgende week donderdag."
-        )
-        notes.setWordWrap(True)
-        notes.setStyleSheet("color:#9ca3af;")
-        layout.addWidget(notes)
+        self.notes = QLabel()
+        self.notes.setWordWrap(True)
+        self.notes.setStyleSheet("color:#9ca3af;")
+        layout.addWidget(self.notes)
         layout.addStretch(1)
         return card
 
@@ -125,3 +95,79 @@ class ContactsPage(QWidget):
         self.company.setText(contact["company"])
         self.email.setText(f"✉ {contact['email']}")
         self.phone.setText(f"☎ {contact['phone']}")
+        self.notes.setText(contact.get("notes", ""))
+
+    def _reload_contacts(self) -> None:
+        try:
+            resp = requests.get(f"{BACKEND_HTTP}/contacts", timeout=5)
+            resp.raise_for_status()
+            self.contacts = resp.json()
+        except Exception:
+            self.contacts = []
+
+        self.list_widget.clear()
+        for person in self.contacts:
+            item = QListWidgetItem(person["name"])
+            self.list_widget.addItem(item)
+        self.count_label.setText(f"{len(self.contacts)} contacten")
+        if self.contacts:
+            self.list_widget.setCurrentRow(0)
+            self._update_detail(0)
+
+    def _open_add_dialog(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Nieuw contact")
+
+        form = QFormLayout(dialog)
+        name_edit = QLineEdit()
+        company_edit = QLineEdit()
+        email_edit = QLineEdit()
+        phone_edit = QLineEdit()
+        notes_edit = QLineEdit()
+
+        form.addRow("Naam", name_edit)
+        form.addRow("Bedrijf", company_edit)
+        form.addRow("E-mail", email_edit)
+        form.addRow("Telefoon", phone_edit)
+        form.addRow("Notities", notes_edit)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog
+        )
+        form.addRow(buttons)
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        name = name_edit.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Ongeldig", "Naam is verplicht.")
+            return
+
+        payload = {
+            "name": name,
+            "company": company_edit.text().strip(),
+            "email": email_edit.text().strip(),
+            "phone": phone_edit.text().strip(),
+            "notes": notes_edit.text().strip(),
+        }
+
+        try:
+            resp = requests.post(f"{BACKEND_HTTP}/contacts", json=payload, timeout=5)
+            resp.raise_for_status()
+            contact = resp.json()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Fout",
+                f"Contact kon niet worden opgeslagen:\n{exc}",
+            )
+            return
+
+        self.contacts.append(contact)
+        self.list_widget.addItem(QListWidgetItem(contact["name"]))
+        self.count_label.setText(f"{len(self.contacts)} contacten")
+        self.list_widget.setCurrentRow(len(self.contacts) - 1)

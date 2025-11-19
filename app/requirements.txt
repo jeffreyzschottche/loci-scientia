@@ -6,3 +6,4 @@ qasync
 websockets
 psutil
 requests
+qdrant-client[fastembed]

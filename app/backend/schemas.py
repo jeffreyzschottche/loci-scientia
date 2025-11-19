@@ -8,6 +8,40 @@ class ChatRequest(BaseModel):
     max_new_tokens: int = 128
 
 
+class Contact(BaseModel):
+    id: str
+    name: str
+    company: str
+    email: str
+    phone: str
+    notes: str = ""
+
+
+class ContactCreate(BaseModel):
+    name: str
+    company: str
+    email: str
+    phone: str
+    notes: str = ""
+
+
+class Device(BaseModel):
+    id: str
+    user_name: str
+    email: str
+    password: str
+    phone: str
+    device_name: str
+
+
+class DeviceCreate(BaseModel):
+    user_name: str
+    email: str
+    password: str
+    phone: str
+    device_name: str
+
+
 class ApiRoute(BaseModel):
     id: str
     name: str
