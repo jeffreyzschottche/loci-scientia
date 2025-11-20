@@ -1,6 +1,7 @@
 # 🧠 Loci Scientia Desktop
 
 Een moderne **desktopapplicatie** met:
+
 - **PySide6 UI** (frontend)
 - **FastAPI backend** (API + WebSocket)
 - **Chat-interface, API-routebeheer en SSD-monitoring**
@@ -8,6 +9,7 @@ Een moderne **desktopapplicatie** met:
 ---
 
 ## 📁 Projectstructuur
+
 ```
 app/
   backend/
@@ -37,10 +39,13 @@ app/
 ### 🧩 1. Controleer of Python is geïnstalleerd
 
 #### macOS (zsh)
+
 ```bash
 command -v python3 && python3 --version
 ```
-Als je géén versie ziet of iets van *“command not found”*, installeer Python via Homebrew:
+
+Als je géén versie ziet of iets van _“command not found”_, installeer Python via Homebrew:
+
 ```bash
 # Installeer Homebrew (als je dat nog niet hebt)
 # /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -51,11 +56,13 @@ source ~/.zshrc
 ```
 
 #### Windows (PowerShell)
+
 Download en installeer Python via  
 👉 https://www.python.org/downloads/  
 Zorg dat je **“Add Python to PATH”** aanvinkt tijdens installatie.
 
 Controleer daarna:
+
 ```powershell
 py --version
 ```
@@ -65,12 +72,14 @@ py --version
 ### 🧱 2. Virtuele omgeving maken
 
 #### macOS/Linux
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
 #### Windows
+
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -90,23 +99,44 @@ python -m pip install -r app/requirements.txt
 ```
 
 #### Veelvoorkomende fout
+
 > `zsh: command not found: python`  
-Gebruik dan `python3` in plaats van `python`.
+> Gebruik dan `python3` in plaats van `python`.
 
 > `zsh: command not found: pip`  
-Gebruik `python -m pip ...`.
+> Gebruik `python -m pip ...`.
 
 ---
 
 ## 🚀 Applicatie starten
 
+### ⚡ Eén commando
+
+Als je alles tegelijk wilt starten en alleen verder wil zodra de backend klaar is, draai je vanaf de projectroot:
+
+```bash
+./lociscientia.sh
+```
+
+Het script zorgt ervoor dat:
+
+1. De virtuele omgeving bestaat en afhankelijkheden worden geïnstalleerd (éénmalig).
+2. De backend (`uvicorn ...`) in de achtergrond draait en wacht tot `/health` reageert.
+3. Pas als de backend klaar is, wordt de frontend gestart.
+4. `backend.log` alle backend-output verzamelt zodat je fouten kunt teruglezen.
+
+Stoppen doe je met Ctrl+C; het script sluit eerst de frontend en daarna de backend netjes af.
+
 ### 🖥️ Backend (API + WebSocket)
+
 Laat dit venster open:
+
 ```bash
 uvicorn app.backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Als alles goed is zie je:
+
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000
 ```
@@ -114,7 +144,9 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 ---
 
 ### 🪟 Frontend (PySide6 Desktop UI)
+
 Open een **nieuw terminalvenster**, activeer opnieuw de venv en start:
+
 ```bash
 source .venv/bin/activate  # (of .\.venv\Scripts\Activate.ps1 op Windows)
 python -m app.frontend.main
@@ -142,6 +174,7 @@ frontend:
 ```
 
 Gebruik dan:
+
 ```bash
 make setup
 make backend
@@ -152,16 +185,16 @@ make frontend
 
 ## 💡 Troubleshooting
 
-| Probleem | Oplossing |
-|-----------|------------|
+| Probleem                                         | Oplossing                                                                         |
+| ------------------------------------------------ | --------------------------------------------------------------------------------- |
 | `ModuleNotFoundError: No module named 'fastapi'` | Virtuele omgeving niet actief → `source .venv/bin/activate` en installeer opnieuw |
-| `zsh: command not found: python` | Gebruik `python3` of installeer via Homebrew |
-| `zsh: command not found: pip` | Gebruik `python -m pip install ...` |
-| Backend start niet | Controleer of `uvicorn` geïnstalleerd is (`python -m pip show uvicorn`) |
+| `zsh: command not found: python`                 | Gebruik `python3` of installeer via Homebrew                                      |
+| `zsh: command not found: pip`                    | Gebruik `python -m pip install ...`                                               |
+| Backend start niet                               | Controleer of `uvicorn` geïnstalleerd is (`python -m pip show uvicorn`)           |
 
 ---
 
 ## 🧬 Credits
+
 **Loci Scientia OS**  
 Cognitionis Scientia • Chat, API Management, Knowledge & Monitoring
-
