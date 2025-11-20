@@ -63,7 +63,7 @@ class ChatPage(QWidget):
         asyncio.create_task(self._stream(text))
 
     async def _stream(self, prompt: str):
-        endpoints = ["/api/v1/ask", "/chat"]
+        endpoints = ["/api/v1/ask"]
 
         def _post():
             last_error: Exception | None = None

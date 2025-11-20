@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from PySide6.QtCore import QUrl, QDir, Qt, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -49,9 +49,13 @@ class BootScreen(QWidget):
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         self.showFullScreen()
 
+        pixmap = QPixmap()
         image_url = ""
         if logo_path and os.path.exists(logo_path):
-            image_url = QUrl.fromLocalFile(logo_path).toString()
+            loaded = QPixmap(logo_path)
+            if not loaded.isNull():
+                pixmap = loaded
+                image_url = QUrl.fromLocalFile(logo_path).toString()
 
         style_lines = [
             "QWidget#BootScreenRoot {",
@@ -75,6 +79,7 @@ class BootScreen(QWidget):
             "}",
         ]
         self.setStyleSheet("\n".join(style_lines))
+        self.background_pixmap = pixmap
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(80, 80, 80, 80)
@@ -120,6 +125,19 @@ class BootScreen(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._next_message)
         self.timer.start(self.interval_ms)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        if self.background_pixmap and not self.background_pixmap.isNull() and self.size().isValid():
+            scaled = self.background_pixmap.scaled(
+                self.size(),
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation,
+            )
+            painter.drawPixmap(0, 0, scaled)
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 110))
+        painter.end()
+        super().paintEvent(event)
 
     def _next_message(self):
         if self.current_index < len(self.messages):
