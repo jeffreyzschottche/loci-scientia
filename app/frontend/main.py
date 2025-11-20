@@ -1,10 +1,19 @@
 import asyncio
 import sys
 import os
+from typing import Optional
 
-from PySide6.QtCore import QUrl, QDir # NIEUW: Import voor robuuste padconversie
+from PySide6.QtCore import QUrl, QDir, Qt, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPlainTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from qasync import QEventLoop
 
 from .net.ws_client import WSClient
@@ -22,6 +31,109 @@ from .widgets.sidebar import Sidebar
 from .widgets.settings_page import SettingsPage
 
 BACKEND_WS = "ws://127.0.0.1:8000/ws"
+
+
+class BootScreen(QWidget):
+    def __init__(
+        self,
+        logo_path: Optional[str] = None,
+        duration_ms: int = 5000,
+        on_finished=None,
+    ):
+        super().__init__()
+
+        self.on_finished = on_finished
+        self.duration_ms = duration_ms
+
+        self.setObjectName("BootScreenRoot")
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self.showFullScreen()
+
+        image_url = ""
+        if logo_path and os.path.exists(logo_path):
+            image_url = QUrl.fromLocalFile(logo_path).toString()
+
+        style_lines = [
+            "QWidget#BootScreenRoot {",
+            "    background-color: #000000;",
+        ]
+        if image_url:
+            style_lines += [
+                f"    background-image: url({image_url});",
+                "    background-repeat: no-repeat;",
+                "    background-position: center;",
+            ]
+        style_lines += [
+            "}",
+            "QPlainTextEdit#Terminal {",
+            "    background-color: rgba(0, 0, 0, 210);",
+            "    color: #00ff7f;",
+            "    border: 1px solid #00ff7f;",
+            "    font-family: \"Fira Code\", \"Consolas\", \"Courier New\", monospace;",
+            "    font-size: 12pt;",
+            "    padding: 8px;",
+            "}",
+        ]
+        self.setStyleSheet("\n".join(style_lines))
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(80, 80, 80, 80)
+        layout.setSpacing(0)
+
+        logo_label = QLabel("Loci Scientia")
+        logo_label.setObjectName("BootLogoLabel")
+        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setStyleSheet(
+            "font-size: 32pt;"
+            "font-weight: 600;"
+            "letter-spacing: 6px;"
+        )
+        layout.addWidget(logo_label, 0, Qt.AlignHCenter)
+        layout.addSpacing(32)
+
+        self.terminal = QPlainTextEdit()
+        self.terminal.setObjectName("Terminal")
+        self.terminal.setReadOnly(True)
+        self.terminal.setLineWrapMode(QPlainTextEdit.NoWrap)
+
+        layout.addWidget(self.terminal)
+
+        self.messages = [
+            "[BOOT] Initializing Loci kernel...",
+            "[OK]  Loading core modules...",
+            "[OK]  Mounting /knowledge...",
+            "[OK]  Starting neural interfaces...",
+            "[SYS] Scanning local devices...",
+            "[OK]  Connecting to Loci Network...",
+            "[OK]  Getting knowledge ready...",
+            "[OK]  Finding out the secrets of the universe...",
+            "[SYS] Installing dependencies for chat engine...",
+            "[OK]  Starting Loci Scientia services...",
+            "[DONE] System ready. Type 'loci --start' to begin.",
+            "",
+            "loci@localhost:~$ loci --start",
+        ]
+
+        self.current_index = 0
+        self.interval_ms = max(150, int(self.duration_ms / (len(self.messages) + 1)))
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._next_message)
+        self.timer.start(self.interval_ms)
+
+    def _next_message(self):
+        if self.current_index < len(self.messages):
+            line = self.messages[self.current_index]
+            self.terminal.appendPlainText(line)
+            self.current_index += 1
+        else:
+            self.timer.stop()
+            QTimer.singleShot(400, self.finish)
+
+    def finish(self):
+        if self.on_finished:
+            self.on_finished()
+        self.close()
 
 
 class MainWindow(QMainWindow):
@@ -63,7 +175,6 @@ class MainWindow(QMainWindow):
                     background-image: url({image_url});
                     background-repeat: no-repeat;
                     background-position: center;
-                    background-size: cover; 
                 }}
             """
             root.setStyleSheet(root_style)
@@ -153,22 +264,37 @@ class MainWindow(QMainWindow):
         }
         self.header.set_title(titles.get(key, "Loci"))
 
-    async def closeEvent(self, event):  # type: ignore[override]
-        await self.ws_client.close()
+    def closeEvent(self, event):
+        asyncio.create_task(self.ws_client.close())
         event.accept()
 
 
 def main():
     app = QApplication(sys.argv)
-    # Zorg dat de desktopafbeelding ook als applicatie-icoon wordt ingesteld
-    app_images_dir = os.path.join(os.path.dirname(__file__), "images")
+
+    app_dir = os.path.dirname(__file__)
+    app_images_dir = os.path.join(app_dir, "images")
     app_icon_path = os.path.join(app_images_dir, "desktopimage.jpeg")
     if os.path.exists(app_icon_path):
         app.setWindowIcon(QIcon(app_icon_path))
+
+    boot_logo_path = os.path.join(app_images_dir, "lociscientialogo.png")
+
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
+
     window = MainWindow()
-    window.show()
+
+    def on_boot_finished():
+        window.show()
+
+    boot_screen = BootScreen(
+        logo_path=boot_logo_path,
+        duration_ms=5000,
+        on_finished=on_boot_finished,
+    )
+    boot_screen.show()
+
     with loop:
         loop.run_forever()
 
