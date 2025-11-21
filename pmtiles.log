@@ -1,1 +1,11 @@
-2025/11/21 19:13:12 main.go:159: Serving  /Users/jeffreyzschottche/Sites/loci-scientia/app/offlinemap on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/11/21 22:39:44 main.go:159: Serving  . on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/11/21 22:39:53 server.go:156: fetching europe 0-16384
+2025/11/21 22:39:53 server.go:200: fetched europe 0-16384
+2025/11/21 22:39:53 server.go:156: fetching europe 127-66
+2025/11/21 22:39:53 server.go:200: fetched europe 127-66
+2025/11/21 22:39:53 server.go:156: fetching europe 1310-11918
+2025/11/21 22:39:53 server.go:200: fetched europe 1310-11918
+2025/11/21 22:39:53 main.go:156: served 200 %2Feurope%2F3%2F4%2F2.mvt in 2.49725ms
+2025/11/21 22:39:53 main.go:156: served 200 %2Feurope%2F3%2F3%2F2.mvt in 2.7315ms
+2025/11/21 22:39:53 main.go:156: served 200 %2Feurope%2F3%2F4%2F3.mvt in 2.828792ms
+2025/11/21 22:39:53 main.go:156: served 200 %2Feurope%2F3%2F3%2F3.mvt in 2.472458ms
