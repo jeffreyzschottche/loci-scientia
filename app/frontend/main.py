@@ -25,7 +25,7 @@ from .widgets.devices_page import DevicesPage
 from .widgets.faq_page import FAQPage
 from .widgets.headerbar import HeaderBar
 from .widgets.knowledge_page import KnowledgePage
-from .widgets.maps_page import MapsPage
+from app.maps.maps_page import MapsPage
 from .widgets.network_page import NetworkStatusPage
 from .widgets.sidebar import Sidebar
 from .widgets.settings_page import SettingsPage

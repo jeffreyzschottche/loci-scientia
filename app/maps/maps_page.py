@@ -102,10 +102,8 @@ class MapsPage(QWidget):
 
         self.webview = QWebEngineView()
 
-        # Pad naar app/offlinemaps/style.json
-        # maps_page.py zit in app/frontend/widgets → parents[2] = app/
-        offlinemaps_dir = Path(__file__).resolve().parents[2] / "offlinemaps"
-        style_path = offlinemaps_dir / "style.json"
+        # style.json ligt in dezelfde map als deze widget
+        style_path = Path(__file__).with_name("style.json")
         style_json = style_path.read_text(encoding="utf-8")
 
         # HTML: we plakken de JSON letterlijk in de <script>-tag
@@ -134,6 +132,22 @@ class MapsPage(QWidget):
       position: absolute;
       inset: 0;
     }
+    #status-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+      font-size: 14px;
+      background: rgba(2, 6, 23, 0.85);
+      color: #fcd34d;
+      pointer-events: none;
+    }
+    #status-overlay.hidden {
+      display: none;
+    }
     .maplibregl-ctrl-logo {
       display: none !important;
     }
@@ -141,6 +155,7 @@ class MapsPage(QWidget):
 </head>
 <body>
   <div id="map"></div>
+  <div id="status-overlay">Offline kaart wordt geladen…</div>
 
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <script>
@@ -149,6 +164,29 @@ class MapsPage(QWidget):
 """ + style_json + """
     ;
 
+    const statusOverlay = document.getElementById("status-overlay");
+    const showStatus = (message) => {
+      if (!statusOverlay) return;
+      statusOverlay.textContent = message;
+      statusOverlay.classList.remove("hidden");
+    };
+    const hideStatus = () => {
+      if (!statusOverlay) return;
+      statusOverlay.classList.add("hidden");
+    };
+
+    const zoomAroundCenter = (delta) => {
+      if (!window.map) {
+        return;
+      }
+      const nextZoom = window.map.getZoom() + delta;
+      window.map.zoomTo(nextZoom, {
+        around: window.map.getCenter(),
+        duration: 0,
+      });
+    };
+    window.zoomAroundMapCenter = zoomAroundCenter;
+
     // Kaart voor Europa
     window.map = new maplibregl.Map({
       container: "map",
@@ -156,14 +194,45 @@ class MapsPage(QWidget):
       center: [10, 50],
       zoom: 3.5,
       minZoom: 3,
+      maxZoom: 16,
       maxBounds: [
         [-25, 34],
         [45, 72]
       ]
     });
 
+    // Scroll-wheel zoom altijd rond het midden houden voor een rustiger gevoel
+    window.map.scrollZoom.disable();
+    const mapCanvas = window.map.getCanvas();
+    const handleCenteredScroll = (event) => {
+      if (!window.map) {
+        return;
+      }
+      event.preventDefault();
+      let delta = -event.deltaY / 300;
+      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        delta *= 12;
+      } else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        delta *= 60;
+      }
+      if (event.ctrlKey) {
+        delta /= 2;
+      }
+      if (delta === 0) {
+        return;
+      }
+      zoomAroundCenter(delta);
+    };
+    mapCanvas.addEventListener("wheel", handleCenteredScroll, { passive: false });
+
     window.map.on("load", function() {
+      hideStatus();
       window.map.resize();
+    });
+
+    window.map.on("error", function(event) {
+      console.error(event.error || event);
+      showStatus("Kaartdata kon niet geladen worden. Controleer of de pmtiles-server draait op poort 8080.");
     });
 
     window.addEventListener("resize", function() {
@@ -208,8 +277,12 @@ class MapsPage(QWidget):
     # ---------------------------------------------------------
     def zoom_in(self):
         if hasattr(self, "webview"):
-            self.webview.page().runJavaScript("if (window.map) map.zoomIn();")
+            self.webview.page().runJavaScript(
+                "if (window.zoomAroundMapCenter) { window.zoomAroundMapCenter(0.65); }"
+            )
 
     def zoom_out(self):
         if hasattr(self, "webview"):
-            self.webview.page().runJavaScript("if (window.map) map.zoomOut();")
+            self.webview.page().runJavaScript(
+                "if (window.zoomAroundMapCenter) { window.zoomAroundMapCenter(-0.65); }"
+            )

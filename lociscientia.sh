@@ -29,15 +29,21 @@ echo "⏳ Backend starten (log: $backend_log)..."
 "${BACKEND_CMD[@]}" >"$backend_log" 2>&1 &
 backend_pid=$!
 
-# pmtiles config – MOET draaien in app/offlinemaps
+# pmtiles config – serve app/maps zodat tiles altijd gevonden worden
 PMTILES_PORT=8080
+PMTILES_DIR="$PROJECT_ROOT/app/maps"
 pmtiles_log="$PROJECT_ROOT/pmtiles.log"
 
-echo "⏳ pmtiles server starten vanuit app/offlinemaps (log: $pmtiles_log)..."
-(
-    cd "$PROJECT_ROOT/app/offlinemaps"
-    pmtiles serve . --port="$PMTILES_PORT" --cors='*'
-) >"$pmtiles_log" 2>&1 &
+# voorkom dat een oude pmtiles-server op dezelfde poort blijft draaien
+if lsof -ti:"$PMTILES_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    old_pid=$(lsof -ti:"$PMTILES_PORT" -sTCP:LISTEN)
+    echo "⚠️  bestaand proces op poort $PMTILES_PORT gevonden (pid $old_pid), stoppen…"
+    kill "$old_pid" >/dev/null 2>&1 || true
+    sleep 1
+fi
+
+echo "⏳ pmtiles server starten voor $PMTILES_DIR (log: $pmtiles_log)..."
+pmtiles serve "$PMTILES_DIR" --port="$PMTILES_PORT" --cors='*' >"$pmtiles_log" 2>&1 &
 pmtiles_pid=$!
 
 cleanup() {
