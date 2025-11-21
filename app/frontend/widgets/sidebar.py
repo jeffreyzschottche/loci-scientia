@@ -49,7 +49,7 @@ class Sidebar(QWidget):
             btn_layout.addWidget(icon_label)
             btn_layout.addWidget(text_label)
             btn_layout.addStretch(1)
-            btn.clicked.connect(lambda _checked, k=key: self._on_nav(k))
+            btn.clicked.connect(lambda _checked=False, k=key: self._on_nav(k))
             self.buttons[key] = btn
             layout.addWidget(btn)
 
