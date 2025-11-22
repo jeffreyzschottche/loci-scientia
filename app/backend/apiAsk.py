@@ -57,6 +57,8 @@ def handle_ask(req: ChatRequest) -> dict:
     """Returneer de beste match op basis van contacten en devices."""
 
     contact_hits = contacts_repo.search_contacts(req.prompt, limit=3)
+    if not contact_hits:
+        contact_hits = contacts_repo.keyword_search_contacts(req.prompt, limit=3)
     device_hits = devices_repo.search_devices(req.prompt, limit=3)
     best = _pick_best_candidate(contact_hits, device_hits)
     if not best:

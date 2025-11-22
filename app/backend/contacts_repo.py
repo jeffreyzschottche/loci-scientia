@@ -224,3 +224,30 @@ class ContactsRepository:
             matches.append((contact, score))
 
         return matches
+
+    def keyword_search_contacts(self, query: str, limit: int = 3) -> list[tuple[Contact, float]]:
+        """Fallback voor eenvoudige substring-zoekopdrachten (naam/adres)."""
+
+        needle = query.strip().lower()
+        if not needle:
+            return []
+        contacts = self.list_contacts()
+        hits: list[tuple[Contact, float]] = []
+        for contact in contacts:
+            haystack_parts = [
+                contact.name,
+                contact.company,
+                contact.email,
+                contact.phone,
+                contact.notes,
+                contact.location_label or "",
+                contact.location_street or "",
+                contact.location_city or "",
+                contact.location_region or "",
+                contact.location_country or "",
+                contact.location_context or "",
+            ]
+            haystack = " ".join(part for part in haystack_parts if part).lower()
+            if needle in haystack:
+                hits.append((contact, 1.0))
+        return hits[:limit]
