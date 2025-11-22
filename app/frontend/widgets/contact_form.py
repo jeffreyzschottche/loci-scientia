@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLineEdit,
     QMessageBox,
+    QPushButton,
 )
 
 
@@ -25,6 +26,7 @@ class ContactFormDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._payload_cache: Optional[Dict[str, Any]] = None
+        self._save_mode: str = "save"
 
         form = QFormLayout(self)
         form.setContentsMargins(16, 16, 16, 16)
@@ -59,10 +61,16 @@ class ContactFormDialog(QDialog):
         form.addRow("Longitude", self.lon_edit)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self
         )
-        buttons.accepted.connect(self.accept)
+        save_button = buttons.button(QDialogButtonBox.Save)
+        if save_button:
+            save_button.setText("Opslaan")
+        buttons.accepted.connect(self._handle_save_clicked)
         buttons.rejected.connect(self.reject)
+        self.save_and_map_button = QPushButton("Opslaan + locatie via kaart")
+        self.save_and_map_button.clicked.connect(self._handle_save_and_map_clicked)
+        buttons.addButton(self.save_and_map_button, QDialogButtonBox.ActionRole)
         form.addRow(buttons)
 
         if initial:
@@ -124,6 +132,14 @@ class ContactFormDialog(QDialog):
         except ValueError:
             return None
 
+    def _handle_save_clicked(self) -> None:
+        self._save_mode = "save"
+        self.accept()
+
+    def _handle_save_and_map_clicked(self) -> None:
+        self._save_mode = "save_and_map"
+        self.accept()
+
     def accept(self) -> None:  # type: ignore[override]
         if not self.name_edit.text().strip():
             QMessageBox.warning(self, "Ongeldig", "Naam is verplicht.")
@@ -150,3 +166,6 @@ class ContactFormDialog(QDialog):
 
     def payload_cache(self) -> Optional[Dict[str, Any]]:
         return self._payload_cache
+
+    def save_mode(self) -> str:
+        return self._save_mode

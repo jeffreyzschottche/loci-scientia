@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 
 from PySide6.QtCore import Qt, QUrl, QObject, Signal, Slot
 from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -13,6 +15,8 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -45,8 +49,26 @@ class MapsPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self._build_map_view(), 1)
+
+        self._active_contact_ids: Set[Any] = set()
+        self._block_contact_signals = False
+        self._contacts_by_id: Dict[Any, dict] = {}
+        self._updating_select_all = False
+        self._pending_contact_id_for_pin: Optional[Any] = None
+
+        content = QWidget()
+        content_layout = QHBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+
+        content_layout.addWidget(self._build_map_view(), 1)
+        content_layout.addWidget(self._build_contacts_panel())
+
+        self.webview.loadFinished.connect(self._handle_map_ready)
+
+        layout.addWidget(content, 1)
         self._last_location: Optional[Dict[str, Any]] = None
+        self._load_contacts_for_map()
 
     def _build_map_view(self) -> QFrame:
         area = QFrame()
@@ -118,6 +140,9 @@ class MapsPage(QWidget):
       cursor: pointer;
       box-shadow: 0 0 8px rgba(0, 0, 0, 0.65);
     }}
+    .loci-marker.contact {{
+      background: #2563eb;
+    }}
   </style>
 </head>
 <body>
@@ -134,6 +159,7 @@ class MapsPage(QWidget):
     let pyBridge = null;
     let pendingPin = false;
     let activePinMarker = null;
+    let contactMarkers = new Map();
 
     const statusOverlay = document.getElementById("status-overlay");
     const showStatus = (message) => {{
@@ -196,6 +222,56 @@ class MapsPage(QWidget):
       if (!window.map) return;
       pendingPin = true;
       showStatus("Klik op de kaart om een locatie te pinnen…");
+    }};
+
+    window.setActiveContacts = (contacts, focusId) => {{
+      if (!window.map) {{
+        return;
+      }}
+      const active = Array.isArray(contacts) ? contacts : [];
+      const nextIds = new Set(active.map((contact) => contact.id));
+      for (const [id, marker] of contactMarkers.entries()) {{
+        if (!nextIds.has(id)) {{
+          marker.remove();
+          contactMarkers.delete(id);
+        }}
+      }}
+      active.forEach((contact) => {{
+        if (contact?.lat == null || contact?.lon == null) {{
+          return;
+        }}
+        let marker = contactMarkers.get(contact.id);
+        if (!marker) {{
+          const el = document.createElement("button");
+          el.className = "loci-marker contact";
+          el.title = contact.name || contact.label || "Contact";
+          marker = new maplibregl.Marker(el)
+            .setLngLat([contact.lon, contact.lat])
+            .addTo(window.map);
+          if (contact.info) {{
+            marker.setPopup(
+              new maplibregl.Popup({{ offset: 18 }}).setText(contact.info)
+            );
+          }}
+          contactMarkers.set(contact.id, marker);
+        }} else {{
+          marker.setLngLat([contact.lon, contact.lat]);
+        }}
+      }});
+      if (focusId !== null && nextIds.has(focusId)) {{
+        const focusContact = active.find((c) => c.id === focusId);
+        if (focusContact) {{
+          window.map.easeTo({{
+            center: [focusContact.lon, focusContact.lat],
+            zoom: Math.max(window.map.getZoom(), 9),
+            duration: 800,
+          }});
+          const marker = contactMarkers.get(focusContact.id);
+          if (marker?.getPopup && marker.getPopup()) {{
+            marker.getPopup().addTo(window.map);
+          }}
+        }}
+      }}
     }};
 
     const datasetBounds = [
@@ -314,6 +390,55 @@ class MapsPage(QWidget):
 
         return area
 
+    def _build_contacts_panel(self) -> QFrame:
+        panel = QFrame()
+        panel.setObjectName("Card")
+        panel.setFixedWidth(300)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        header = QHBoxLayout()
+        title = QLabel("Contacten op kaart")
+        title.setStyleSheet("font-weight:600;")
+        header.addWidget(title)
+        header.addStretch(1)
+        reload = QPushButton("Herlaad")
+        reload.setFixedSize(72, 28)
+        reload.setToolTip("Herlaad contacten")
+        reload.clicked.connect(self._load_contacts_for_map)
+        header.addWidget(reload)
+        layout.addLayout(header)
+
+        self.contacts_hint = QLabel(
+            "Selecteer welke contacten met opgeslagen locatie zichtbaar zijn op de kaart."
+        )
+        self.contacts_hint.setWordWrap(True)
+        self.contacts_hint.setStyleSheet("color:#9ca3af; font-size:12px;")
+        layout.addWidget(self.contacts_hint)
+
+        self.select_all_checkbox = QCheckBox("Alle contacten tonen")
+        self.select_all_checkbox.setTristate(True)
+        self.select_all_checkbox.setEnabled(False)
+        self.select_all_checkbox.stateChanged.connect(self._toggle_select_all)
+        layout.addWidget(self.select_all_checkbox)
+
+        self.contacts_empty = QLabel(
+            "Nog geen contacten met GPS-coördinaten. Koppel een locatie om deze hier te tonen."
+        )
+        self.contacts_empty.setWordWrap(True)
+        self.contacts_empty.setStyleSheet("color:#9ca3af; font-size:12px;")
+        layout.addWidget(self.contacts_empty)
+
+        self.contacts_list = QListWidget()
+        self.contacts_list.setAlternatingRowColors(True)
+        self.contacts_list.itemChanged.connect(self._handle_contact_toggle)
+        layout.addWidget(self.contacts_list, 1)
+
+        self.contacts_empty.hide()
+
+        return panel
+
     def zoom_in(self):
         if hasattr(self, "webview"):
             self.webview.page().runJavaScript(
@@ -326,12 +451,90 @@ class MapsPage(QWidget):
                 "if (window.zoomAroundMapCenter) { window.zoomAroundMapCenter(-0.65); }"
             )
 
+    def _handle_map_ready(self, _ok: bool) -> None:
+        self._sync_contact_markers()
+
     def _start_pin_mode(self) -> None:
         if not hasattr(self, "webview"):
             return
         self.webview.page().runJavaScript(
             "if (window.enablePinMode) { window.enablePinMode(); }"
         )
+
+    def _handle_contact_toggle(self, item: QListWidgetItem) -> None:
+        if self._block_contact_signals:
+            return
+        contact = item.data(Qt.UserRole)
+        if not contact:
+            return
+        contact_id = contact.get("id")
+        if contact_id is None:
+            return
+        checked = item.checkState() == Qt.Checked
+        if checked:
+            self._active_contact_ids.add(contact_id)
+        else:
+            self._active_contact_ids.discard(contact_id)
+        focus_id = contact_id if checked else None
+        self._sync_contact_markers(focus_contact_id=focus_id)
+        self._update_select_all_state()
+
+    def _toggle_select_all(self, state: int) -> None:
+        if self._updating_select_all:
+            return
+        if not hasattr(self, "contacts_list"):
+            return
+        if self.contacts_list.count() == 0:
+            self._update_select_all_state()
+            return
+        if state == Qt.PartiallyChecked:
+            return
+        checked = state == Qt.Checked
+        target_state = Qt.Checked if checked else Qt.Unchecked
+        self._block_contact_signals = True
+        for index in range(self.contacts_list.count()):
+            item = self.contacts_list.item(index)
+            item.setCheckState(target_state)
+        self._block_contact_signals = False
+        if checked:
+            selected_ids: Set[Any] = set()
+            for index in range(self.contacts_list.count()):
+                contact = self.contacts_list.item(index).data(Qt.UserRole) or {}
+                contact_id = contact.get("id")
+                if contact_id is not None:
+                    selected_ids.add(contact_id)
+            self._active_contact_ids = selected_ids
+        else:
+            self._active_contact_ids.clear()
+        self._sync_contact_markers()
+        self._update_select_all_state()
+
+    def _update_select_all_state(self) -> None:
+        if not hasattr(self, "select_all_checkbox") or not hasattr(
+            self, "contacts_list"
+        ):
+            return
+        total = self.contacts_list.count()
+        checked = 0
+        for index in range(self.contacts_list.count()):
+            if self.contacts_list.item(index).checkState() == Qt.Checked:
+                checked += 1
+        if total == 0:
+            state = Qt.Unchecked
+            enabled = False
+        elif checked == 0:
+            state = Qt.Unchecked
+            enabled = True
+        elif checked == total:
+            state = Qt.Checked
+            enabled = True
+        else:
+            state = Qt.PartiallyChecked
+            enabled = True
+        self._updating_select_all = True
+        self.select_all_checkbox.setEnabled(enabled)
+        self.select_all_checkbox.setCheckState(state)
+        self._updating_select_all = False
 
     def _on_location_pinned(self, lon: float, lat: float, info: Dict[str, Any]) -> None:
         self._last_location = {
@@ -381,6 +584,14 @@ class MapsPage(QWidget):
             combo.addItem(person.get("name", "Onbekend"), person)
         form.addRow("Contact", combo)
 
+        preferred_contact_id = self._pending_contact_id_for_pin
+        if preferred_contact_id is not None:
+            for index in range(combo.count()):
+                payload = combo.itemData(index)
+                if payload and payload.get("id") == preferred_contact_id:
+                    combo.setCurrentIndex(index)
+                    break
+
         new_btn = QPushButton("Nieuw contact…")
         form.addRow(new_btn)
 
@@ -400,6 +611,7 @@ class MapsPage(QWidget):
                 return
             dialog.done(1)
             self._update_contact_location(selected, location)
+            self._pending_contact_id_for_pin = None
 
         new_btn.clicked.connect(create_new_contact)
         buttons.accepted.connect(save_location)
@@ -419,6 +631,188 @@ class MapsPage(QWidget):
                 f"Kon contacten niet laden:\n{exc}",
             )
             return []
+
+    def _load_contacts_for_map(self) -> None:
+        contacts = self._fetch_contacts()
+        geocoded = [
+            contact
+            for contact in contacts
+            if contact.get("location_lat") is not None
+            and contact.get("location_lon") is not None
+        ]
+        geocoded.sort(key=lambda person: (person.get("name") or "").lower())
+        self._contacts_by_id = {contact.get("id"): contact for contact in geocoded}
+        previous_selection = set(self._active_contact_ids)
+
+        self._block_contact_signals = True
+        self.contacts_list.clear()
+        for person in geocoded:
+            item = QListWidgetItem(self._contact_list_label(person))
+            item.setData(Qt.UserRole, person)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            if person.get("id") in previous_selection:
+                item.setCheckState(Qt.Checked)
+            else:
+                item.setCheckState(Qt.Unchecked)
+            tooltip = self._contact_tooltip(person)
+            if tooltip:
+                item.setToolTip(tooltip)
+            self.contacts_list.addItem(item)
+        self._block_contact_signals = False
+
+        has_contacts = bool(geocoded)
+        self.contacts_list.setVisible(has_contacts)
+        self.contacts_empty.setVisible(not has_contacts)
+        self._active_contact_ids = {
+            person_id
+            for person_id in previous_selection
+            if person_id in self._contacts_by_id and person_id is not None
+        }
+        self._update_select_all_state()
+        self._sync_contact_markers()
+
+    def _contact_list_label(self, contact: dict) -> str:
+        name = contact.get("name") or "Onbekend"
+        context_bits = [
+            contact.get("location_label") or contact.get("location_street"),
+            contact.get("location_city"),
+            contact.get("location_country"),
+        ]
+        context = ", ".join([bit for bit in context_bits if bit])
+        return f"{name}\n{context}" if context else name
+
+    def _contact_tooltip(self, contact: dict) -> str:
+        lat = contact.get("location_lat")
+        lon = contact.get("location_lon")
+        if lat is None or lon is None:
+            return ""
+        label = contact.get("location_label") or contact.get("location_city") or ""
+        coords = f"GPS: {lat:.5f}, {lon:.5f}"
+        return f"{label}\n{coords}" if label else coords
+
+    def _contact_marker_payload(self, contact: dict) -> Optional[Dict[str, Any]]:
+        lat = contact.get("location_lat")
+        lon = contact.get("location_lon")
+        if lat is None or lon is None:
+            return None
+        name = contact.get("name") or "Contact"
+        location_bits = [
+            contact.get("location_label") or contact.get("location_street"),
+            contact.get("location_city"),
+            contact.get("location_country"),
+        ]
+        location_text = ", ".join([bit for bit in location_bits if bit])
+        popup_text = name if not location_text else f"{name}\n{location_text}"
+        return {
+            "id": contact.get("id"),
+            "name": contact.get("name"),
+            "label": contact.get("location_label"),
+            "lat": lat,
+            "lon": lon,
+            "info": popup_text,
+        }
+
+    def _sync_contact_markers(self, *, focus_contact_id: Optional[Any] = None) -> None:
+        if not hasattr(self, "webview") or not hasattr(self, "contacts_list"):
+            return
+        active_payloads: List[Dict[str, Any]] = []
+        for index in range(self.contacts_list.count()):
+            item = self.contacts_list.item(index)
+            if item.checkState() != Qt.Checked:
+                continue
+            contact = item.data(Qt.UserRole)
+            payload = self._contact_marker_payload(contact or {})
+            if payload:
+                active_payloads.append(payload)
+        contacts_json = json.dumps(active_payloads)
+        focus_arg = "null" if focus_contact_id is None else json.dumps(focus_contact_id)
+        script = (
+            f"if (window.setActiveContacts) {{ window.setActiveContacts({contacts_json}, {focus_arg}); }}"
+        )
+        self.webview.page().runJavaScript(script)
+
+    def _find_contact_item(self, contact_id: Any) -> Optional[QListWidgetItem]:
+        for index in range(self.contacts_list.count()):
+            item = self.contacts_list.item(index)
+            contact = item.data(Qt.UserRole) or {}
+            if contact.get("id") == contact_id:
+                return item
+        return None
+
+    def _set_contact_checked(self, contact_id: Any, checked: bool) -> None:
+        item = self._find_contact_item(contact_id)
+        if not item:
+            return
+        state = Qt.Checked if checked else Qt.Unchecked
+        if item.checkState() == state:
+            return
+        self._block_contact_signals = True
+        item.setCheckState(state)
+        self._block_contact_signals = False
+        if checked:
+            self._active_contact_ids.add(contact_id)
+        else:
+            self._active_contact_ids.discard(contact_id)
+
+    def _append_contact_item(self, contact: dict) -> None:
+        self._contacts_by_id[contact.get("id")] = contact
+        item = QListWidgetItem(self._contact_list_label(contact))
+        item.setData(Qt.UserRole, contact)
+        item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+        item.setCheckState(Qt.Unchecked)
+        tooltip = self._contact_tooltip(contact)
+        if tooltip:
+            item.setToolTip(tooltip)
+        self.contacts_list.addItem(item)
+        self.contacts_list.show()
+        self.contacts_empty.hide()
+
+    def focus_on_contact(self, contact: dict) -> None:
+        if not contact:
+            return
+        contact_id = contact.get("id")
+        if contact_id is None:
+            return
+        if contact.get("location_lat") is None or contact.get("location_lon") is None:
+            QMessageBox.information(
+                self,
+                "Geen locatie",
+                "Dit contact heeft geen GPS-locatie om te tonen.",
+            )
+            return
+        self._load_contacts_for_map()
+        if self._find_contact_item(contact_id) is None:
+            self._append_contact_item(contact)
+        self._set_contact_checked(contact_id, True)
+        item = self._find_contact_item(contact_id)
+        if item:
+            self.contacts_list.scrollToItem(item)
+        self._sync_contact_markers(focus_contact_id=contact_id)
+
+    def request_location_for_contact(self, contact: dict) -> None:
+        if not contact:
+            return
+        contact_id = contact.get("id")
+        if contact_id is None:
+            QMessageBox.warning(
+                self,
+                "Contact onbekend",
+                "Dit contact kan niet gekoppeld worden omdat het geen ID heeft.",
+            )
+            return
+        lat = contact.get("location_lat")
+        lon = contact.get("location_lon")
+        if lat is not None and lon is not None:
+            self.focus_on_contact(contact)
+            return
+        self._pending_contact_id_for_pin = contact_id
+        name = contact.get("name") or "dit contact"
+        QMessageBox.information(
+            self,
+            "Locatie koppelen",
+            f"Selecteer op de kaart een locatie voor {name}.",
+        )
+        self._start_pin_mode()
 
     def _location_payload(self, location: Dict[str, Any]) -> Dict[str, Any]:
         return {

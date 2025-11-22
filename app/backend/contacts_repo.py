@@ -1,5 +1,6 @@
 import os
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -14,6 +15,16 @@ from .schemas import Contact, ContactCreate, ContactPatch
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 QDRANT_LOCAL_DIR = _PROJECT_ROOT / "qdrant_storage"
 QDRANT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@lru_cache(maxsize=None)
+def _cached_local_client(path: str) -> QdrantClient:
+    return QdrantClient(path=path)
+
+
+@lru_cache(maxsize=None)
+def _cached_remote_client(host: str, port: int, api_key: Optional[str]) -> QdrantClient:
+    return QdrantClient(host=host, port=port, api_key=api_key or None)
 
 
 def _get_qdrant_client(embedded_path: Optional[Path] = None) -> QdrantClient:
@@ -31,11 +42,11 @@ def _get_qdrant_client(embedded_path: Optional[Path] = None) -> QdrantClient:
         else:
             db_path = embedded_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        return QdrantClient(path=str(db_path))
+        return _cached_local_client(str(db_path))
 
     port = int(os.getenv("QDRANT_PORT", "6333"))
     api_key = os.getenv("QDRANT_API_KEY") or None
-    return QdrantClient(host=host, port=port, api_key=api_key)
+    return _cached_remote_client(host, port, api_key)
 
 
 class ContactsRepository:
@@ -47,12 +58,9 @@ class ContactsRepository:
         self._embedded_path = (
             Path(env_path) if env_path else QDRANT_LOCAL_DIR / "contacts_db"
         )
-        self._client: Optional[QdrantClient] = None
 
     def _client_instance(self) -> QdrantClient:
-        if self._client is None:
-            self._client = _get_qdrant_client(self._embedded_path)
-        return self._client
+        return _get_qdrant_client(self._embedded_path)
 
     def _ensure_collection(self, vector_size: int) -> None:
         """Zorg dat de collectie bestaat."""

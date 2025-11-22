@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -22,9 +22,13 @@ from .contact_form import ContactFormDialog
 
 
 class ContactsPage(QWidget):
+    view_on_map_requested = Signal(dict)
+    add_location_requested = Signal(dict)
+
     def __init__(self):
         super().__init__()
         self.contacts: list[dict] = []
+        self.current_contact: dict | None = None
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
@@ -98,13 +102,31 @@ class ContactsPage(QWidget):
         layout.addWidget(self.location_summary)
         layout.addWidget(self.location_coords)
 
+        self.add_location_btn = QPushButton("Voeg locatie toe via kaart")
+        self.add_location_btn.setEnabled(False)
+        self.add_location_btn.clicked.connect(self._request_location_assignment)
+        layout.addWidget(self.add_location_btn, 0, Qt.AlignLeft)
+        self.add_location_btn.hide()
+
+        self.view_on_map_btn = QPushButton("Bekijk op kaart")
+        self.view_on_map_btn.setEnabled(False)
+        self.view_on_map_btn.clicked.connect(self._open_map_for_contact)
+        layout.addWidget(self.view_on_map_btn, 0, Qt.AlignLeft)
+        self.view_on_map_btn.hide()
+
         layout.addStretch(1)
         return card
 
     def _update_detail(self, index: int) -> None:
         if index < 0 or index >= len(self.contacts):
+            self.current_contact = None
+            self.view_on_map_btn.setEnabled(False)
+            self.view_on_map_btn.hide()
+            self.add_location_btn.setEnabled(False)
+            self.add_location_btn.hide()
             return
         contact = self.contacts[index]
+        self.current_contact = contact
         self.name.setText(contact.get("name", ""))
         self.company.setText(contact.get("company", ""))
         self.email.setText(f"✉ {contact.get('email', '')}")
@@ -114,6 +136,13 @@ class ContactsPage(QWidget):
         summary, coords = self._format_location(contact)
         self.location_summary.setText(summary)
         self.location_coords.setText(coords)
+        has_coords = contact.get("location_lat") is not None and contact.get(
+            "location_lon"
+        ) is not None
+        self.view_on_map_btn.setEnabled(has_coords)
+        self.view_on_map_btn.setVisible(has_coords)
+        self.add_location_btn.setVisible(not has_coords)
+        self.add_location_btn.setEnabled(not has_coords)
 
     def _format_location(self, contact: dict) -> tuple[str, str]:
         label = contact.get("location_label") or contact.get("location_street")
@@ -133,6 +162,25 @@ class ContactsPage(QWidget):
             coords = f"GPS: {lat:.5f}, {lon:.5f}"
         return summary, coords
 
+    def _open_map_for_contact(self) -> None:
+        if not self.current_contact:
+            return
+        lat = self.current_contact.get("location_lat")
+        lon = self.current_contact.get("location_lon")
+        if lat is None or lon is None:
+            QMessageBox.information(
+                self,
+                "Geen locatie",
+                "Dit contact heeft nog geen GPS-locatie.",
+            )
+            return
+        self.view_on_map_requested.emit(self.current_contact)
+
+    def _request_location_assignment(self) -> None:
+        if not self.current_contact:
+            return
+        self.add_location_requested.emit(self.current_contact)
+
     def _reload_contacts(self) -> None:
         try:
             resp = requests.get(f"{BACKEND_HTTP}/contacts", timeout=BACKEND_TIMEOUT)
@@ -149,6 +197,12 @@ class ContactsPage(QWidget):
         if self.contacts:
             self.list_widget.setCurrentRow(0)
             self._update_detail(0)
+        else:
+            self.current_contact = None
+            self.view_on_map_btn.setEnabled(False)
+            self.view_on_map_btn.hide()
+            self.add_location_btn.setEnabled(False)
+            self.add_location_btn.hide()
 
     def _open_add_dialog(self) -> None:
         dialog = ContactFormDialog(self)
@@ -156,6 +210,7 @@ class ContactsPage(QWidget):
             return
 
         payload = dialog.payload()
+        mode = dialog.save_mode()
         try:
             resp = requests.post(
                 f"{BACKEND_HTTP}/contacts", json=payload, timeout=BACKEND_TIMEOUT
@@ -174,3 +229,16 @@ class ContactsPage(QWidget):
         self.list_widget.addItem(QListWidgetItem(contact.get("name", "Onbekend")))
         self.count_label.setText(f"{len(self.contacts)} contacten")
         self.list_widget.setCurrentRow(len(self.contacts) - 1)
+        needs_location = contact.get("location_lat") is None or contact.get(
+            "location_lon"
+        ) is None
+        link_via_map = mode == "save_and_map" and needs_location
+        if needs_location and not link_via_map:
+            choice = QMessageBox.question(
+                self,
+                "Locatie toevoegen",
+                "Contact is opgeslagen. Wil je nu een locatie koppelen via de kaart?",
+            )
+            link_via_map = choice == QMessageBox.Yes
+        if link_via_map:
+            self.add_location_requested.emit(contact)

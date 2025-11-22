@@ -244,6 +244,15 @@ class MainWindow(QMainWindow):
             "faq": FAQPage(),
         }
 
+        contacts_page = self.pages["contacts"]
+        if isinstance(contacts_page, ContactsPage):
+            contacts_page.view_on_map_requested.connect(
+                self._handle_view_on_map_request
+            )
+            contacts_page.add_location_requested.connect(
+                self._handle_add_location_request
+            )
+
         self.content = QWidget()
         
         # Oplossing 2: Zorg ervoor dat de content container ook transparant is
@@ -262,9 +271,23 @@ class MainWindow(QMainWindow):
         self.sidebar.navigate.connect(self.show_page)
         self.sidebar.set_current("chat")
         self.show_page("chat")
-        
+
         # Pas de DARK_QSS toe op de gehele MainWindow (behalve waar overschreven)
         self.setStyleSheet(DARK_QSS) 
+
+    def _handle_view_on_map_request(self, contact: dict) -> None:
+        maps_page = self.pages.get("maps")
+        if isinstance(maps_page, MapsPage):
+            maps_page.focus_on_contact(contact)
+        self.sidebar.set_current("maps")
+        self.show_page("maps")
+
+    def _handle_add_location_request(self, contact: dict) -> None:
+        maps_page = self.pages.get("maps")
+        if isinstance(maps_page, MapsPage):
+            maps_page.request_location_for_contact(contact)
+        self.sidebar.set_current("maps")
+        self.show_page("maps")
 
     def show_page(self, key: str):
         for name, page in self.pages.items():

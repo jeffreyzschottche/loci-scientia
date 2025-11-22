@@ -4,6 +4,13 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
+if [ -f ".env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source .env
+    set +a
+fi
+
 # Zorg dat er een virtuele omgeving is en dat requirements éénmaal geïnstalleerd zijn.
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
@@ -45,7 +52,12 @@ backend_pid=$!
 
 # pmtiles config – serve app/maps zodat tiles altijd gevonden worden
 PMTILES_PORT=8080
-PMTILES_DIR="$PROJECT_ROOT/app/maps"
+DEFAULT_PMTILES_DIR="$PROJECT_ROOT/app/maps"
+PMTILES_DIR="${PMTILES_DATA_DIR:-$DEFAULT_PMTILES_DIR}"
+if [ ! -d "$PMTILES_DIR" ]; then
+    echo "⚠️  opgegeven PMTiles-pad '$PMTILES_DIR' bestaat niet."
+    echo "    Pas PMTILES_DATA_DIR in .env aan of controleer of de schijf aangekoppeld is."
+fi
 pmtiles_log="$PROJECT_ROOT/pmtiles.log"
 
 # voorkom dat een oude pmtiles-server op dezelfde poort blijft draaien
