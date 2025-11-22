@@ -1,16 +1,10 @@
-import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWidgets import (
-    QComboBox,
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -22,77 +16,10 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 class MapsPage(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
-
-        layout.addWidget(self._build_sidebar(), 0)
+        layout.setSpacing(0)
         layout.addWidget(self._build_map_view(), 1)
-
-    # ---------------------------------------------------------
-    # SIDEBAR
-    # ---------------------------------------------------------
-    def _build_sidebar(self) -> QFrame:
-        side = QFrame()
-        side.setObjectName("Card")
-        side_layout = QVBoxLayout(side)
-        side_layout.setContentsMargins(16, 16, 16, 16)
-        side_layout.setSpacing(16)
-
-        search = QLineEdit()
-        search.setPlaceholderText("Zoek locatie…")
-        search.returnPressed.connect(self._handle_search)
-        self._search_input = search
-        side_layout.addWidget(search)
-
-        combo_layout = QHBoxLayout()
-        combo_layout.setContentsMargins(0, 0, 0, 0)
-        combo_layout.setSpacing(8)
-
-        layer_label = QLabel("Kaartlaag")
-        layer_label.setStyleSheet("color:#9ca3af;")
-        self.layer_combo = QComboBox()
-        self.layer_combo.addItems(["Standaard", "Satelliet", "Hoogte"])
-        combo_layout.addWidget(layer_label)
-        combo_layout.addStretch(1)
-        combo_layout.addWidget(self.layer_combo)
-        side_layout.addLayout(combo_layout)
-
-        current_btn = QPushButton("Huidige Locatie")
-        current_btn.setStyleSheet(
-            "background:#2563eb; color:white; border-radius:8px; padding:8px;"
-        )
-        side_layout.addWidget(current_btn)
-
-        side_layout.addWidget(QLabel("Gedownloade Regio's"))
-        region_list = QListWidget()
-        for name, size, status in [
-            ("Nederland", "1.2 GB", "Offline"),
-            ("België", "890 MB", "Offline"),
-            ("Duitsland", "3.4 GB", "Download beschikbaar"),
-        ]:
-            item = QListWidgetItem(f"{name} • {size} • {status}")
-            region_list.addItem(item)
-        side_layout.addWidget(region_list, 1)
-
-        download_btn = QPushButton("Nieuwe Regio Downloaden")
-        download_btn.setStyleSheet(
-            "border:1px solid #374151; color:white; border-radius:8px; padding:8px;"
-        )
-        side_layout.addWidget(download_btn)
-
-        storage = QFrame()
-        storage_layout = QVBoxLayout(storage)
-        storage_layout.setContentsMargins(0, 0, 0, 0)
-        storage_label = QLabel("Kaartdata Opslag: 2.1 / 256 GB")
-        storage_label.setStyleSheet("color:#9ca3af;")
-        storage_bar = QLabel("████░░░░░░░░░░░░")
-        storage_bar.setStyleSheet("font-family: monospace; color:#2563eb;")
-        storage_layout.addWidget(storage_label)
-        storage_layout.addWidget(storage_bar)
-        side_layout.addWidget(storage)
-
-        return side
 
     # ---------------------------------------------------------
     # MAP VIEW (QWebEngineView + MapLibre + style.json van schijf)
@@ -154,18 +81,6 @@ class MapsPage(QWidget):
     .maplibregl-ctrl-logo {
       display: none !important;
     }
-    .loci-marker {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid white;
-      background: #f59e0b;
-      cursor: pointer;
-      box-shadow: 0 0 6px rgba(0, 0, 0, 0.65);
-    }
-    .loci-marker.primary {
-      background: #2563eb;
-    }
   </style>
 </head>
 <body>
@@ -190,76 +105,6 @@ class MapsPage(QWidget):
       statusOverlay.classList.add("hidden");
     };
 
-    const searchMarkers = [];
-    const clearSearchMarkers = () => {
-      while (searchMarkers.length) {
-        const entry = searchMarkers.pop();
-        entry.marker.remove();
-      }
-    };
-
-    const focusFeature = (feature, animate = true) => {
-      if (!window.map || !feature || !feature.geometry || !feature.geometry.coordinates) {
-        return;
-      }
-      const [lon, lat] = feature.geometry.coordinates;
-      const targetZoom = Math.max(window.map.getZoom(), 11.5);
-      window.map.easeTo({
-        center: [lon, lat],
-        zoom: targetZoom,
-        duration: animate ? 1200 : 0,
-      });
-    };
-
-    window.searchPlace = async (query) => {
-      const trimmed = (query || "").trim();
-      if (!trimmed) {
-        showStatus("Voer een plaatsnaam in.");
-        setTimeout(() => hideStatus(), 2000);
-        return;
-      }
-      showStatus(`Zoeken naar “${trimmed}”…`);
-      clearSearchMarkers();
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?format=geojson&limit=5&addressdetails=1&q=${encodeURIComponent(trimmed)}`;
-        const response = await fetch(url, {
-          headers: {
-            "Accept-Language": "nl",
-          },
-        });
-        if (!response.ok) {
-          throw new Error(`Status ${response.status}`);
-        }
-        const result = await response.json();
-        const features = result.features || [];
-        if (!features.length) {
-          showStatus("Geen locaties gevonden.");
-          setTimeout(() => hideStatus(), 2000);
-          return;
-        }
-        hideStatus();
-        features.forEach((feature, index) => {
-          const coords = feature.geometry?.coordinates;
-          if (!coords || coords.length < 2) {
-            return;
-          }
-          const el = document.createElement("button");
-          el.className = index === 0 ? "loci-marker primary" : "loci-marker";
-          el.title = feature.properties?.display_name || trimmed;
-          el.addEventListener("click", () => focusFeature(feature, true));
-          const marker = new maplibregl.Marker(el).setLngLat([coords[0], coords[1]]).addTo(window.map);
-          searchMarkers.push({ marker, feature });
-          if (index === 0) {
-            focusFeature(feature, false);
-          }
-        });
-      } catch (error) {
-        console.error(error);
-        showStatus("Zoekopdracht mislukt. Controleer je internetverbinding.");
-        setTimeout(() => hideStatus(), 2500);
-      }
-    };
-
     const zoomAroundCenter = (delta) => {
       if (!window.map) {
         return;
@@ -276,7 +121,6 @@ class MapsPage(QWidget):
       [-25, 34],
       [45, 72]
     ];
-    const datasetPadding = 0;
     const datasetCenter = [10, 50];
 
     window.map = new maplibregl.Map({
@@ -374,14 +218,3 @@ class MapsPage(QWidget):
             self.webview.page().runJavaScript(
                 "if (window.zoomAroundMapCenter) { window.zoomAroundMapCenter(-0.65); }"
             )
-
-    def _handle_search(self):
-        if not hasattr(self, "_search_input") or not hasattr(self, "webview"):
-            return
-        query = self._search_input.text().strip()
-        if not query:
-            return
-        safe_query = json.dumps(query)
-        self.webview.page().runJavaScript(
-            f"if (window.searchPlace) window.searchPlace({safe_query});"
-        )
