@@ -1,13 +1,13 @@
 import os
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from .rag.embedder import embed_text
-from .schemas import Contact, ContactCreate
+from .schemas import Contact, ContactCreate, ContactPatch
 
 # Zorg dat er in het project een map bestaat waar je Qdrant-data
 # aan kunt koppelen via Docker (-v ...:/qdrant/storage).
@@ -47,17 +47,17 @@ class ContactsRepository:
         self._embedded_path = (
             Path(env_path) if env_path else QDRANT_LOCAL_DIR / "contacts_db"
         )
+        self._client: Optional[QdrantClient] = None
+
+    def _client_instance(self) -> QdrantClient:
+        if self._client is None:
+            self._client = _get_qdrant_client(self._embedded_path)
+        return self._client
 
     def _ensure_collection(self, vector_size: int) -> None:
-        """Zorg dat de collectie bestaat.
+        """Zorg dat de collectie bestaat."""
 
-        We gebruiken een vaste vectorgrootte voor contacten. Als de
-        collectie nog niet bestaat, maken we deze aan. We doen verder
-        geen automatische migraties; bij schemawijzigingen kun je de
-        embedded database-map éénmalig verwijderen.
-        """
-
-        client = _get_qdrant_client(self._embedded_path)
+        client = self._client_instance()
         try:
             client.get_collection(self.collection)
         except Exception:
@@ -69,8 +69,48 @@ class ContactsRepository:
                 ),
             )
 
+    def _contact_from_payload(self, payload: Dict, fallback_id: Optional[str] = None) -> Contact:
+        return Contact(
+            id=str(payload.get("id") or fallback_id or uuid.uuid4().hex),
+            name=payload.get("name", ""),
+            company=payload.get("company", ""),
+            email=payload.get("email", ""),
+            phone=payload.get("phone", ""),
+            notes=payload.get("notes", ""),
+            location_label=payload.get("location_label"),
+            location_street=payload.get("location_street"),
+            location_city=payload.get("location_city"),
+            location_region=payload.get("location_region"),
+            location_country=payload.get("location_country"),
+            location_lat=payload.get("location_lat"),
+            location_lon=payload.get("location_lon"),
+            location_context=payload.get("location_context"),
+        )
+
+    def _embedding_text(self, payload: Dict) -> str:
+        parts: List[str] = []
+        for key in (
+            "name",
+            "company",
+            "email",
+            "phone",
+            "notes",
+            "location_label",
+            "location_street",
+            "location_city",
+            "location_region",
+            "location_country",
+            "location_context",
+        ):
+            value = payload.get(key)
+            if value:
+                parts.append(str(value))
+        if payload.get("location_lat") is not None and payload.get("location_lon") is not None:
+            parts.append(f"{payload['location_lat']}, {payload['location_lon']}")
+        return "\n".join(parts)
+
     def list_contacts(self) -> List[Contact]:
-        client = _get_qdrant_client(self._embedded_path)
+        client = self._client_instance()
         try:
             points, _ = client.scroll(
                 collection_name=self.collection,
@@ -86,48 +126,22 @@ class ContactsRepository:
             payload = point.payload or {}
             try:
                 contacts.append(
-                    Contact(
-                        id=str(payload.get("id") or point.id),
-                        name=payload["name"],
-                        company=payload.get("company", ""),
-                        email=payload.get("email", ""),
-                        phone=payload.get("phone", ""),
-                        notes=payload.get("notes", ""),
-                    )
+                    self._contact_from_payload(payload, fallback_id=str(point.id))
                 )
             except KeyError:
                 continue
         return contacts
 
     def create_contact(self, data: ContactCreate) -> Contact:
-        # Bouw een beschrijving van het contact op en genereer een
-        # embeddingvector via de FastEmbed-pipeline, zodat we later
-        # semantische zoekacties kunnen doen over contacten.
-        text = "\n".join(
-            [
-                data.name,
-                data.company,
-                data.email,
-                data.phone,
-                data.notes,
-            ]
-        )
-        embedding = embed_text(text)
-        vector = list(embedding.vector)
-        vector_size = len(vector)
-        self._ensure_collection(vector_size)
-
+        payload = data.model_dump()
         cid = uuid.uuid4().hex
-        payload = {
-            "id": cid,
-            "name": data.name,
-            "company": data.company,
-            "email": data.email,
-            "phone": data.phone,
-            "notes": data.notes,
-        }
+        payload["id"] = cid
 
-        client = _get_qdrant_client(self._embedded_path)
+        embedding = embed_text(self._embedding_text(payload))
+        vector = list(embedding.vector)
+        self._ensure_collection(len(vector))
+
+        client = self._client_instance()
         client.upsert(
             collection_name=self.collection,
             points=[
@@ -139,13 +153,48 @@ class ContactsRepository:
             ],
         )
 
-        return Contact(id=cid, **data.model_dump())
+        return self._contact_from_payload(payload)
+
+    def update_contact(self, contact_id: str, patch: ContactPatch) -> Contact:
+        client = self._client_instance()
+        existing = client.retrieve(
+            collection_name=self.collection,
+            ids=[contact_id],
+            with_payload=True,
+            with_vectors=False,
+        )
+        if not existing:
+            raise ValueError("contact not found")
+
+        payload = existing[0].payload or {}
+        payload.setdefault("id", contact_id)
+
+        updates = patch.model_dump(exclude_unset=True)
+        payload.update(updates)
+
+        text = self._embedding_text(payload)
+        embedding = embed_text(text)
+        vector = list(embedding.vector)
+        self._ensure_collection(len(vector))
+
+        client.upsert(
+            collection_name=self.collection,
+            points=[
+                PointStruct(
+                    id=payload["id"],
+                    vector=vector,
+                    payload=payload,
+                )
+            ],
+        )
+
+        return self._contact_from_payload(payload)
 
     def search_contacts(self, query: str, limit: int = 3) -> list[tuple[Contact, float]]:
         """Zoek naar contacten die qua embedding het dichtst bij *query* liggen."""
 
         vector = embed_text(query).vector
-        client = _get_qdrant_client(self._embedded_path)
+        client = self._client_instance()
         try:
             response = client.query_points(
                 collection_name=self.collection,
@@ -160,14 +209,7 @@ class ContactsRepository:
         for hit in response.points:
             payload = hit.payload or {}
             try:
-                contact = Contact(
-                    id=str(payload.get("id") or hit.id),
-                    name=payload["name"],
-                    company=payload.get("company", ""),
-                    email=payload.get("email", ""),
-                    phone=payload.get("phone", ""),
-                    notes=payload.get("notes", ""),
-                )
+                contact = self._contact_from_payload(payload, fallback_id=str(hit.id))
             except KeyError:
                 continue
             score = hit.score or 0.0

@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -17,13 +17,14 @@ from PySide6.QtWidgets import (
 
 import requests
 
-BACKEND_HTTP = "http://127.0.0.1:8000"
+from ..config import BACKEND_HTTP, BACKEND_TIMEOUT
+from .contact_form import ContactFormDialog
 
 
 class ContactsPage(QWidget):
     def __init__(self):
         super().__init__()
-        self.contacts = []
+        self.contacts: list[dict] = []
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
@@ -84,22 +85,57 @@ class ContactsPage(QWidget):
         self.notes.setWordWrap(True)
         self.notes.setStyleSheet("color:#9ca3af;")
         layout.addWidget(self.notes)
+
+        self.location_title = QLabel("Locatie")
+        self.location_title.setStyleSheet("font-weight:600; margin-top:16px;")
+        self.location_summary = QLabel("Nog geen locatie gekoppeld.")
+        self.location_summary.setWordWrap(True)
+        self.location_summary.setStyleSheet("color:#9ca3af;")
+        self.location_coords = QLabel()
+        self.location_coords.setStyleSheet("color:#9ca3af; font-size:11px;")
+
+        layout.addWidget(self.location_title)
+        layout.addWidget(self.location_summary)
+        layout.addWidget(self.location_coords)
+
         layout.addStretch(1)
         return card
 
-    def _update_detail(self, index: int):
+    def _update_detail(self, index: int) -> None:
         if index < 0 or index >= len(self.contacts):
             return
         contact = self.contacts[index]
-        self.name.setText(contact["name"])
-        self.company.setText(contact["company"])
-        self.email.setText(f"✉ {contact['email']}")
-        self.phone.setText(f"☎ {contact['phone']}")
+        self.name.setText(contact.get("name", ""))
+        self.company.setText(contact.get("company", ""))
+        self.email.setText(f"✉ {contact.get('email', '')}")
+        self.phone.setText(f"☎ {contact.get('phone', '')}")
         self.notes.setText(contact.get("notes", ""))
+
+        summary, coords = self._format_location(contact)
+        self.location_summary.setText(summary)
+        self.location_coords.setText(coords)
+
+    def _format_location(self, contact: dict) -> tuple[str, str]:
+        label = contact.get("location_label") or contact.get("location_street")
+        city = contact.get("location_city")
+        region = contact.get("location_region")
+        country = contact.get("location_country")
+        lat = contact.get("location_lat")
+        lon = contact.get("location_lon")
+        context_bits = [bit for bit in [city, region, country] if bit]
+        summary = label or city or "Nog geen locatie gekoppeld."
+        if label and context_bits:
+            summary = f"{label} — {', '.join(context_bits)}"
+        elif context_bits and not label:
+            summary = ", ".join(context_bits)
+        coords = ""
+        if lat is not None and lon is not None:
+            coords = f"GPS: {lat:.5f}, {lon:.5f}"
+        return summary, coords
 
     def _reload_contacts(self) -> None:
         try:
-            resp = requests.get(f"{BACKEND_HTTP}/contacts", timeout=5)
+            resp = requests.get(f"{BACKEND_HTTP}/contacts", timeout=BACKEND_TIMEOUT)
             resp.raise_for_status()
             self.contacts = resp.json()
         except Exception:
@@ -107,7 +143,7 @@ class ContactsPage(QWidget):
 
         self.list_widget.clear()
         for person in self.contacts:
-            item = QListWidgetItem(person["name"])
+            item = QListWidgetItem(person.get("name", "Onbekend"))
             self.list_widget.addItem(item)
         self.count_label.setText(f"{len(self.contacts)} contacten")
         if self.contacts:
@@ -115,48 +151,15 @@ class ContactsPage(QWidget):
             self._update_detail(0)
 
     def _open_add_dialog(self) -> None:
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Nieuw contact")
-
-        form = QFormLayout(dialog)
-        name_edit = QLineEdit()
-        company_edit = QLineEdit()
-        email_edit = QLineEdit()
-        phone_edit = QLineEdit()
-        notes_edit = QLineEdit()
-
-        form.addRow("Naam", name_edit)
-        form.addRow("Bedrijf", company_edit)
-        form.addRow("E-mail", email_edit)
-        form.addRow("Telefoon", phone_edit)
-        form.addRow("Notities", notes_edit)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog
-        )
-        form.addRow(buttons)
-
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-
+        dialog = ContactFormDialog(self)
         if dialog.exec() != QDialog.Accepted:
             return
 
-        name = name_edit.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Ongeldig", "Naam is verplicht.")
-            return
-
-        payload = {
-            "name": name,
-            "company": company_edit.text().strip(),
-            "email": email_edit.text().strip(),
-            "phone": phone_edit.text().strip(),
-            "notes": notes_edit.text().strip(),
-        }
-
+        payload = dialog.payload()
         try:
-            resp = requests.post(f"{BACKEND_HTTP}/contacts", json=payload, timeout=5)
+            resp = requests.post(
+                f"{BACKEND_HTTP}/contacts", json=payload, timeout=BACKEND_TIMEOUT
+            )
             resp.raise_for_status()
             contact = resp.json()
         except Exception as exc:
@@ -168,6 +171,6 @@ class ContactsPage(QWidget):
             return
 
         self.contacts.append(contact)
-        self.list_widget.addItem(QListWidgetItem(contact["name"]))
+        self.list_widget.addItem(QListWidgetItem(contact.get("name", "Onbekend")))
         self.count_label.setText(f"{len(self.contacts)} contacten")
         self.list_widget.setCurrentRow(len(self.contacts) - 1)

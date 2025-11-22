@@ -8,21 +8,44 @@ class ChatRequest(BaseModel):
     max_new_tokens: int = 128
 
 
-class Contact(BaseModel):
+class ContactBase(BaseModel):
+    name: str
+    company: str
+    email: str
+    phone: str
+    notes: str = ""
+    location_label: Optional[str] = None
+    location_street: Optional[str] = None
+    location_city: Optional[str] = None
+    location_region: Optional[str] = None
+    location_country: Optional[str] = None
+    location_lat: Optional[float] = None
+    location_lon: Optional[float] = None
+    location_context: Optional[str] = None
+
+
+class Contact(ContactBase):
     id: str
-    name: str
-    company: str
-    email: str
-    phone: str
-    notes: str = ""
 
 
-class ContactCreate(BaseModel):
-    name: str
-    company: str
-    email: str
-    phone: str
-    notes: str = ""
+class ContactCreate(ContactBase):
+    pass
+
+
+class ContactPatch(BaseModel):
+    name: Optional[str] = None
+    company: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+    location_label: Optional[str] = None
+    location_street: Optional[str] = None
+    location_city: Optional[str] = None
+    location_region: Optional[str] = None
+    location_country: Optional[str] = None
+    location_lat: Optional[float] = None
+    location_lon: Optional[float] = None
+    location_context: Optional[str] = None
 
 
 class Device(BaseModel):

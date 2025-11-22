@@ -1,13 +1,13 @@
 INFO:     Will watch for changes in these directories: ['/Users/jeffreyzschottche/Sites/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [34038] using WatchFiles
+INFO:     Started reloader process [36879] using WatchFiles
 /Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
   warnings.warn(
-INFO:     Started server process [34045]
+INFO:     Started server process [36886]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:58011 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58013 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58015 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58016 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58017 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58914 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58917 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58920 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58921 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58922 - "GET /devices HTTP/1.1" 200 OK

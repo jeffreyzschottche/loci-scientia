@@ -12,6 +12,7 @@ from .schemas import (
     ChatRequest,
     Contact,
     ContactCreate,
+    ContactPatch,
     Device,
     DeviceCreate,
 )
@@ -76,6 +77,19 @@ def create_contact(data: ContactCreate):
     except Exception as exc:  # pragma: no cover - simple error surface
         # Log de volledige traceback zodat we fouten in Qdrant of
         # het opslagpad kunnen debuggen.
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.patch("/contacts/{contact_id}", response_model=Contact)
+def patch_contact(contact_id: str, patch: ContactPatch):
+    try:
+        return contacts_repo.update_contact(contact_id, patch)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="contact not found")
+    except Exception as exc:  # pragma: no cover
         import traceback
 
         traceback.print_exc()
