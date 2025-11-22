@@ -77,6 +77,8 @@ class MapsPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
 
         self.webview = QWebEngineView()
+        self._project_root = Path(__file__).resolve().parents[2]
+        self._assets_dir = self._project_root / "app" / "frontend" / "assets"
 
         self.bridge = MapBridge(self)
         self.bridge.locationPinned.connect(self._on_location_pinned)
@@ -87,7 +89,10 @@ class MapsPage(QWidget):
         style_path = Path(__file__).with_name("style.json")
         style_json = style_path.read_text(encoding="utf-8")
 
-        html = f"""
+        css_inline = (self._assets_dir / "maplibre-gl.css").read_text(encoding="utf-8")
+        js_inline = (self._assets_dir / "maplibre-gl.js").read_text(encoding="utf-8")
+
+        html_template = f"""
 <!DOCTYPE html>
 <html lang=\"nl\">
 <head>
@@ -95,10 +100,9 @@ class MapsPage(QWidget):
   <title>Offline Map (Europe)</title>
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
 
-  <link
-    rel=\"stylesheet\"
-    href=\"https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css\"
-  />
+  <style>
+  /*__MAPLIBRE_CSS__*/
+  </style>
 
   <style>
     html, body {{
@@ -149,7 +153,9 @@ class MapsPage(QWidget):
   <div id=\"map\"></div>
   <div id=\"status-overlay\">Offline kaart wordt geladen…</div>
 
-  <script src=\"https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js\"></script>
+  <script>
+  /*__MAPLIBRE_JS__*/
+  </script>
   <script src=\"qrc:///qtwebchannel/qwebchannel.js\"></script>
   <script>
     const style =
@@ -358,6 +364,9 @@ class MapsPage(QWidget):
 </html>
 """
 
+        html = html_template.replace("/*__MAPLIBRE_CSS__*/", css_inline).replace(
+            "/*__MAPLIBRE_JS__*/", js_inline
+        )
         self.webview.setHtml(html, QUrl("http://localhost/"))
         layout.addWidget(self.webview, 0, 0, 1, 2)
 
