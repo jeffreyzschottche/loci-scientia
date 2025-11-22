@@ -4,3 +4,5 @@ venv/
 *.pyc
 __pycache__/
 app/maps/europe.pmtilesx
+app/maps/europe.pmtilesb
+app/maps/europe.pmtilesp

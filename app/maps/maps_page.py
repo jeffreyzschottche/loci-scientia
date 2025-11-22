@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
@@ -40,6 +41,8 @@ class MapsPage(QWidget):
 
         search = QLineEdit()
         search.setPlaceholderText("Zoek locatie…")
+        search.returnPressed.connect(self._handle_search)
+        self._search_input = search
         side_layout.addWidget(search)
 
         combo_layout = QHBoxLayout()
@@ -151,6 +154,18 @@ class MapsPage(QWidget):
     .maplibregl-ctrl-logo {
       display: none !important;
     }
+    .loci-marker {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid white;
+      background: #f59e0b;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.65);
+    }
+    .loci-marker.primary {
+      background: #2563eb;
+    }
   </style>
 </head>
 <body>
@@ -175,6 +190,76 @@ class MapsPage(QWidget):
       statusOverlay.classList.add("hidden");
     };
 
+    const searchMarkers = [];
+    const clearSearchMarkers = () => {
+      while (searchMarkers.length) {
+        const entry = searchMarkers.pop();
+        entry.marker.remove();
+      }
+    };
+
+    const focusFeature = (feature, animate = true) => {
+      if (!window.map || !feature || !feature.geometry || !feature.geometry.coordinates) {
+        return;
+      }
+      const [lon, lat] = feature.geometry.coordinates;
+      const targetZoom = Math.max(window.map.getZoom(), 11.5);
+      window.map.easeTo({
+        center: [lon, lat],
+        zoom: targetZoom,
+        duration: animate ? 1200 : 0,
+      });
+    };
+
+    window.searchPlace = async (query) => {
+      const trimmed = (query || "").trim();
+      if (!trimmed) {
+        showStatus("Voer een plaatsnaam in.");
+        setTimeout(() => hideStatus(), 2000);
+        return;
+      }
+      showStatus(`Zoeken naar “${trimmed}”…`);
+      clearSearchMarkers();
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=geojson&limit=5&addressdetails=1&q=${encodeURIComponent(trimmed)}`;
+        const response = await fetch(url, {
+          headers: {
+            "Accept-Language": "nl",
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`Status ${response.status}`);
+        }
+        const result = await response.json();
+        const features = result.features || [];
+        if (!features.length) {
+          showStatus("Geen locaties gevonden.");
+          setTimeout(() => hideStatus(), 2000);
+          return;
+        }
+        hideStatus();
+        features.forEach((feature, index) => {
+          const coords = feature.geometry?.coordinates;
+          if (!coords || coords.length < 2) {
+            return;
+          }
+          const el = document.createElement("button");
+          el.className = index === 0 ? "loci-marker primary" : "loci-marker";
+          el.title = feature.properties?.display_name || trimmed;
+          el.addEventListener("click", () => focusFeature(feature, true));
+          const marker = new maplibregl.Marker(el).setLngLat([coords[0], coords[1]]).addTo(window.map);
+          searchMarkers.push({ marker, feature });
+          if (index === 0) {
+            focusFeature(feature, false);
+          }
+        });
+      } catch (error) {
+        console.error(error);
+        showStatus("Zoekopdracht mislukt. Controleer je internetverbinding.");
+        setTimeout(() => hideStatus(), 2500);
+      }
+    };
+
     const zoomAroundCenter = (delta) => {
       if (!window.map) {
         return;
@@ -187,18 +272,21 @@ class MapsPage(QWidget):
     };
     window.zoomAroundMapCenter = zoomAroundCenter;
 
-    // Kaart voor Europa
+    const datasetBounds = [
+      [-25, 34],
+      [45, 72]
+    ];
+    const datasetPadding = 0;
+    const datasetCenter = [10, 50];
+
     window.map = new maplibregl.Map({
       container: "map",
       style: style,
-      center: [10, 50],
+      center: datasetCenter,
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 16,
-      maxBounds: [
-        [-25, 34],
-        [45, 72]
-      ]
+      maxBounds: datasetBounds
     });
 
     // Scroll-wheel zoom altijd rond het midden houden voor een rustiger gevoel
@@ -225,7 +313,7 @@ class MapsPage(QWidget):
     };
     mapCanvas.addEventListener("wheel", handleCenteredScroll, { passive: false });
 
-    window.map.on("load", function() {
+    window.map.once("load", function() {
       hideStatus();
       window.map.resize();
     });
@@ -286,3 +374,14 @@ class MapsPage(QWidget):
             self.webview.page().runJavaScript(
                 "if (window.zoomAroundMapCenter) { window.zoomAroundMapCenter(-0.65); }"
             )
+
+    def _handle_search(self):
+        if not hasattr(self, "_search_input") or not hasattr(self, "webview"):
+            return
+        query = self._search_input.text().strip()
+        if not query:
+            return
+        safe_query = json.dumps(query)
+        self.webview.page().runJavaScript(
+            f"if (window.searchPlace) window.searchPlace({safe_query});"
+        )

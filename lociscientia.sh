@@ -25,6 +25,20 @@ BACKEND_HOST="127.0.0.1"
 BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_HOST" --port "$BACKEND_PORT")
 backend_log="$PROJECT_ROOT/backend.log"
 
+if lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    backend_pids="$(lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN)"
+    for pid in $backend_pids; do
+        echo "⚠️  bestaand backend-proces op poort $BACKEND_PORT gevonden (pid $pid), stoppen…"
+        kill "$pid" >/dev/null 2>&1 || true
+    done
+    sleep 1
+    if lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+        echo "⚠️  backend-proces reageert niet, force kill."
+        lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN | xargs kill -9 >/dev/null 2>&1 || true
+        sleep 1
+    fi
+fi
+
 echo "⏳ Backend starten (log: $backend_log)..."
 "${BACKEND_CMD[@]}" >"$backend_log" 2>&1 &
 backend_pid=$!
