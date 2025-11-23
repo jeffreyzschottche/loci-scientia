@@ -1,28 +1,31 @@
 INFO:     Will watch for changes in these directories: ['/Users/jeffreyzschottche/Sites/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [63601] using WatchFiles
+INFO:     Started reloader process [68562] using WatchFiles
 /Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
   warnings.warn(
-INFO:     Started server process [63608]
+INFO:     Started server process [68571]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:63703 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63705 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63708 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63709 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63710 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63711 - "GET /devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63716 - "GET /sprites/v4/light%402x.png HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63715 - "GET /sprites/v4/light%402x.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63715 - "GET /fonts/Noto%20Sans%20Italic/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63716 - "GET /fonts/Noto%20Sans%20Regular/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63721 - "GET /fonts/Noto%20Sans%20Regular/1536-1791.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63722 - "GET /fonts/Noto%20Sans%20Regular/11520-11775.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63723 - "GET /fonts/Noto%20Sans%20Medium/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63724 - "GET /fonts/Noto%20Sans%20Regular/768-1023.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63715 - "GET /fonts/Noto%20Sans%20Regular/1024-1279.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63841 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63843 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63845 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63846 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63847 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63848 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63854 - "GET /sprites/v4/light%402x.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63853 - "GET /sprites/v4/light%402x.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63854 - "GET /fonts/Noto%20Sans%20Italic/0-255.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63859 - "GET /fonts/Noto%20Sans%20Regular/1536-1791.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63853 - "GET /fonts/Noto%20Sans%20Regular/0-255.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /fonts/Noto%20Sans%20Regular/11520-11775.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63861 - "GET /fonts/Noto%20Sans%20Medium/0-255.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63861 - "GET /fonts/Noto%20Sans%20Regular/768-1023.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /fonts/Noto%20Sans%20Regular/1024-1279.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63864 - "GET /fonts/Noto%20Sans%20Medium/256-511.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63864 - "GET /fonts/Noto%20Sans%20Regular/256-511.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63865 - "GET /fonts/Noto%20Sans%20Regular/512-767.pbf HTTP/1.1" 200 OK
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [63608]
-INFO:     Stopping reloader process [63601]
+INFO:     Finished server process [68571]
+INFO:     Stopping reloader process [68562]

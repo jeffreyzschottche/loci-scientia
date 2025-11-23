@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 from qasync import QEventLoop
 
+from .config import BACKEND_WS
 from .net.ws_client import WSClient
 from .theme import DARK_QSS
 from .widgets.api_page import ApiPage
@@ -29,8 +30,6 @@ from app.maps.maps_page import MapsPage
 from .widgets.network_page import NetworkStatusPage
 from .widgets.sidebar import Sidebar
 from .widgets.settings_page import SettingsPage
-
-BACKEND_WS = "ws://127.0.0.1:8000/ws"
 
 
 class BootScreen(QWidget):

@@ -132,10 +132,10 @@ Stoppen doe je met Ctrl+C; het script sluit eerst de frontend en daarna de backe
 Laat dit venster open:
 
 ```bash
-uvicorn app.backend.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.backend.main:app --reload --host "${BACKEND_HOST:-127.0.0.1}" --port "${BACKEND_PORT:-8000}"
 ```
 
-Als alles goed is zie je:
+Gebruik dezelfde waarden als in `.env` (standaard `127.0.0.1:8000`). Als alles goed is zie je:
 
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000
@@ -153,7 +153,7 @@ python -m app.frontend.main
 ```
 
 De **Loci Scientia Desktop UI** opent automatisch en verbindt met  
-➡️ `http://127.0.0.1:8000`
+➡️ de `BACKEND_HTTP` uit `.env` (standaard `http://127.0.0.1:8000`)
 
 ---
 
@@ -167,7 +167,7 @@ setup:
 	python -m venv .venv && source .venv/bin/activate && python -m pip install -U pip && python -m pip install -r app/requirements.txt
 
 backend:
-	source .venv/bin/activate && uvicorn app.backend.main:app --reload --host 127.0.0.1 --port 8000
+	source .venv/bin/activate && uvicorn app.backend.main:app --reload --host "${BACKEND_HOST:-127.0.0.1}" --port "${BACKEND_PORT:-8000}"
 
 frontend:
 	source .venv/bin/activate && python -m app.frontend.main

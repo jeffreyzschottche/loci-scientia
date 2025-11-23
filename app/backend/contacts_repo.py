@@ -17,6 +17,11 @@ QDRANT_LOCAL_DIR = _PROJECT_ROOT / "qdrant_storage"
 QDRANT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _contacts_embedded_path_from_env() -> Path:
+    env_path = os.getenv("QDRANT_CONTACTS_EMBEDDED_PATH") or os.getenv("QDRANT_EMBEDDED_PATH")
+    return Path(env_path).expanduser() if env_path else QDRANT_LOCAL_DIR / "contacts_db"
+
+
 @lru_cache(maxsize=None)
 def _cached_local_client(path: str) -> QdrantClient:
     return QdrantClient(path=path)
@@ -37,8 +42,7 @@ def _get_qdrant_client(embedded_path: Optional[Path] = None) -> QdrantClient:
     host = os.getenv("QDRANT_HOST")
     if not host:
         if embedded_path is None:
-            env_path = os.getenv("QDRANT_EMBEDDED_PATH")
-            db_path = Path(env_path) if env_path else QDRANT_LOCAL_DIR / "contacts_db"
+            db_path = _contacts_embedded_path_from_env()
         else:
             db_path = embedded_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,10 +58,7 @@ class ContactsRepository:
 
     def __init__(self) -> None:
         self.collection = os.getenv("QDRANT_CONTACTS_COLLECTION", "contacten")
-        env_path = os.getenv("QDRANT_EMBEDDED_PATH")
-        self._embedded_path = (
-            Path(env_path) if env_path else QDRANT_LOCAL_DIR / "contacts_db"
-        )
+        self._embedded_path = _contacts_embedded_path_from_env()
 
     def _client_instance(self) -> QdrantClient:
         return _get_qdrant_client(self._embedded_path)

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 import requests
 
-BACKEND_HTTP = "http://127.0.0.1:8000"
+from ..config import BACKEND_HTTP
 
 
 class DevicesPage(QWidget):

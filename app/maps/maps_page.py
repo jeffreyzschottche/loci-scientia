@@ -25,7 +25,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-from app.frontend.config import BACKEND_HTTP, BACKEND_TIMEOUT
+from app.frontend.config import (
+    BACKEND_HTTP,
+    BACKEND_TIMEOUT,
+    MAP_GLYPHS_URL,
+    MAP_SPRITE_URL,
+    PMTILES_STATUS_HINT,
+    PMTILES_TILE_TEMPLATE,
+)
 from app.frontend.widgets.contact_form import ContactFormDialog
 
 
@@ -87,7 +94,15 @@ class MapsPage(QWidget):
         self.webview.page().setWebChannel(self.web_channel)
 
         style_path = Path(__file__).with_name("style.json")
-        style_json = style_path.read_text(encoding="utf-8")
+        raw_style = json.loads(style_path.read_text(encoding="utf-8"))
+        raw_style["glyphs"] = MAP_GLYPHS_URL
+        raw_style["sprite"] = MAP_SPRITE_URL
+        try:
+            raw_style["sources"]["protomaps"]["tiles"] = [PMTILES_TILE_TEMPLATE]
+        except (KeyError, TypeError):
+            pass
+        style_json = json.dumps(raw_style)
+        tile_hint = PMTILES_STATUS_HINT
 
         css_inline = (self._assets_dir / "maplibre-gl.css").read_text(encoding="utf-8")
         js_inline = (self._assets_dir / "maplibre-gl.js").read_text(encoding="utf-8")
@@ -161,6 +176,7 @@ class MapsPage(QWidget):
     const style =
 {style_json}
     ;
+    const tileErrorHint = {json.dumps(tile_hint)};
 
     let pyBridge = null;
     let pendingPin = false;
@@ -338,7 +354,7 @@ class MapsPage(QWidget):
 
     window.map.on("error", function(event) {{
       console.error(event.error || event);
-      showStatus("Kaartdata kon niet geladen worden. Controleer of de pmtiles-server draait op poort 8080.");
+      showStatus(tileErrorHint);
     }});
 
     const initBridge = () => {{

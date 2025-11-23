@@ -15,7 +15,9 @@ from PySide6.QtWidgets import (
 )
 import requests
 
-API_BASE = "http://127.0.0.1:8000"
+from ..config import API_ROUTES_DEFAULT_PORT, BACKEND_HTTP
+
+API_BASE = BACKEND_HTTP
 
 
 class ApiDialog(QDialog):
@@ -29,7 +31,7 @@ class ApiDialog(QDialog):
         self.path = QLineEdit("/api/example")
         self.port = QSpinBox()
         self.port.setRange(1, 65535)
-        self.port.setValue(8080)
+        self.port.setValue(API_ROUTES_DEFAULT_PORT)
         self.kb = QLineEdit("Algemene Kennisbank")
         self.api_key = QLineEdit("loci_sk_xxx")
 

@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-API_BASE = "http://127.0.0.1:8000"
+from ..config import BACKEND_HTTP
+
+API_BASE = BACKEND_HTTP
 
 
 class ChatSignals(QObject):

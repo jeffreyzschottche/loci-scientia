@@ -1,3 +1,4 @@
+import os
 import uuid
 from typing import Dict, List
 
@@ -7,13 +8,14 @@ from .schemas import ApiRoute, ApiRouteCreate
 class Store:
     def __init__(self):
         self.routes: Dict[str, ApiRoute] = {}
+        default_port = int(os.environ.get("API_ROUTES_DEFAULT_PORT", os.environ.get("BACKEND_PORT", "8000")))
         # seed sample routes for mock UI
         self.create(
             ApiRouteCreate(
                 name="Chat Endpoint",
                 method="POST",
                 path="/api/chat",
-                port=8080,
+                port=default_port,
                 knowledge_base="Algemene Kennisbank",
                 api_key="loci_sk_1a2b3c4d5e6f",
                 active=True,
@@ -24,7 +26,7 @@ class Store:
                 name="Knowledge Query",
                 method="GET",
                 path="/api/knowledge",
-                port=8080,
+                port=default_port,
                 knowledge_base="Technische Documenten",
                 api_key="loci_sk_7g8h9i0j1k2l",
                 active=True,
