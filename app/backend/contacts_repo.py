@@ -1,8 +1,10 @@
 import os
+import threading
 import uuid
+from contextlib import contextmanager, nullcontext
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -16,15 +18,22 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 QDRANT_LOCAL_DIR = _PROJECT_ROOT / "qdrant_storage"
 QDRANT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
 
+_QDRANT_EMBED_LOCK = threading.Lock()
+
 
 def _contacts_embedded_path_from_env() -> Path:
     env_path = os.getenv("QDRANT_CONTACTS_EMBEDDED_PATH") or os.getenv("QDRANT_EMBEDDED_PATH")
     return Path(env_path).expanduser() if env_path else QDRANT_LOCAL_DIR / "contacts_db"
 
 
-@lru_cache(maxsize=None)
-def _cached_local_client(path: str) -> QdrantClient:
-    return QdrantClient(path=path)
+@contextmanager
+def _embedded_client_context(path: Path) -> Iterator[QdrantClient]:
+    with _QDRANT_EMBED_LOCK:
+        client = QdrantClient(path=str(path))
+        try:
+            yield client
+        finally:
+            client.close()
 
 
 @lru_cache(maxsize=None)
@@ -32,25 +41,22 @@ def _cached_remote_client(host: str, port: int, api_key: Optional[str]) -> Qdran
     return QdrantClient(host=host, port=port, api_key=api_key or None)
 
 
-def _get_qdrant_client(embedded_path: Optional[Path] = None) -> QdrantClient:
-    """Initialise a Qdrant client.
-
-    - Zonder QDRANT_HOST: gebruik embedded Qdrant met opslag in qdrant_storage/.
-    - Met QDRANT_HOST: verbind naar een externe Qdrant-server (bijv. Docker).
-    """
+def _qdrant_client_context(embedded_path: Optional[Path] = None):
+    """Yield een Qdrant client (embedded of remote) als contextmanager."""
 
     host = os.getenv("QDRANT_HOST")
     if not host:
-        if embedded_path is None:
-            db_path = _contacts_embedded_path_from_env()
-        else:
-            db_path = embedded_path
+        db_path = embedded_path or _contacts_embedded_path_from_env()
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        return _cached_local_client(str(db_path))
+        return _embedded_client_context(db_path)
 
     port = int(os.getenv("QDRANT_PORT", "6333"))
     api_key = os.getenv("QDRANT_API_KEY") or None
-    return _cached_remote_client(host, port, api_key)
+    return nullcontext(_cached_remote_client(host, port, api_key))
+
+
+# Backwards compatible alias voor andere modules
+_get_qdrant_client = _qdrant_client_context
 
 
 class ContactsRepository:
@@ -60,13 +66,12 @@ class ContactsRepository:
         self.collection = os.getenv("QDRANT_CONTACTS_COLLECTION", "contacten")
         self._embedded_path = _contacts_embedded_path_from_env()
 
-    def _client_instance(self) -> QdrantClient:
-        return _get_qdrant_client(self._embedded_path)
+    def _client_context(self):
+        return _qdrant_client_context(self._embedded_path)
 
-    def _ensure_collection(self, vector_size: int) -> None:
+    def _ensure_collection(self, client: QdrantClient, vector_size: int) -> None:
         """Zorg dat de collectie bestaat."""
 
-        client = self._client_instance()
         try:
             client.get_collection(self.collection)
         except Exception:
@@ -119,16 +124,16 @@ class ContactsRepository:
         return "\n".join(parts)
 
     def list_contacts(self) -> List[Contact]:
-        client = self._client_instance()
-        try:
-            points, _ = client.scroll(
-                collection_name=self.collection,
-                limit=1000,
-                with_payload=True,
-                with_vectors=False,
-            )
-        except Exception:
-            return []
+        with self._client_context() as client:
+            try:
+                points, _ = client.scroll(
+                    collection_name=self.collection,
+                    limit=1000,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except Exception:
+                return []
 
         contacts: List[Contact] = []
         for point in points:
@@ -148,30 +153,30 @@ class ContactsRepository:
 
         embedding = embed_text(self._embedding_text(payload))
         vector = list(embedding.vector)
-        self._ensure_collection(len(vector))
 
-        client = self._client_instance()
-        client.upsert(
-            collection_name=self.collection,
-            points=[
-                PointStruct(
-                    id=cid,
-                    vector=vector,
-                    payload=payload,
-                )
-            ],
-        )
+        with self._client_context() as client:
+            self._ensure_collection(client, len(vector))
+            client.upsert(
+                collection_name=self.collection,
+                points=[
+                    PointStruct(
+                        id=cid,
+                        vector=vector,
+                        payload=payload,
+                    )
+                ],
+            )
 
         return self._contact_from_payload(payload)
 
     def update_contact(self, contact_id: str, patch: ContactPatch) -> Contact:
-        client = self._client_instance()
-        existing = client.retrieve(
-            collection_name=self.collection,
-            ids=[contact_id],
-            with_payload=True,
-            with_vectors=False,
-        )
+        with self._client_context() as client:
+            existing = client.retrieve(
+                collection_name=self.collection,
+                ids=[contact_id],
+                with_payload=True,
+                with_vectors=False,
+            )
         if not existing:
             raise ValueError("contact not found")
 
@@ -184,18 +189,19 @@ class ContactsRepository:
         text = self._embedding_text(payload)
         embedding = embed_text(text)
         vector = list(embedding.vector)
-        self._ensure_collection(len(vector))
 
-        client.upsert(
-            collection_name=self.collection,
-            points=[
-                PointStruct(
-                    id=payload["id"],
-                    vector=vector,
-                    payload=payload,
-                )
-            ],
-        )
+        with self._client_context() as client:
+            self._ensure_collection(client, len(vector))
+            client.upsert(
+                collection_name=self.collection,
+                points=[
+                    PointStruct(
+                        id=payload["id"],
+                        vector=vector,
+                        payload=payload,
+                    )
+                ],
+            )
 
         return self._contact_from_payload(payload)
 
@@ -203,17 +209,17 @@ class ContactsRepository:
         """Zoek naar contacten die qua embedding het dichtst bij *query* liggen."""
 
         vector = embed_text(query).vector
-        client = self._client_instance()
-        try:
-            response = client.query_points(
-                collection_name=self.collection,
-                query=list(vector),
-                limit=limit,
-                with_payload=True,
-                with_vectors=False,
-            )
-        except ValueError:
-            return []
+        with self._client_context() as client:
+            try:
+                response = client.query_points(
+                    collection_name=self.collection,
+                    query=list(vector),
+                    limit=limit,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except ValueError:
+                return []
         matches: list[tuple[Contact, float]] = []
         for hit in response.points:
             payload = hit.payload or {}

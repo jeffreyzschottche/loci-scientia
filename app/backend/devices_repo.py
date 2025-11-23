@@ -17,30 +17,33 @@ class DevicesRepository:
         self.collection = os.getenv("QDRANT_DEVICES_COLLECTION", "devices")
         env_path = os.getenv("QDRANT_DEVICES_EMBEDDED_PATH")
         self._embedded_path = (
-            Path(env_path) if env_path else QDRANT_LOCAL_DIR / "devices_db"
+            Path(env_path).expanduser() if env_path else QDRANT_LOCAL_DIR / "devices_db"
         )
 
+    def _client_context(self):
+        return _get_qdrant_client(self._embedded_path)
+
     def _ensure_collection(self, vector_size: int) -> None:
-        client = _get_qdrant_client(self._embedded_path)
-        try:
-            client.get_collection(self.collection)
-        except Exception:
-            client.recreate_collection(
-                collection_name=self.collection,
-                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-            )
+        with self._client_context() as client:
+            try:
+                client.get_collection(self.collection)
+            except Exception:
+                client.recreate_collection(
+                    collection_name=self.collection,
+                    vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+                )
 
     def list_devices(self) -> List[Device]:
-        client = _get_qdrant_client(self._embedded_path)
-        try:
-            points, _ = client.scroll(
-                collection_name=self.collection,
-                limit=1000,
-                with_payload=True,
-                with_vectors=False,
-            )
-        except Exception:
-            return []
+        with self._client_context() as client:
+            try:
+                points, _ = client.scroll(
+                    collection_name=self.collection,
+                    limit=1000,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except Exception:
+                return []
 
         devices: List[Device] = []
         for point in points:
@@ -85,33 +88,33 @@ class DevicesRepository:
             "device_name": data.device_name,
         }
 
-        client = _get_qdrant_client(self._embedded_path)
-        client.upsert(
-            collection_name=self.collection,
-            points=[
-                PointStruct(
-                    id=did,
-                    vector=vector,
-                    payload=payload,
-                )
-            ],
-        )
+        with self._client_context() as client:
+            client.upsert(
+                collection_name=self.collection,
+                points=[
+                    PointStruct(
+                        id=did,
+                        vector=vector,
+                        payload=payload,
+                    )
+                ],
+            )
 
         return Device(id=did, **data.model_dump())
 
     def search_devices(self, query: str, limit: int = 3) -> list[tuple[Device, float]]:
         vector = embed_text(query).vector
-        client = _get_qdrant_client(self._embedded_path)
-        try:
-            response = client.query_points(
-                collection_name=self.collection,
-                query=list(vector),
-                limit=limit,
-                with_payload=True,
-                with_vectors=False,
-            )
-        except ValueError:
-            return []
+        with self._client_context() as client:
+            try:
+                response = client.query_points(
+                    collection_name=self.collection,
+                    query=list(vector),
+                    limit=limit,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except ValueError:
+                return []
         matches: list[tuple[Device, float]] = []
         for hit in response.points:
             payload = hit.payload or {}
