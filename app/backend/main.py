@@ -3,6 +3,7 @@ import json
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .apiAsk import handle_ask
 from .contacts_repo import ContactsRepository
@@ -26,6 +27,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if settings.offline_assets_dir and settings.offline_assets_dir.exists():
+    fonts_dir = settings.offline_assets_dir / "fonts"
+    sprites_dir = settings.offline_assets_dir / "sprites"
+    if fonts_dir.exists():
+        app.mount("/fonts", StaticFiles(directory=str(fonts_dir)), name="fonts")
+    if sprites_dir.exists():
+        app.mount("/sprites", StaticFiles(directory=str(sprites_dir)), name="sprites")
 
 store = Store()
 contacts_repo = ContactsRepository()

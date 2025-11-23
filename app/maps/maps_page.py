@@ -50,11 +50,11 @@ class MapsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._active_contact_ids: Set[Any] = set()
+        self._active_contact_ids: Set[str] = set()
         self._block_contact_signals = False
-        self._contacts_by_id: Dict[Any, dict] = {}
+        self._contacts_by_id: Dict[str, dict] = {}
         self._updating_select_all = False
-        self._pending_contact_id_for_pin: Optional[Any] = None
+        self._pending_contact_id_for_pin: Optional[str] = None
 
         content = QWidget()
         content_layout = QHBoxLayout(content)
@@ -234,8 +234,13 @@ class MapsPage(QWidget):
       if (!window.map) {{
         return;
       }}
+      const normalizeId = (value) => (value == null ? null : String(value));
       const active = Array.isArray(contacts) ? contacts : [];
-      const nextIds = new Set(active.map((contact) => contact.id));
+      const nextIds = new Set(
+        active
+          .map((contact) => normalizeId(contact.id))
+          .filter((value) => value !== null)
+      );
       for (const [id, marker] of contactMarkers.entries()) {{
         if (!nextIds.has(id)) {{
           marker.remove();
@@ -246,7 +251,11 @@ class MapsPage(QWidget):
         if (contact?.lat == null || contact?.lon == null) {{
           return;
         }}
-        let marker = contactMarkers.get(contact.id);
+        const contactId = normalizeId(contact.id);
+        if (!contactId) {{
+          return;
+        }}
+        let marker = contactMarkers.get(contactId);
         if (!marker) {{
           const el = document.createElement("button");
           el.className = "loci-marker contact";
@@ -259,20 +268,23 @@ class MapsPage(QWidget):
               new maplibregl.Popup({{ offset: 18 }}).setText(contact.info)
             );
           }}
-          contactMarkers.set(contact.id, marker);
+          contactMarkers.set(contactId, marker);
         }} else {{
           marker.setLngLat([contact.lon, contact.lat]);
         }}
       }});
-      if (focusId !== null && nextIds.has(focusId)) {{
-        const focusContact = active.find((c) => c.id === focusId);
+      const focusKey = normalizeId(focusId);
+      if (focusKey && nextIds.has(focusKey)) {{
+        const focusContact = active.find(
+          (c) => normalizeId(c.id) === focusKey
+        );
         if (focusContact) {{
           window.map.easeTo({{
             center: [focusContact.lon, focusContact.lat],
             zoom: Math.max(window.map.getZoom(), 9),
             duration: 800,
           }});
-          const marker = contactMarkers.get(focusContact.id);
+          const marker = contactMarkers.get(focusKey);
           if (marker?.getPopup && marker.getPopup()) {{
             marker.getPopup().addTo(window.map);
           }}
@@ -476,9 +488,10 @@ class MapsPage(QWidget):
         contact = item.data(Qt.UserRole)
         if not contact:
             return
-        contact_id = contact.get("id")
-        if contact_id is None:
+        contact_id_value = contact.get("id")
+        if contact_id_value is None:
             return
+        contact_id = str(contact_id_value)
         checked = item.checkState() == Qt.Checked
         if checked:
             self._active_contact_ids.add(contact_id)
@@ -506,12 +519,12 @@ class MapsPage(QWidget):
             item.setCheckState(target_state)
         self._block_contact_signals = False
         if checked:
-            selected_ids: Set[Any] = set()
+            selected_ids: Set[str] = set()
             for index in range(self.contacts_list.count()):
                 contact = self.contacts_list.item(index).data(Qt.UserRole) or {}
-                contact_id = contact.get("id")
-                if contact_id is not None:
-                    selected_ids.add(contact_id)
+                contact_id_value = contact.get("id")
+                if contact_id_value is not None:
+                    selected_ids.add(str(contact_id_value))
             self._active_contact_ids = selected_ids
         else:
             self._active_contact_ids.clear()
@@ -597,7 +610,10 @@ class MapsPage(QWidget):
         if preferred_contact_id is not None:
             for index in range(combo.count()):
                 payload = combo.itemData(index)
-                if payload and payload.get("id") == preferred_contact_id:
+                if not payload:
+                    continue
+                payload_id = payload.get("id")
+                if payload_id is not None and str(payload_id) == preferred_contact_id:
                     combo.setCurrentIndex(index)
                     break
 
@@ -650,16 +666,20 @@ class MapsPage(QWidget):
             and contact.get("location_lon") is not None
         ]
         geocoded.sort(key=lambda person: (person.get("name") or "").lower())
-        self._contacts_by_id = {contact.get("id"): contact for contact in geocoded}
+        self._contacts_by_id = {}
         previous_selection = set(self._active_contact_ids)
 
         self._block_contact_signals = True
         self.contacts_list.clear()
         for person in geocoded:
+            person_id_value = person.get("id")
+            person_key = str(person_id_value) if person_id_value is not None else None
+            if person_key:
+                self._contacts_by_id[person_key] = person
             item = QListWidgetItem(self._contact_list_label(person))
             item.setData(Qt.UserRole, person)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            if person.get("id") in previous_selection:
+            if person_key and person_key in previous_selection:
                 item.setCheckState(Qt.Checked)
             else:
                 item.setCheckState(Qt.Unchecked)
@@ -675,7 +695,7 @@ class MapsPage(QWidget):
         self._active_contact_ids = {
             person_id
             for person_id in previous_selection
-            if person_id in self._contacts_by_id and person_id is not None
+            if person_id in self._contacts_by_id
         }
         self._update_select_all_state()
         self._sync_contact_markers()
@@ -700,9 +720,13 @@ class MapsPage(QWidget):
         return f"{label}\n{coords}" if label else coords
 
     def _contact_marker_payload(self, contact: dict) -> Optional[Dict[str, Any]]:
-        lat = contact.get("location_lat")
-        lon = contact.get("location_lon")
-        if lat is None or lon is None:
+        contact_id_value = contact.get("id")
+        if contact_id_value is None:
+            return None
+        try:
+            lat = float(contact.get("location_lat"))
+            lon = float(contact.get("location_lon"))
+        except (TypeError, ValueError):
             return None
         name = contact.get("name") or "Contact"
         location_bits = [
@@ -713,7 +737,7 @@ class MapsPage(QWidget):
         location_text = ", ".join([bit for bit in location_bits if bit])
         popup_text = name if not location_text else f"{name}\n{location_text}"
         return {
-            "id": contact.get("id"),
+            "id": str(contact_id_value),
             "name": contact.get("name"),
             "label": contact.get("location_label"),
             "lat": lat,
@@ -721,7 +745,7 @@ class MapsPage(QWidget):
             "info": popup_text,
         }
 
-    def _sync_contact_markers(self, *, focus_contact_id: Optional[Any] = None) -> None:
+    def _sync_contact_markers(self, *, focus_contact_id: Optional[str] = None) -> None:
         if not hasattr(self, "webview") or not hasattr(self, "contacts_list"):
             return
         active_payloads: List[Dict[str, Any]] = []
@@ -740,15 +764,18 @@ class MapsPage(QWidget):
         )
         self.webview.page().runJavaScript(script)
 
-    def _find_contact_item(self, contact_id: Any) -> Optional[QListWidgetItem]:
+    def _find_contact_item(self, contact_id: str) -> Optional[QListWidgetItem]:
         for index in range(self.contacts_list.count()):
             item = self.contacts_list.item(index)
             contact = item.data(Qt.UserRole) or {}
-            if contact.get("id") == contact_id:
+            contact_id_value = contact.get("id")
+            if contact_id_value is None:
+                continue
+            if str(contact_id_value) == contact_id:
                 return item
         return None
 
-    def _set_contact_checked(self, contact_id: Any, checked: bool) -> None:
+    def _set_contact_checked(self, contact_id: str, checked: bool) -> None:
         item = self._find_contact_item(contact_id)
         if not item:
             return
@@ -764,7 +791,9 @@ class MapsPage(QWidget):
             self._active_contact_ids.discard(contact_id)
 
     def _append_contact_item(self, contact: dict) -> None:
-        self._contacts_by_id[contact.get("id")] = contact
+        contact_id_value = contact.get("id")
+        if contact_id_value is not None:
+            self._contacts_by_id[str(contact_id_value)] = contact
         item = QListWidgetItem(self._contact_list_label(contact))
         item.setData(Qt.UserRole, contact)
         item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
@@ -775,13 +804,15 @@ class MapsPage(QWidget):
         self.contacts_list.addItem(item)
         self.contacts_list.show()
         self.contacts_empty.hide()
+        self._update_select_all_state()
 
     def focus_on_contact(self, contact: dict) -> None:
         if not contact:
             return
-        contact_id = contact.get("id")
-        if contact_id is None:
+        contact_id_value = contact.get("id")
+        if contact_id_value is None:
             return
+        contact_id = str(contact_id_value)
         if contact.get("location_lat") is None or contact.get("location_lon") is None:
             QMessageBox.information(
                 self,
@@ -801,14 +832,15 @@ class MapsPage(QWidget):
     def request_location_for_contact(self, contact: dict) -> None:
         if not contact:
             return
-        contact_id = contact.get("id")
-        if contact_id is None:
+        contact_id_value = contact.get("id")
+        if contact_id_value is None:
             QMessageBox.warning(
                 self,
                 "Contact onbekend",
                 "Dit contact kan niet gekoppeld worden omdat het geen ID heeft.",
             )
             return
+        contact_id = str(contact_id_value)
         lat = contact.get("location_lat")
         lon = contact.get("location_lon")
         if lat is not None and lon is not None:

@@ -1,8 +1,8 @@
 {
   "version": 8,
   "name": "style@5.0.0 flavor@light lang@en",
-  "glyphs": "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
-  "sprite": "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
+  "glyphs": "http://127.0.0.1:8000/fonts/{fontstack}/{range}.pbf",
+  "sprite": "http://127.0.0.1:8000/sprites/v4/light",
   "sources": {
     "protomaps": {
       "attribution": "<a href=\"https://github.com/protomaps/basemaps\">Protomaps</a> © <a href=\"https://openstreetmap.org\">OpenStreetMap</a>",
