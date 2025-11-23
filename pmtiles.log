@@ -1,90 +1,11 @@
-2025/11/23 19:36:10 main.go:159: Serving  /Volumes/Expansion on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
-2025/11/23 19:36:23 server.go:156: fetching europe 0-16384
-2025/11/23 19:36:23 server.go:200: fetched europe 0-16384
-2025/11/23 19:36:23 server.go:156: fetching europe 127-11904
-2025/11/23 19:36:23 server.go:200: fetched europe 127-11904
-2025/11/23 19:36:23 server.go:156: fetching europe 13148-13185
-2025/11/23 19:36:23 server.go:200: fetched europe 13148-13185
-2025/11/23 19:36:23 main.go:156: served 200 %2Feurope%2F3%2F4%2F2.mvt in 22.549167ms
-2025/11/23 19:36:24 main.go:156: served 200 %2Feurope%2F3%2F3%2F2.mvt in 376.191458ms
-2025/11/23 19:36:24 main.go:156: served 200 %2Feurope%2F3%2F4%2F3.mvt in 388.896667ms
-2025/11/23 19:36:24 main.go:156: served 200 %2Feurope%2F3%2F3%2F3.mvt in 409.856959ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F8%2F5.mvt in 8.323584ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F7%2F5.mvt in 11.879833ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F7%2F6.mvt in 2.653083ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F8%2F6.mvt in 13.9505ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F8%2F4.mvt in 18.134708ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F9%2F5.mvt in 21.989875ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F7%2F4.mvt in 24.765458ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F9%2F4.mvt in 19.247875ms
-2025/11/23 19:36:25 main.go:156: served 200 %2Feurope%2F4%2F9%2F6.mvt in 16.027875ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F6%2F33%2F20.mvt in 3.160416ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F6%2F33%2F21.mvt in 7.078334ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F6%2F32%2F20.mvt in 7.212834ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F6%2F32%2F21.mvt in 9.385541ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F7%2F66%2F41.mvt in 3.687834ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F7%2F65%2F42.mvt in 7.105333ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F7%2F66%2F42.mvt in 25.35125ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F7%2F65%2F41.mvt in 26.859417ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F8%2F131%2F84.mvt in 12.988458ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F8%2F132%2F84.mvt in 15.647584ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F8%2F132%2F83.mvt in 17.453708ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F8%2F131%2F83.mvt in 23.352167ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F8%2F131%2F85.mvt in 24.333292ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F8%2F132%2F85.mvt in 29.080416ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F9%2F263%2F168.mvt in 8.383416ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F9%2F262%2F169.mvt in 9.848334ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F9%2F262%2F168.mvt in 13.404084ms
-2025/11/23 19:36:26 main.go:156: served 200 %2Feurope%2F9%2F263%2F169.mvt in 16.1775ms
-2025/11/23 19:36:31 server.go:156: fetching europe 51368-12302
-2025/11/23 19:36:31 server.go:200: fetched europe 51368-12302
-2025/11/23 19:36:31 main.go:156: served 200 %2Feurope%2F10%2F526%2F336.mvt in 98.389916ms
-2025/11/23 19:36:31 main.go:156: served 200 %2Feurope%2F10%2F524%2F337.mvt in 108.535667ms
-2025/11/23 19:36:31 main.go:156: served 200 %2Feurope%2F10%2F526%2F337.mvt in 116.162958ms
-2025/11/23 19:36:31 main.go:156: served 200 %2Feurope%2F10%2F525%2F336.mvt in 118.028334ms
-2025/11/23 19:36:31 main.go:156: served 200 %2Feurope%2F10%2F525%2F337.mvt in 122.260583ms
-2025/11/23 19:36:31 main.go:156: served 200 %2Feurope%2F10%2F524%2F336.mvt in 122.011458ms
-2025/11/23 19:36:32 server.go:156: fetching europe 141330-11637
-2025/11/23 19:36:32 server.go:200: fetched europe 141330-11637
-2025/11/23 19:36:32 main.go:156: served 200 %2Feurope%2F11%2F1050%2F674.mvt in 23.039125ms
-2025/11/23 19:36:32 main.go:156: served 200 %2Feurope%2F11%2F1051%2F673.mvt in 23.395083ms
-2025/11/23 19:36:32 main.go:156: served 200 %2Feurope%2F11%2F1051%2F674.mvt in 27.230083ms
-2025/11/23 19:36:32 main.go:156: served 200 %2Feurope%2F11%2F1050%2F673.mvt in 29.767333ms
-2025/11/23 19:36:34 main.go:156: served 200 %2Feurope%2F11%2F1051%2F672.mvt in 12.739292ms
-2025/11/23 19:36:34 main.go:156: served 200 %2Feurope%2F11%2F1050%2F672.mvt in 15.152875ms
-2025/11/23 19:36:39 main.go:156: served 200 %2Feurope%2F11%2F1049%2F672.mvt in 4.200042ms
-2025/11/23 19:36:39 main.go:156: served 200 %2Feurope%2F11%2F1049%2F673.mvt in 4.067833ms
-2025/11/23 19:36:41 server.go:156: fetching europe 484466-11540
-2025/11/23 19:36:41 server.go:200: fetched europe 484466-11540
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2100%2F1344.mvt in 107.285458ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2100%2F1346.mvt in 110.332042ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2101%2F1345.mvt in 113.436958ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2099%2F1344.mvt in 3.273041ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2099%2F1345.mvt in 114.146875ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2101%2F1346.mvt in 8.58375ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2101%2F1344.mvt in 118.312875ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2100%2F1345.mvt in 121.849375ms
-2025/11/23 19:36:41 main.go:156: served 200 %2Feurope%2F12%2F2099%2F1346.mvt in 9.901292ms
-2025/11/23 19:36:53 main.go:156: served 200 %2Feurope%2F12%2F2100%2F1343.mvt in 334.73175ms
-2025/11/23 19:36:53 main.go:156: served 200 %2Feurope%2F12%2F2101%2F1343.mvt in 345.233292ms
-2025/11/23 19:36:54 main.go:156: served 200 %2Feurope%2F12%2F2099%2F1343.mvt in 441.625µs
-2025/11/23 19:36:59 server.go:156: fetching europe 1657966-11065
-2025/11/23 19:36:59 server.go:200: fetched europe 1657966-11065
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F13%2F4200%2F2687.mvt in 106.591875ms
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F13%2F4200%2F2688.mvt in 110.579542ms
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F13%2F4201%2F2687.mvt in 112.444167ms
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F13%2F4201%2F2688.mvt in 113.888125ms
-2025/11/23 19:36:59 server.go:156: fetching europe 5739896-11094
-2025/11/23 19:36:59 server.go:200: fetched europe 5739896-11094
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F14%2F8400%2F5375.mvt in 23.169167ms
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F14%2F8400%2F5374.mvt in 25.0045ms
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F14%2F8401%2F5374.mvt in 25.14475ms
-2025/11/23 19:36:59 main.go:156: served 200 %2Feurope%2F14%2F8401%2F5375.mvt in 26.083875ms
-2025/11/23 19:37:00 server.go:156: fetching europe 20639451-11230
-2025/11/23 19:37:00 server.go:200: fetched europe 20639451-11230
-2025/11/23 19:37:00 main.go:156: served 200 %2Feurope%2F15%2F16802%2F10750.mvt in 23.128583ms
-2025/11/23 19:37:00 main.go:156: served 200 %2Feurope%2F15%2F16801%2F10750.mvt in 23.932417ms
-2025/11/23 19:37:00 main.go:156: served 200 %2Feurope%2F15%2F16801%2F10751.mvt in 24.597917ms
-2025/11/23 19:37:00 main.go:156: served 200 %2Feurope%2F15%2F16802%2F10751.mvt in 24.645959ms
-2025/11/23 19:37:11 main.go:156: served 200 %2Feurope%2F15%2F16802%2F10749.mvt in 3.24525ms
-2025/11/23 19:37:11 main.go:156: served 200 %2Feurope%2F15%2F16801%2F10749.mvt in 6.688666ms
+2025/11/23 19:59:55 main.go:159: Serving  /Volumes/Expansion on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/11/23 20:00:27 server.go:156: fetching europe 0-16384
+2025/11/23 20:00:30 server.go:200: fetched europe 0-16384
+2025/11/23 20:00:30 server.go:156: fetching europe 127-11904
+2025/11/23 20:00:30 server.go:200: fetched europe 127-11904
+2025/11/23 20:00:30 server.go:156: fetching europe 13148-13185
+2025/11/23 20:00:30 server.go:200: fetched europe 13148-13185
+2025/11/23 20:00:30 main.go:156: served 200 %2Feurope%2F3%2F3%2F2.mvt in 2.345390375s
+2025/11/23 20:00:30 main.go:156: served 200 %2Feurope%2F3%2F4%2F3.mvt in 2.340740417s
+2025/11/23 20:00:30 main.go:156: served 200 %2Feurope%2F3%2F4%2F2.mvt in 2.35675675s
+2025/11/23 20:00:30 main.go:156: served 200 %2Feurope%2F3%2F3%2F3.mvt in 2.340785917s
