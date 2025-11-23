@@ -1,0 +1,248 @@
+[2025-11-23T19:43:20.923241Z]
+User Prompt: amersfoort
+> context:
+1. [contact] score 0.716: Hond (woef) ✉ blaf@gmail.com ☎ 0612345678 ❝ blaf blaf
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:43:39.253070Z]
+User Prompt: kees
+> context:
+1. [contact] score 0.436: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:44:05.004542Z]
+User Prompt: Connected devices
+> context:
+1. [contact] score 0.501: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw?
+2. [contact] score 0.425: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens
+3. [contact] score 0.404: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM.
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:44:23.785035Z]
+User Prompt: Adress van jeffrey
+> context:
+1. [device] score 0.588: Jeffrey (Jeffrey's computer) ✉ jeffrey@gmail.com ☎ 0612345678
+2. [contact] score 0.569: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk
+3. [contact] score 0.415: Hond (woef) ✉ blaf@gmail.com ☎ 0612345678 ❝ blaf blaf
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:44:54.666984Z]
+User Prompt: locatie van jeffrey
+> context:
+1. [contact] score 0.580: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk
+2. [device] score 0.513: Jeffrey (Jeffrey's computer) ✉ jeffrey@gmail.com ☎ 0612345678
+3. [contact] score 0.511: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw?
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:45:08.794012Z]
+User Prompt: de locatie van Hond
+> context:
+1. [contact] score 0.479: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk
+2. [contact] score 0.437: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw?
+3. [contact] score 0.400: Karel (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:46:27.269712Z]
+User Prompt: Wijk aan zee
+> context:
+1. [contact] score 0.675: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:47:12.096674Z]
+User Prompt: wijk aan zee
+> context:
+1. [contact] score 0.675: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens 📍 Wijk aan Zee, Wijk aan Zee (52.49393, 4.59390)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:49:24.678149Z]
+User Prompt: Maarssen
+> context:
+1. [contact] score 0.609: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:49:47.701346Z]
+User Prompt: Connected devices
+> context:
+1. [contact] score 0.501: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw? 📍 Gelabelde locatie (51.97087, 9.83895)
+2. [contact] score 0.425: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens 📍 Wijk aan Zee, Wijk aan Zee (52.49393, 4.59390)
+3. [contact] score 0.404: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:50:27.158748Z]
+User Prompt: Wie van onze contacten woont in Milan?
+> context:
+1. [contact] score 0.588: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+2. [contact] score 0.496: Karel (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind 📍 Gelabelde locatie (50.96989, 10.97561)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+
+[2025-11-23T19:52:09.987674Z]
+User Prompt: Wat is wordpress
+> context:
+1. [contact] score 0.427: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-23T19:52:49.310517Z]
+User Prompt: Je bent niet jeffrey, je bent loci scientia, een contact van ons heet jeffrey
+> context:
+1. [contact] score 0.646: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+2. [contact] score 0.549: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw? 📍 Gelabelde locatie (51.97087, 9.83895)
+3. [contact] score 0.496: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens 📍 Wijk aan Zee, Wijk aan Zee (52.49393, 4.59390)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-23T19:53:16.679575Z]
+User Prompt: Welke contacten van ons wonen in Nederland
+> context:
+1. [contact] score 0.572: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+2. [contact] score 0.569: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw? 📍 Gelabelde locatie (51.97087, 9.83895)
+3. [contact] score 0.466: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens 📍 Wijk aan Zee, Wijk aan Zee (52.49393, 4.59390)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-23T19:53:39.769415Z]
+User Prompt: Gideon woont niet in Nederland toch?
+> context:
+1. [contact] score 0.601: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+2. [contact] score 0.529: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw? 📍 Gelabelde locatie (51.97087, 9.83895)
+3. [contact] score 0.437: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-23T19:54:05.509727Z]
+User Prompt: Hij is niet italiaans hij heet italiaander en woont gewoon in milaan hij is nederlands
+> context:
+1. [contact] score 0.630: Karel (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind 📍 Gelabelde locatie (50.96989, 10.97561)
+2. [contact] score 0.534: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+3. [contact] score 0.519: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-23T19:54:50.924613Z]
+User Prompt: Kan je me wat code geven waar een array instaat als json met al onze contacten, de code moet javascript zijn en moet als ik het run alle informatie van onze contacten outputten
+> context:
+1. [contact] score 0.646: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+2. [contact] score 0.608: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+3. [contact] score 0.600: Karel (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind 📍 Gelabelde locatie (50.96989, 10.97561)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+

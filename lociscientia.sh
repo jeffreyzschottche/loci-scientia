@@ -11,6 +11,63 @@ if [ -f ".env" ]; then
     set +a
 fi
 
+install_ollama() {
+    if ! command -v ollama >/dev/null 2>&1; then
+        echo "📦 Ollama niet gevonden, proberen te installeren..."
+        if curl -fsSL https://ollama.com/install.sh | sh; then
+            echo "✅ Ollama geïnstalleerd"
+        else
+            echo "⚠️  Ollama installatie mislukt. Mogelijk netwerk restrictie."
+            echo "    Installeer Ollama handmatig: https://ollama.com/download"
+            echo "    Of gebruik de mock mode voor testing."
+            return 1
+        fi
+    else
+        echo "✅ Ollama is al geïnstalleerd"
+    fi
+    return 0
+}
+
+ollama_pid=""
+start_ollama() {
+    if ! command -v ollama >/dev/null 2>&1; then
+        echo "⚠️  Ollama niet beschikbaar, overslaan..."
+        return 1
+    fi
+
+    if pgrep -x "ollama" >/dev/null 2>&1; then
+        echo "✅ Ollama draait al"
+    else
+        echo "⏳ Ollama server starten..."
+        ollama serve > "$PROJECT_ROOT/ollama.log" 2>&1 &
+        ollama_pid=$!
+        echo "✅ Ollama server gestart (PID: $ollama_pid)"
+        sleep 3
+    fi
+
+    if ! ollama list | grep -q "gemma3:4b"; then
+        echo "📥 Model gemma3:4b downloaden (dit kan even duren bij eerste keer)..."
+        if ollama pull gemma3:4b; then
+            echo "✅ Model gemma3:4b gedownload"
+        else
+            echo "⚠️  Model download mislukt. Check netwerk verbinding."
+            return 1
+        fi
+    else
+        echo "✅ Model gemma3:4b is al beschikbaar"
+    fi
+    return 0
+}
+
+echo "=== Ollama Setup ==="
+if install_ollama; then
+    start_ollama || echo "⚠️  Kon Ollama niet starten, app draait zonder LLM support"
+else
+    echo "⚠️  App draait zonder Ollama support"
+fi
+echo "===================="
+echo
+
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 BACKEND_HTTP="${BACKEND_HTTP:-http://$BACKEND_HOST:$BACKEND_PORT}"
@@ -25,12 +82,10 @@ if [ -z "${BACKEND_WS:-}" ]; then
 fi
 export BACKEND_HOST BACKEND_PORT BACKEND_HTTP BACKEND_WS
 
-# Zorg dat er een virtuele omgeving is en dat requirements éénmaal geïnstalleerd zijn.
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
 fi
 
-# Activeer de venv voordat we afhankelijkheden installeren of de app starten.
 # shellcheck source=/dev/null
 source .venv/bin/activate
 
@@ -40,7 +95,6 @@ if [ ! -f ".venv/.requirements_installed" ]; then
     touch .venv/.requirements_installed
 fi
 
-# Backend config
 BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_HOST" --port "$BACKEND_PORT")
 backend_log="$PROJECT_ROOT/backend.log"
 
@@ -97,8 +151,8 @@ if [ -z "${PMTILES_STATUS_HINT:-}" ]; then
 fi
 export MAP_GLYPHS_URL MAP_SPRITE_URL PMTILES_STATUS_HINT
 pmtiles_log="$PROJECT_ROOT/pmtiles.log"
+pmtiles_pid=""
 
-# voorkom dat een oude pmtiles-server op dezelfde poort blijft draaien
 if lsof -ti:"$PMTILES_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     old_pid=$(lsof -ti:"$PMTILES_PORT" -sTCP:LISTEN)
     echo "⚠️  bestaand proces op poort $PMTILES_PORT gevonden (pid $old_pid), stoppen…"
@@ -116,12 +170,18 @@ cleanup() {
     kill "$backend_pid" >/dev/null 2>&1 || true
 
     echo "🛑 pmtiles server stoppen..."
-    kill "$pmtiles_pid" >/dev/null 2>&1 || true
+    if [ -n "${pmtiles_pid:-}" ]; then
+        kill "$pmtiles_pid" >/dev/null 2>&1 || true
+    fi
+
+    if [ -n "${ollama_pid:-}" ]; then
+        echo "🛑 Ollama stoppen..."
+        kill "$ollama_pid" >/dev/null 2>&1 || true
+    fi
 }
 
 trap cleanup EXIT
 
-# Wachten tot backend reageert
 health_url="http://$BACKEND_HOST:$BACKEND_PORT/health"
 for i in {1..40}; do
     if curl -fs "$health_url" >/dev/null 2>&1; then
@@ -136,8 +196,6 @@ if ! curl -fs "$health_url" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Frontend starten (blokkerend)
 python -m app.frontend.main
 
-# Wacht op backend-proces (zodat EXIT-trap netjes afgaat)
 wait "$backend_pid"

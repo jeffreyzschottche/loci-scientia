@@ -6,5 +6,6 @@ qasync
 websockets
 psutil
 requests
+httpx
 qdrant-client[fastembed]
 numpy<2.0

@@ -26,7 +26,7 @@ from .widgets.devices_page import DevicesPage
 from .widgets.faq_page import FAQPage
 from .widgets.headerbar import HeaderBar
 from .widgets.knowledge_page import KnowledgePage
-from app.maps.maps_page import MapsPage
+from .widgets.maps_page import MapsPage
 from .widgets.network_page import NetworkStatusPage
 from .widgets.sidebar import Sidebar
 from .widgets.settings_page import SettingsPage
@@ -243,7 +243,7 @@ class MainWindow(QMainWindow):
             "faq": FAQPage(),
         }
 
-        contacts_page = self.pages["contacts"]
+        contacts_page = self.pages.get("contacts")
         if isinstance(contacts_page, ContactsPage):
             contacts_page.view_on_map_requested.connect(
                 self._handle_view_on_map_request
@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
         self.sidebar.navigate.connect(self.show_page)
         self.sidebar.set_current("chat")
         self.show_page("chat")
-
+        
         # Pas de DARK_QSS toe op de gehele MainWindow (behalve waar overschreven)
         self.setStyleSheet(DARK_QSS) 
 
