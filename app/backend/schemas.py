@@ -65,6 +65,14 @@ class DeviceCreate(BaseModel):
     device_name: str
 
 
+class DevicePatch(BaseModel):
+    user_name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    phone: Optional[str] = None
+    device_name: Optional[str] = None
+
+
 class ApiRoute(BaseModel):
     id: str
     name: str

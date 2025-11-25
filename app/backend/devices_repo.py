@@ -8,7 +8,7 @@ from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorPa
 
 from .contacts_repo import _get_qdrant_client, QDRANT_LOCAL_DIR
 from .rag.embedder import embed_text
-from .schemas import Device, DeviceCreate
+from .schemas import Device, DeviceCreate, DevicePatch
 
 
 class DevicesRepository:
@@ -94,6 +94,18 @@ class DevicesRepository:
             return
         self._rebuild_collection(client, vector_size)
 
+    def _device_from_payload(self, payload: Dict, fallback_id: Optional[str] = None) -> Device:
+        payload = dict(payload)
+        payload.setdefault("id", fallback_id or uuid.uuid4().hex)
+        return Device(
+            id=str(payload["id"]),
+            user_name=payload.get("user_name", ""),
+            email=payload.get("email", ""),
+            password=payload.get("password", ""),
+            phone=payload.get("phone", ""),
+            device_name=payload.get("device_name", ""),
+        )
+
     def list_devices(self) -> List[Device]:
         with self._client_context() as client:
             try:
@@ -110,16 +122,7 @@ class DevicesRepository:
         for point in points:
             payload = point.payload or {}
             try:
-                devices.append(
-                    Device(
-                        id=str(payload.get("id") or point.id),
-                        user_name=payload["user_name"],
-                        email=payload.get("email", ""),
-                        password=payload.get("password", ""),
-                        phone=payload.get("phone", ""),
-                        device_name=payload.get("device_name", ""),
-                    )
-                )
+                devices.append(self._device_from_payload(payload, fallback_id=str(point.id)))
             except KeyError:
                 continue
         return devices
@@ -151,7 +154,44 @@ class DevicesRepository:
                 ],
             )
 
-        return Device(id=did, **data.model_dump())
+        return self._device_from_payload(payload)
+
+    def update_device(self, device_id: str, patch: DevicePatch) -> Device:
+        with self._client_context() as client:
+            existing = client.retrieve(
+                collection_name=self.collection,
+                ids=[device_id],
+                with_payload=True,
+                with_vectors=False,
+            )
+        if not existing:
+            raise ValueError("device not found")
+
+        payload = dict(existing[0].payload or {})
+        payload.setdefault("id", device_id)
+        payload.update(patch.model_dump(exclude_unset=True))
+
+        text = self._embedding_text(payload)
+        vector = list(embed_text(text).vector)
+
+        with self._client_context() as client:
+            self._ensure_collection(client, len(vector))
+            client.upsert(
+                collection_name=self.collection,
+                points=[
+                    PointStruct(
+                        id=payload["id"],
+                        vector=vector,
+                        payload=payload,
+                    )
+                ],
+            )
+
+        return self._device_from_payload(payload)
+
+    def delete_device(self, device_id: str) -> None:
+        with self._client_context() as client:
+            client.delete(collection_name=self.collection, points_selector=[device_id])
 
     def search_devices(self, query: str, limit: int = 3) -> list[tuple[Device, float]]:
         vector = embed_text(query).vector
@@ -170,14 +210,7 @@ class DevicesRepository:
         for hit in response.points:
             payload = hit.payload or {}
             try:
-                device = Device(
-                    id=str(payload.get("id") or hit.id),
-                    user_name=payload["user_name"],
-                    email=payload.get("email", ""),
-                    password=payload.get("password", ""),
-                    phone=payload.get("phone", ""),
-                    device_name=payload.get("device_name", ""),
-                )
+                device = self._device_from_payload(payload, fallback_id=str(hit.id))
             except KeyError:
                 continue
             score = hit.score or 0.0

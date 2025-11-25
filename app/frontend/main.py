@@ -244,6 +244,7 @@ class MainWindow(QMainWindow):
         }
 
         contacts_page = self.pages.get("contacts")
+        maps_page = self.pages.get("maps")
         if isinstance(contacts_page, ContactsPage):
             contacts_page.view_on_map_requested.connect(
                 self._handle_view_on_map_request
@@ -251,7 +252,17 @@ class MainWindow(QMainWindow):
             contacts_page.add_location_requested.connect(
                 self._handle_add_location_request
             )
-
+        if isinstance(maps_page, MapsPage) and isinstance(contacts_page, ContactsPage):
+            contacts_page.contacts_updated.connect(
+                lambda contact_id="": maps_page.handle_external_contact_change(
+                    contact_id or None
+                )
+            )
+            maps_page.contact_changed.connect(
+                lambda contact_id="": contacts_page.reload_contacts(
+                    select_id=contact_id or None
+                )
+            )
         self.content = QWidget()
         
         # Oplossing 2: Zorg ervoor dat de content container ook transparant is
@@ -281,10 +292,10 @@ class MainWindow(QMainWindow):
         self.sidebar.set_current("maps")
         self.show_page("maps")
 
-    def _handle_add_location_request(self, contact: dict) -> None:
+    def _handle_add_location_request(self, contact: dict, force_pin: bool = False) -> None:
         maps_page = self.pages.get("maps")
         if isinstance(maps_page, MapsPage):
-            maps_page.request_location_for_contact(contact)
+            maps_page.request_location_for_contact(contact, force_pin=force_pin)
         self.sidebar.set_current("maps")
         self.show_page("maps")
 

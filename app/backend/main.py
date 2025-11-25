@@ -21,6 +21,7 @@ from .schemas import (
     ContactPatch,
     Device,
     DeviceCreate,
+    DevicePatch,
 )
 from .settings import settings
 from .store import Store
@@ -271,6 +272,15 @@ def patch_contact(contact_id: str, patch: ContactPatch):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.delete("/contacts/{contact_id}")
+def delete_contact(contact_id: str):
+    try:
+        contacts_repo.delete_contact(contact_id)
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"status": "ok"}
+
+
 @app.get("/devices", response_model=list[Device])
 def list_devices():
     return devices_repo.list_devices()
@@ -282,6 +292,25 @@ def create_device(data: DeviceCreate):
         return devices_repo.create_device(data)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.patch("/devices/{device_id}", response_model=Device)
+def patch_device(device_id: str, patch: DevicePatch):
+    try:
+        return devices_repo.update_device(device_id, patch)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="device not found")
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.delete("/devices/{device_id}")
+def delete_device(device_id: str):
+    try:
+        devices_repo.delete_device(device_id)
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"status": "ok"}
 
 
 @app.websocket(settings.ws_path)

@@ -51,6 +51,7 @@ class MapBridge(QObject):
 
 
 class MapsPage(QWidget):
+    contact_changed = Signal(str)
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -470,7 +471,33 @@ class MapsPage(QWidget):
         self.contacts_list = QListWidget()
         self.contacts_list.setAlternatingRowColors(True)
         self.contacts_list.itemChanged.connect(self._handle_contact_toggle)
+        self.contacts_list.currentItemChanged.connect(
+            lambda *_: self._update_contact_action_state()
+        )
         layout.addWidget(self.contacts_list, 1)
+
+        actions = QVBoxLayout()
+        actions.setSpacing(6)
+        self.edit_contact_btn = QPushButton("Bewerk contact")
+        self.edit_contact_btn.clicked.connect(self._edit_selected_contact)
+        actions.addWidget(self.edit_contact_btn)
+        self.pin_contact_btn = QPushButton("Nieuwe locatie pinnen")
+        self.pin_contact_btn.clicked.connect(self._pin_selected_contact)
+        actions.addWidget(self.pin_contact_btn)
+        self.clear_location_btn = QPushButton("Verwijder locatie")
+        self.clear_location_btn.clicked.connect(self._clear_selected_location)
+        actions.addWidget(self.clear_location_btn)
+        self.delete_contact_btn = QPushButton("Verwijder contact")
+        self.delete_contact_btn.clicked.connect(self._delete_selected_contact)
+        actions.addWidget(self.delete_contact_btn)
+        layout.addLayout(actions)
+        for button in (
+            self.edit_contact_btn,
+            self.pin_contact_btn,
+            self.clear_location_btn,
+            self.delete_contact_btn,
+        ):
+            button.setEnabled(False)
 
         self.contacts_empty.hide()
 
@@ -673,7 +700,7 @@ class MapsPage(QWidget):
             )
             return []
 
-    def _load_contacts_for_map(self) -> None:
+    def _load_contacts_for_map(self, focus_contact_id: Optional[str] = None) -> None:
         contacts = self._fetch_contacts()
         geocoded = [
             contact
@@ -715,6 +742,13 @@ class MapsPage(QWidget):
         }
         self._update_select_all_state()
         self._sync_contact_markers()
+        if focus_contact_id:
+            self._set_contact_checked(focus_contact_id, True)
+            item = self._find_contact_item(focus_contact_id)
+            if item:
+                self.contacts_list.setCurrentItem(item)
+                self.contacts_list.scrollToItem(item)
+        self._update_contact_action_state()
 
     def _contact_list_label(self, contact: dict) -> str:
         name = contact.get("name") or "Onbekend"
@@ -760,6 +794,144 @@ class MapsPage(QWidget):
             "lon": lon,
             "info": popup_text,
         }
+
+    def _selected_contact(self) -> Optional[dict]:
+        if not hasattr(self, "contacts_list"):
+            return None
+        item = self.contacts_list.currentItem()
+        return item.data(Qt.UserRole) if item else None
+
+    def _update_contact_action_state(self) -> None:
+        contact = self._selected_contact()
+        has_contact = contact is not None
+        has_location = bool(
+            contact
+            and contact.get("location_lat") is not None
+            and contact.get("location_lon") is not None
+        )
+        for button in (
+            getattr(self, "edit_contact_btn", None),
+            getattr(self, "pin_contact_btn", None),
+            getattr(self, "delete_contact_btn", None),
+        ):
+            if button:
+                button.setEnabled(has_contact)
+        if getattr(self, "clear_location_btn", None):
+            self.clear_location_btn.setEnabled(has_location)
+
+    def _edit_selected_contact(self) -> None:
+        contact = self._selected_contact()
+        if not contact:
+            return
+        contact_id = contact.get("id")
+        if contact_id is None:
+            return
+        dialog = ContactFormDialog(self, title="Contact bewerken", initial=contact)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        payload = dialog.payload()
+        mode = dialog.save_mode()
+        try:
+            resp = requests.patch(
+                f"{BACKEND_HTTP}/contacts/{contact_id}",
+                json=payload,
+                timeout=BACKEND_TIMEOUT,
+            )
+            resp.raise_for_status()
+            updated = resp.json()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Fout",
+                f"Contact kon niet worden bijgewerkt:\n{exc}",
+            )
+            return
+        contact_key = str(contact_id)
+        self.contact_changed.emit(contact_key)
+        self._load_contacts_for_map(focus_contact_id=contact_key)
+        if mode == "save_and_map":
+            self.request_location_for_contact(updated, force_pin=True)
+
+    def _pin_selected_contact(self) -> None:
+        contact = self._selected_contact()
+        if not contact:
+            return
+        self.request_location_for_contact(contact, force_pin=True)
+
+    def _clear_selected_location(self) -> None:
+        contact = self._selected_contact()
+        if not contact:
+            return
+        contact_id = contact.get("id")
+        if contact_id is None:
+            return
+        confirm = QMessageBox.question(
+            self,
+            "Locatie verwijderen",
+            "Weet je zeker dat je de locatie voor dit contact wilt verwijderen?",
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        payload = {
+            "location_label": None,
+            "location_street": None,
+            "location_city": None,
+            "location_region": None,
+            "location_country": None,
+            "location_context": None,
+            "location_lat": None,
+            "location_lon": None,
+        }
+        try:
+            resp = requests.patch(
+                f"{BACKEND_HTTP}/contacts/{contact_id}",
+                json=payload,
+                timeout=BACKEND_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Fout",
+                f"Locatie kon niet worden verwijderd:\n{exc}",
+            )
+            return
+        contact_key = str(contact_id)
+        self.contact_changed.emit(contact_key)
+        self._load_contacts_for_map(focus_contact_id=contact_key)
+
+    def _delete_selected_contact(self) -> None:
+        contact = self._selected_contact()
+        if not contact:
+            return
+        contact_id = contact.get("id")
+        if contact_id is None:
+            return
+        confirm = QMessageBox.question(
+            self,
+            "Contact verwijderen",
+            f"Weet je zeker dat je {contact.get('name', 'dit contact')} wilt verwijderen?",
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        try:
+            resp = requests.delete(
+                f"{BACKEND_HTTP}/contacts/{contact_id}",
+                timeout=BACKEND_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Fout",
+                f"Contact kon niet worden verwijderd:\n{exc}",
+            )
+            return
+        self.contact_changed.emit(str(contact_id))
+        self._load_contacts_for_map()
+
+    def handle_external_contact_change(self, contact_id: Optional[str]) -> None:
+        self._load_contacts_for_map(focus_contact_id=contact_id)
 
     def _sync_contact_markers(self, *, focus_contact_id: Optional[str] = None) -> None:
         if not hasattr(self, "webview") or not hasattr(self, "contacts_list"):
@@ -845,7 +1017,7 @@ class MapsPage(QWidget):
             self.contacts_list.scrollToItem(item)
         self._sync_contact_markers(focus_contact_id=contact_id)
 
-    def request_location_for_contact(self, contact: dict) -> None:
+    def request_location_for_contact(self, contact: dict, force_pin: bool = False) -> None:
         if not contact:
             return
         contact_id_value = contact.get("id")
@@ -859,16 +1031,16 @@ class MapsPage(QWidget):
         contact_id = str(contact_id_value)
         lat = contact.get("location_lat")
         lon = contact.get("location_lon")
-        if lat is not None and lon is not None:
+        if lat is not None and lon is not None and not force_pin:
             self.focus_on_contact(contact)
             return
         self._pending_contact_id_for_pin = contact_id
         name = contact.get("name") or "dit contact"
-        QMessageBox.information(
-            self,
-            "Locatie koppelen",
-            f"Selecteer op de kaart een locatie voor {name}.",
-        )
+        if force_pin:
+            message = f"Selecteer op de kaart een nieuwe locatie voor {name}."
+        else:
+            message = f"Selecteer op de kaart een locatie voor {name}."
+        QMessageBox.information(self, "Locatie koppelen", message)
         self._start_pin_mode()
 
     def _location_payload(self, location: Dict[str, Any]) -> Dict[str, Any]:
@@ -905,6 +1077,11 @@ class MapsPage(QWidget):
             "Locatie opgeslagen",
             f"Locatie is gekoppeld aan {contact.get('name', 'contact')}.",
         )
+        contact_id = contact.get("id")
+        if contact_id is not None:
+            contact_key = str(contact_id)
+            self.contact_changed.emit(contact_key)
+            self._load_contacts_for_map(focus_contact_id=contact_key)
 
     def _create_contact_with_location(self, location: Dict[str, Any]) -> Optional[dict]:
         dialog = ContactFormDialog(
@@ -930,7 +1107,11 @@ class MapsPage(QWidget):
                 timeout=BACKEND_TIMEOUT,
             )
             resp.raise_for_status()
-            return resp.json()
+            created = resp.json()
+            contact_id = created.get("id")
+            if contact_id is not None:
+                self.contact_changed.emit(str(contact_id))
+            return created
         except Exception as exc:
             QMessageBox.critical(
                 self,

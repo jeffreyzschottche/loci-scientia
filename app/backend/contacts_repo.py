@@ -263,6 +263,10 @@ class ContactsRepository:
 
         return self._contact_from_payload(payload)
 
+    def delete_contact(self, contact_id: str) -> None:
+        with self._client_context() as client:
+            client.delete(collection_name=self.collection, points_selector=[contact_id])
+
     def search_contacts(self, query: str, limit: int = 3) -> list[tuple[Contact, float]]:
         """Zoek naar contacten die qua embedding het dichtst bij *query* liggen."""
 
