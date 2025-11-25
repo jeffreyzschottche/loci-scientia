@@ -176,7 +176,7 @@ async def sse_stream_generator(req: ChatRequest):
     # Call Ollama API with streaming
     ollama_url = "http://localhost:11434/api/generate"
     ollama_payload = {
-        "model": "gemma3:4b",
+        "model": "mistral:7b",
         "prompt": final_prompt,
         "stream": True,
     }
