@@ -1,11 +1,19 @@
-"""Eenvoudige, offline embedding via hashing van tokens/teksten."""
+"""Embedding helper dat fastembed gebruikt en dus afgesneden kan draaien."""
 from dataclasses import dataclass
-from math import sqrt
-from typing import Sequence
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional, Sequence
 
-import hashlib
+import os
+import shutil
 
-VECTOR_SIZE = 64
+from fastembed import TextEmbedding
+
+DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+DEFAULT_CACHE_DIR = Path.home() / ".cache" / "fastembed"
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LOCAL_MODEL_ROOT = _PROJECT_ROOT / "fastembed_models"
+LOCAL_MODEL_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass(frozen=True)
@@ -18,44 +26,120 @@ class EmbeddingResult:
         return len(self.vector)
 
 
-def _stable_hash(value: str) -> int:
-    """Bepaal een reproduceerbare hash zonder afhankelijkheid van hash randomization."""
-    digest = hashlib.blake2b(value.encode("utf-8"), digest_size=8).digest()
-    return int.from_bytes(digest, byteorder="big", signed=False)
+def _cache_dir() -> Path:
+    """Bepaal waar fastembed de modellen mag cachen."""
+    override = os.getenv("FASTEMBED_CACHE_DIR")
+    if override:
+        path = Path(override).expanduser()
+    else:
+        path = DEFAULT_CACHE_DIR
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
-def _normalize(vector: Sequence[float]) -> list[float]:
-    norm = sqrt(sum(value * value for value in vector))
-    if norm <= 0:
-        return [0.0] * len(vector)
-    return [value / norm for value in vector]
+def _safe_model_dir_name(model_name: str) -> str:
+    return model_name.replace("/", "__")
 
 
-def _tokenize(text: str) -> list[str]:
-    cleaned = "".join(ch if ch.isalnum() else " " for ch in text.lower())
-    return [token for token in cleaned.split() if token]
+def _local_model_dir(model_name: str) -> Path:
+    override = os.getenv("FASTEMBED_MODEL_DIR")
+    if override:
+        return Path(override).expanduser()
+    return LOCAL_MODEL_ROOT / _safe_model_dir_name(model_name)
 
 
-def _add_ngrams(vector: list[float], text: str, weight: float, n: int) -> None:
-    for i in range(len(text) - n + 1):
-        ngram = text[i : i + n]
-        if " " in ngram:
-            continue
-        idx = _stable_hash(ngram) % VECTOR_SIZE
-        vector[idx] += weight
+def _allow_download() -> bool:
+    flag = os.getenv("FASTEMBED_ALLOW_DOWNLOAD", "")
+    return flag.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _seed_local_model(embedder: TextEmbedding, target_dir: Path) -> None:
+    """Kopieer een gedownloade fastembed map naar het project voor offline gebruik."""
+    try:
+        model_dir = Path(getattr(embedder.model, "_model_dir"))
+    except Exception:
+        return
+    if not model_dir.exists() or target_dir.exists():
+        return
+    target_dir.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copytree(model_dir, target_dir)
+    except FileExistsError:
+        pass
+
+
+@lru_cache(maxsize=None)
+def _model_metadata(model_name: str) -> dict:
+    for model in TextEmbedding.list_supported_models():
+        if model_name.lower() == model["model"].lower():
+            return model
+    raise ValueError(f"Onbekend fastembed model: {model_name}")
+
+
+def _snapshot_dir_from_cache(cache_dir: Path, model_name: str) -> Optional[Path]:
+    meta = _model_metadata(model_name)
+    sources = meta.get("sources") or {}
+    hf_repo = sources.get("hf")
+    if not hf_repo:
+        return None
+    repo_dir = cache_dir / f"models--{hf_repo.replace('/', '--')}"
+    snapshots_dir = repo_dir / "snapshots"
+    if not snapshots_dir.exists():
+        return None
+    candidates = sorted(
+        [path for path in snapshots_dir.iterdir() if path.is_dir()],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for snapshot in candidates:
+        if any(snapshot.iterdir()):
+            return snapshot
+    return None
+
+
+def _try_seed_from_cache(cache_dir: Path, local_dir: Path, model_name: str) -> None:
+    if local_dir.exists():
+        return
+    snapshot = _snapshot_dir_from_cache(cache_dir, model_name)
+    if not snapshot or not snapshot.exists():
+        return
+    local_dir.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copytree(snapshot, local_dir)
+    except FileExistsError:
+        pass
+
+
+@lru_cache(maxsize=1)
+def _text_embedder() -> TextEmbedding:
+    """Cache de fastembed instantie zodat modellen één keer worden geladen."""
+    model_name = os.getenv("FASTEMBED_MODEL", DEFAULT_MODEL)
+    cache_dir = _cache_dir()
+    local_dir = _local_model_dir(model_name)
+    _try_seed_from_cache(cache_dir, local_dir, model_name)
+    if local_dir.exists():
+        return TextEmbedding(
+            model_name=model_name,
+            cache_dir=str(cache_dir),
+            local_files_only=True,
+            specific_model_path=str(local_dir),
+        )
+    if not _allow_download():
+        raise RuntimeError(
+            (
+                f"Fastembed model '{model_name}' ontbreekt lokaal in {local_dir}. "
+                "Plaats de uitgepakte modelbestanden daar of zet FASTEMBED_ALLOW_DOWNLOAD=1 "
+                "om het eenmalig automatisch op te halen."
+            )
+        )
+    embedder = TextEmbedding(model_name=model_name, cache_dir=str(cache_dir))
+    _seed_local_model(embedder, local_dir)
+    return embedder
 
 
 def embed_text(text: str) -> EmbeddingResult:
-    vector = [0.0] * VECTOR_SIZE
-    tokens = _tokenize(text)
-
-    for token in tokens:
-        idx = _stable_hash(token) % VECTOR_SIZE
-        vector[idx] += 1.0
-
-    joined = " ".join(tokens)
-    _add_ngrams(vector, joined, weight=0.5, n=3)
-    _add_ngrams(vector, joined, weight=0.2, n=4)
-
-    normalized = _normalize(vector)
-    return EmbeddingResult(text=text, vector=normalized)
+    """Embed de tekst met fastembed en geef de vector terug."""
+    embedder = _text_embedder()
+    # embed() retourneert een generator, we willen alleen het eerste (en enige) item.
+    vector = next(embedder.embed([text]))
+    return EmbeddingResult(text=text, vector=vector)

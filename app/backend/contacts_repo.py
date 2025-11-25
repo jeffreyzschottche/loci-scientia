@@ -4,10 +4,10 @@ import uuid
 from contextlib import contextmanager, nullcontext
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorParams
 
 from .rag.embedder import embed_text
 from .schemas import Contact, ContactCreate, ContactPatch
@@ -69,19 +69,77 @@ class ContactsRepository:
     def _client_context(self):
         return _qdrant_client_context(self._embedded_path)
 
+    def _collection_vector_size(self, info: CollectionInfo) -> Optional[int]:
+        vectors = info.config.params.vectors
+        if isinstance(vectors, VectorParams):
+            return vectors.size
+        if isinstance(vectors, dict):
+            first = next(iter(vectors.values()), None)
+            if isinstance(first, VectorParams):
+                return first.size
+        return None
+
+    def _iterate_existing_payloads(self, client: QdrantClient) -> List[Tuple[Dict, str]]:
+        payloads: List[Tuple[Dict, str]] = []
+        next_page: Optional[Union[str, int]] = None
+        while True:
+            points, next_page = client.scroll(
+                collection_name=self.collection,
+                with_payload=True,
+                with_vectors=False,
+                limit=256,
+                offset=next_page,
+            )
+            if not points:
+                break
+            for point in points:
+                payload = dict(point.payload or {})
+                fallback_id = str(point.id or uuid.uuid4().hex)
+                payloads.append((payload, fallback_id))
+            if next_page is None:
+                break
+        return payloads
+
+    def _create_collection(self, client: QdrantClient, vector_size: int) -> None:
+        client.recreate_collection(
+            collection_name=self.collection,
+            vectors_config=VectorParams(
+                size=vector_size,
+                distance=Distance.COSINE,
+            ),
+        )
+
+    def _rebuild_collection(self, client: QdrantClient, vector_size: int) -> None:
+        existing_payloads = self._iterate_existing_payloads(client)
+        self._create_collection(client, vector_size)
+        if not existing_payloads:
+            return
+        new_points: List[PointStruct] = []
+        for payload, fallback_id in existing_payloads:
+            payload.setdefault("id", fallback_id)
+            vector = list(embed_text(self._embedding_text(payload)).vector)
+            new_points.append(
+                PointStruct(
+                    id=payload["id"],
+                    vector=vector,
+                    payload=payload,
+                )
+            )
+        client.upsert(collection_name=self.collection, points=new_points)
+
     def _ensure_collection(self, client: QdrantClient, vector_size: int) -> None:
-        """Zorg dat de collectie bestaat."""
+        """Zorg dat de collectie bestaat en de vector-dimensie klopt."""
 
         try:
-            client.get_collection(self.collection)
+            info = client.get_collection(self.collection)
         except Exception:
-            client.recreate_collection(
-                collection_name=self.collection,
-                vectors_config=VectorParams(
-                    size=vector_size,
-                    distance=Distance.COSINE,
-                ),
-            )
+            self._create_collection(client, vector_size)
+            return
+
+        current_size = self._collection_vector_size(info)
+        if current_size == vector_size:
+            return
+        self._rebuild_collection(client, vector_size)
 
     def _contact_from_payload(self, payload: Dict, fallback_id: Optional[str] = None) -> Contact:
         return Contact(

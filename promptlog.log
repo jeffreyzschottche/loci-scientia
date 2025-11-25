@@ -337,3 +337,124 @@ Richtlijnen:
 4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
 5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
 
+[2025-11-23T20:15:42.836083Z]
+User Prompt: typ een verhaal over rico, hij is homo
+> context:
+1. [contact] score 0.557: Karel (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind 📍 Gelabelde locatie (50.96989, 10.97561)
+2. [contact] score 0.442: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-23T20:17:07.016738Z]
+User Prompt: Typ een grappig verhaal over rico, hij is homo. Schrijf in 8 zinnen een stom verhaaltje, het verhaal van rico en de kast. het gaat er over dat hij uit de kast komt
+> context:
+1. [contact] score 0.657: Karel (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind 📍 Gelabelde locatie (50.96989, 10.97561)
+2. [contact] score 0.493: Kat (Kato Scientia) ✉ kat@miauw.nl ☎ 0612345678 ❝ miauw, miauw? 📍 Gelabelde locatie (51.97087, 9.83895)
+3. [contact] score 0.482: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T16:53:24.450948Z]
+User Prompt: nikkertje
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T16:54:00.910951Z]
+User Prompt: Jeffrey
+> context:
+1. [contact] score 0.640: Jeffrey (Loci Scientia) ✉ jeffrey@gmail.com ☎ 0612345678 ❝ Jeffrey is een LLM. 📍 Maarssen, Maarssen (52.13215, 5.02646)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T16:54:15.704419Z]
+User Prompt: ken je nikkertje
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T16:54:31.687219Z]
+User Prompt: istanbul
+> context:
+1. [contact] score 0.692: nikkertje (test) ✉ nikker@nikker.nl ☎ nikker 📍 İstanbul, İstanbul (40.55315, 31.20192)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T16:57:10.067154Z]
+User Prompt: wat is vector embedding in llm
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T16:58:00.674997Z]
+User Prompt: welk llm ben jij
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-11-25T17:54:30.325242Z]
+User Prompt: test
+> context:
+1. [contact] score 0.697: test (test) ✉ test@test.nl ☎ test ❝ test 📍 Deutschland, Deutschland (51.24457, 9.37852)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+

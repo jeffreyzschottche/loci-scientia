@@ -1,9 +1,10 @@
 import os
 import uuid
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional, Tuple, Union
 
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client import QdrantClient
+from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorParams
 
 from .contacts_repo import _get_qdrant_client, QDRANT_LOCAL_DIR
 from .rag.embedder import embed_text
@@ -23,15 +24,75 @@ class DevicesRepository:
     def _client_context(self):
         return _get_qdrant_client(self._embedded_path)
 
-    def _ensure_collection(self, vector_size: int) -> None:
-        with self._client_context() as client:
-            try:
-                client.get_collection(self.collection)
-            except Exception:
-                client.recreate_collection(
-                    collection_name=self.collection,
-                    vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-                )
+    def _embedding_text(self, payload: Dict[str, str]) -> str:
+        parts = []
+        for key in ("device_name", "user_name", "email", "phone"):
+            value = payload.get(key)
+            if value:
+                parts.append(value)
+        return " ".join(parts)
+
+    def _collection_vector_size(self, info: CollectionInfo) -> Optional[int]:
+        vectors = info.config.params.vectors
+        if isinstance(vectors, VectorParams):
+            return vectors.size
+        if isinstance(vectors, dict):
+            first = next(iter(vectors.values()), None)
+            if isinstance(first, VectorParams):
+                return first.size
+        return None
+
+    def _iterate_existing_payloads(self, client: QdrantClient) -> List[Tuple[Dict, str]]:
+        payloads: List[Tuple[Dict, str]] = []
+        next_page: Optional[Union[str, int]] = None
+        while True:
+            points, next_page = client.scroll(
+                collection_name=self.collection,
+                with_payload=True,
+                with_vectors=False,
+                limit=256,
+                offset=next_page,
+            )
+            if not points:
+                break
+            for point in points:
+                payload = dict(point.payload or {})
+                fallback_id = str(point.id or uuid.uuid4().hex)
+                payloads.append((payload, fallback_id))
+            if next_page is None:
+                break
+        return payloads
+
+    def _create_collection(self, client: QdrantClient, vector_size: int) -> None:
+        client.recreate_collection(
+            collection_name=self.collection,
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+        )
+
+    def _rebuild_collection(self, client: QdrantClient, vector_size: int) -> None:
+        existing_payloads = self._iterate_existing_payloads(client)
+        self._create_collection(client, vector_size)
+        if not existing_payloads:
+            return
+        new_points: List[PointStruct] = []
+        for payload, fallback_id in existing_payloads:
+            payload.setdefault("id", fallback_id)
+            text = self._embedding_text(payload)
+            vector = list(embed_text(text).vector)
+            new_points.append(PointStruct(id=payload["id"], vector=vector, payload=payload))
+        client.upsert(collection_name=self.collection, points=new_points)
+
+    def _ensure_collection(self, client: QdrantClient, vector_size: int) -> None:
+        try:
+            info = client.get_collection(self.collection)
+        except Exception:
+            self._create_collection(client, vector_size)
+            return
+
+        current_size = self._collection_vector_size(info)
+        if current_size == vector_size:
+            return
+        self._rebuild_collection(client, vector_size)
 
     def list_devices(self) -> List[Device]:
         with self._client_context() as client:
@@ -64,20 +125,6 @@ class DevicesRepository:
         return devices
 
     def create_device(self, data: DeviceCreate) -> Device:
-        text_components = filter(
-            None,
-            [
-                data.device_name,
-                data.user_name,
-                data.email,
-                data.phone,
-            ],
-        )
-        text = " ".join(text_components)
-        vector = list(embed_text(text).vector)
-        vector_size = len(vector)
-        self._ensure_collection(vector_size)
-
         did = uuid.uuid4().hex
         payload = {
             "id": did,
@@ -88,7 +135,11 @@ class DevicesRepository:
             "device_name": data.device_name,
         }
 
+        text = self._embedding_text(payload)
+        vector = list(embed_text(text).vector)
+
         with self._client_context() as client:
+            self._ensure_collection(client, len(vector))
             client.upsert(
                 collection_name=self.collection,
                 points=[

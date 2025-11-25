@@ -183,6 +183,18 @@ make frontend
 
 ---
 
+## 🧠 Embeddings & Qdrant
+
+Voor vectorzoekopdrachten gebruiken we [fastembed](https://github.com/qdrant/fastembed) via `qdrant-client[fastembed]`. Standaard draait `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. Om volledig offline te blijven:
+
+- Zet het uitgepakte model in `fastembed_models/sentence-transformers__paraphrase-multilingual-MiniLM-L12-v2` (of wijs een eigen map toe via `FASTEMBED_MODEL_DIR`). Die map moet het volledige ONNX-model, tokenizer, vocab-bestanden, enz. bevatten.
+- De backend laadt uitsluitend uit die map. Bestaat hij nog niet, dan krijg je een duidelijke foutmelding; zet dan **eenmalig** `FASTEMBED_ALLOW_DOWNLOAD=1` tijdens het starten zodat het model wordt gedownload en automatisch naar de projectmap wordt gekopieerd voor toekomstig offline gebruik.
+- Gebruik `FASTEMBED_CACHE_DIR` als je de aanvullende cache (standaard `~/.cache/fastembed`) elders wilt bewaren en `FASTEMBED_MODEL` wanneer je een ander fastembed-model kiest (plaats of kopieer dan eerst het juiste model naar de lokale map).
+
+De helper in `app/backend/rag/embedder.py` maakt de vectoren en dezelfde instellingen gelden voor zowel contacten als devices.
+
+---
+
 ## 💡 Troubleshooting
 
 | Probleem                                         | Oplossing                                                                         |
