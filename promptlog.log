@@ -490,3 +490,32 @@ Richtlijnen:
 4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
 5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
 
+[2025-12-05T15:35:45.974799Z]
+User Prompt: yo
+> context:
+1. [contact] score 0.361: Hondje (woef) ✉ blaf@gmail.com ☎ 0612345678 ❝ blaf blaf 📍 Amersfoort, Amersfoort (52.15008, 5.38521)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-05T15:37:16.937709Z]
+User Prompt: hallo
+> context:
+1. [contact] score 0.386: Hondje (woef) ✉ blaf@gmail.com ☎ 0612345678 ❝ blaf blaf 📍 Amersfoort, Amersfoort (52.15008, 5.38521)
+2. [device] score 0.380: Jetsonson (jetson) ✉ jetson@gmail.com ☎ jetson
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
