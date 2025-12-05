@@ -110,6 +110,18 @@ def _try_seed_from_cache(cache_dir: Path, local_dir: Path, model_name: str) -> N
         pass
 
 
+def _is_model_complete(model_dir: Path) -> bool:
+    """Check of het model compleet is door te kijken of de essentiële bestanden bestaan."""
+    if not model_dir.exists():
+        return False
+    # Check voor de ONNX model bestanden
+    required_files = ["model_optimized.onnx", "config.json"]
+    for filename in required_files:
+        if not (model_dir / filename).exists():
+            return False
+    return True
+
+
 @lru_cache(maxsize=1)
 def _text_embedder() -> TextEmbedding:
     """Cache de fastembed instantie zodat modellen één keer worden geladen."""
@@ -117,7 +129,7 @@ def _text_embedder() -> TextEmbedding:
     cache_dir = _cache_dir()
     local_dir = _local_model_dir(model_name)
     _try_seed_from_cache(cache_dir, local_dir, model_name)
-    if local_dir.exists():
+    if _is_model_complete(local_dir):
         return TextEmbedding(
             model_name=model_name,
             cache_dir=str(cache_dir),
@@ -132,6 +144,9 @@ def _text_embedder() -> TextEmbedding:
                 "om het eenmalig automatisch op te halen."
             )
         )
+    # Verwijder incomplete model directory als die bestaat
+    if local_dir.exists():
+        shutil.rmtree(local_dir)
     embedder = TextEmbedding(model_name=model_name, cache_dir=str(cache_dir))
     _seed_local_model(embedder, local_dir)
     return embedder
