@@ -9,3 +9,4 @@ requests
 httpx
 qdrant-client[fastembed]
 numpy
+fastembed

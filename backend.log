@@ -1,41 +1,15 @@
-INFO:     Will watch for changes in these directories: ['/Users/jeffreyzschottche/Sites/loci-scientia']
+INFO:     Will watch for changes in these directories: ['/home/kees/Documents/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [17550] using WatchFiles
-/Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
-  warnings.warn(
-INFO:     Started server process [17559]
+INFO:     Started reloader process [24411] using WatchFiles
+INFO:     Started server process [24419]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:54796 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54798 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54800 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54801 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54802 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54803 - "GET /devices HTTP/1.1" 200 OK
-/Users/jeffreyzschottche/Sites/loci-scientia/app/backend/rag/embedder.py:121: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
+INFO:     127.0.0.1:52872 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52884 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52886 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52894 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52904 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52916 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42932 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
+/home/kees/Documents/loci-scientia/app/backend/rag/embedder.py:133: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
   return TextEmbedding(
-INFO:     127.0.0.1:54806 - "PATCH /contacts/0e851767028c4a6ca562fe8e23426845 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54807 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54808 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54809 - "DELETE /contacts/2122c5d8de154cdb988fe80d0a6c633b HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54810 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54811 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54812 - "GET /sprites/v4/light%402x.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54813 - "GET /sprites/v4/light%402x.png HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54812 - "GET /fonts/Noto%20Sans%20Regular/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54813 - "GET /fonts/Noto%20Sans%20Italic/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54818 - "GET /fonts/Noto%20Sans%20Regular/1536-1791.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54819 - "GET /fonts/Noto%20Sans%20Regular/11520-11775.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54820 - "GET /fonts/Noto%20Sans%20Medium/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54812 - "GET /fonts/Noto%20Sans%20Regular/768-1023.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54821 - "GET /fonts/Noto%20Sans%20Regular/1024-1279.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54821 - "GET /fonts/Noto%20Sans%20Medium/256-511.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54823 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54824 - "PATCH /contacts/36d9b161011447889492ea3cac295d75 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54825 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54826 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [17559]
-INFO:     Stopping reloader process [17550]
