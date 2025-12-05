@@ -10,3 +10,4 @@ httpx
 qdrant-client[fastembed]
 numpy
 fastembed
+pmtiles
