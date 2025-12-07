@@ -48,7 +48,7 @@ check_docker() {
 
 # Check voor NVIDIA Container Toolkit
 check_nvidia_docker() {
-    if ! docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &> /dev/null; then
+    if ! docker run --rm --gpus all nvidia/cuda:12.4.0-runtime-ubuntu22.04 nvidia-smi &> /dev/null; then
         log_warn "NVIDIA Container Toolkit niet geconfigureerd of geen GPU beschikbaar."
         log_info "Installeer de NVIDIA Container Toolkit:"
         echo ""
