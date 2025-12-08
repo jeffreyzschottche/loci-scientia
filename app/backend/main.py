@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -25,6 +26,8 @@ from .schemas import (
 )
 from .settings import settings
 from .store import Store
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Loci Backend")
 app.add_middleware(
@@ -175,20 +178,27 @@ async def sse_stream_generator(req: ChatRequest):
         await asyncio.sleep(1)
 
     # Call Ollama API with streaming
-    ollama_url = "http://localhost:11434/api/generate"
+    ollama_url = f"{settings.ollama_base_url}/api/generate"
     ollama_payload = {
-        "model": "gemma3:4b",
+        "model": settings.ollama_model,
         "prompt": final_prompt,
         "stream": True,
     }
 
-    ollama_available = False
-
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
             async with client.stream("POST", ollama_url, json=ollama_payload) as response:
-                response.raise_for_status()
-                ollama_available = True
+                if response.status_code >= 400:
+                    # Lees fouttekst voor logging zodat we weten waarom de fallback triggert.
+                    error_body = await response.aread()
+                    logger.warning(
+                        "Ollama gaf status %s voor model '%s' via %s: %s",
+                        response.status_code,
+                        settings.ollama_model,
+                        ollama_url,
+                        error_body.decode("utf-8", errors="replace").strip(),
+                    )
+                    response.raise_for_status()
 
                 async for line in response.aiter_lines():
                     if not line:
@@ -211,9 +221,19 @@ async def sse_stream_generator(req: ChatRequest):
                     except json.JSONDecodeError:
                         continue
 
-    except (httpx.HTTPError, httpx.ConnectError) as exc:
+    except Exception as exc:
         # Fallback to mock response if Ollama is not available
-        mock_response = f"[Ollama niet beschikbaar - Mock response] Je vroeg: '{req.prompt}'. Dit is een test response omdat Ollama niet draait. Installeer Ollama via: https://ollama.com"
+        logger.warning(
+            "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
+            ollama_url,
+            settings.ollama_model,
+            exc,
+        )
+        mock_response = (
+            "[Ollama niet beschikbaar - Mock response] "
+            f"Kon geen antwoord krijgen van Ollama op {ollama_url} met model '{settings.ollama_model}'. "
+            f"Je vroeg: '{req.prompt}'. Controleer of de Ollama-service draait en bereikbaar is."
+        )
 
         # Stream the mock response word by word
         words = mock_response.split()

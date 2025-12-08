@@ -1,15 +1,16 @@
-INFO:     Will watch for changes in these directories: ['/home/kees/Documents/loci-scientia']
+INFO:     Will watch for changes in these directories: ['/home/jeffrey/Sites/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [24411] using WatchFiles
-INFO:     Started server process [24419]
+INFO:     Started reloader process [5592] using WatchFiles
+onnxruntime cpuid_info warning: Unknown CPU vendor. cpuinfo_vendor value: 0
+INFO:     Started server process [5607]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:52872 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52884 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52886 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52894 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52904 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52916 - "GET /devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:42932 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
-/home/kees/Documents/loci-scientia/app/backend/rag/embedder.py:133: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
+INFO:     127.0.0.1:37446 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37450 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37466 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37474 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37486 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37496 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47680 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
+/home/jeffrey/Sites/loci-scientia/app/backend/rag/embedder.py:133: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
   return TextEmbedding(

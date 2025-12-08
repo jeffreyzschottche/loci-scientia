@@ -45,16 +45,17 @@ start_ollama() {
         sleep 3
     fi
 
-    if ! ollama list | grep -q "gemma3:4b"; then
-        echo "📥 Model gemma3:4b downloaden (dit kan even duren bij eerste keer)..."
-        if ollama pull gemma3:4b; then
-            echo "✅ Model gemma3:4b gedownload"
+    MODEL_NAME="${OLLAMA_MODEL:-gemma3:4b}"
+    if ! ollama list | grep -q "$MODEL_NAME"; then
+        echo "📥 Model $MODEL_NAME downloaden (dit kan even duren bij eerste keer)..."
+        if ollama pull "$MODEL_NAME"; then
+            echo "✅ Model $MODEL_NAME gedownload"
         else
             echo "⚠️  Model download mislukt. Check netwerk verbinding."
             return 1
         fi
     else
-        echo "✅ Model gemma3:4b is al beschikbaar"
+        echo "✅ Model $MODEL_NAME is al beschikbaar"
     fi
     return 0
 }
