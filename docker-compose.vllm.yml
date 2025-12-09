@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-server
+    runtime: nvidia
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=
+    command: ["--model", "TinyLlama/TinyLlama-1.1B-Chat-v1.0", "--trust-remote-code", "--gpu-memory-utilization", "0.85", "--max-model-len", "2048", "--enforce-eager"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
