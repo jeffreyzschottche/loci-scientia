@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Configuratie
-MODEL_NAME="${MODEL_NAME:-microsoft/phi-2}"
+MODEL_NAME="${MODEL_NAME:-TinyLlama/TinyLlama-1.1B-Chat-v1.0}"
 VLLM_PORT="${VLLM_PORT:-8000}"
 HF_TOKEN="${HF_TOKEN:-}"
 
@@ -105,7 +105,7 @@ services:
       - ~/.cache/huggingface:/root/.cache/huggingface
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
-    command: ["--model", "${MODEL_NAME}", "--trust-remote-code"]
+    command: ["--model", "${MODEL_NAME}", "--trust-remote-code", "--gpu-memory-utilization", "0.85", "--max-model-len", "2048", "--enforce-eager"]
     deploy:
       resources:
         reservations:
