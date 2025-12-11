@@ -65,7 +65,14 @@ class OfflineMapManager:
     )
 
     def __init__(self, base_dir: Optional[Path] = None, regions: Optional[Iterable[OfflineRegion]] = None):
-        default_base = Path(__file__).resolve().parents[2] / "LociMaps" / "offline"
+        base_root = Path(__file__).resolve().parents[2]
+        preferred = base_root / "AITJEMaps" / "offline"
+        fallback = None
+        for candidate in base_root.glob("*Maps/offline"):
+            if candidate != preferred and candidate.exists():
+                fallback = candidate
+                break
+        default_base = preferred if preferred.exists() else fallback or preferred
         self.base_dir = Path(base_dir or default_base)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self._regions: Dict[str, OfflineRegion] = {

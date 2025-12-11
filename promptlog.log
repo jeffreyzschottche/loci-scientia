@@ -721,3 +721,106 @@ Richtlijnen:
 4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
 5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
 
+[2025-12-11T20:13:47.147573Z]
+User Prompt: kleine nikker
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T20:14:11.943365Z]
+User Prompt: wie is paul de leeuw
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T20:14:31.106524Z]
+User Prompt: wie is geert wilders
+> context:
+1. [contact] score 0.409: mannetje (man) ✉ man@man.nl ☎ 0612345667
+2. [contact] score 0.359: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T20:14:57.755328Z]
+User Prompt: wie staan er in de epstein files
+
+Je bent de Loci Scientia assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als Loci Scientia assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T21:14:08.352342Z]
+User Prompt: Hallo
+> context:
+1. [device] score 0.424: Jetsonsonzoontje (jetson) ✉ jetson@gmail.com ☎ jetson
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T21:14:36.781844Z]
+User Prompt: Schrijf een haiku
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T21:15:17.281064Z]
+User Prompt: Schrijf een haiku over japanse meisjes
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-11T21:15:40.162422Z]
+User Prompt: Wie woont er in wijk aan zee
+> context:
+1. [contact] score 0.512: Kees (Loci Scientia) ✉ kees@ls.nl ☎ 0612345678 ❝ kees is een mens 📍 Wijk aan Zee, Wijk aan Zee (52.49393, 4.59390)
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+

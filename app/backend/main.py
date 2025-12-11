@@ -29,7 +29,7 @@ from .store import Store
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Loci Backend")
+app = FastAPI(title="AITJE Backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -103,7 +103,7 @@ def _prompt_template() -> str:
         return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
         return (
-            "Je bent de Loci Scientia assistent. Gebruik context waar mogelijk, "
+            "Je bent de AITJE assistent. Gebruik context waar mogelijk, "
             "maar verzin niets als er geen relevante context beschikbaar is. "
             "Leg je antwoord duidelijk uit en antwoord in het Nederlands."
         )

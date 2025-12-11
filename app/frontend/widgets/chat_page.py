@@ -38,7 +38,7 @@ class ChatPage(QWidget):
 
         self.history = QTextEdit()
         self.history.setReadOnly(True)
-        self.history.setPlaceholderText("Welkom bij Loci Scientia…")
+        self.history.setPlaceholderText("Welkom bij AITJE…")
         layout.addWidget(self.history)
 
         input_card = QFrame()
@@ -202,8 +202,8 @@ class ChatPage(QWidget):
     def _on_token(self, token: str):
         """Append token to the current message."""
         if not self.current_message and not token.startswith("[fout]"):
-            # First token - add "Loci:" prefix if not already there
-            self.history.append(f"<b>Loci:</b> {token}")
+            # First token - add "AITJE:" prefix if not already there
+            self.history.append(f"<b>AITJE:</b> {token}")
             self.current_message = token
         elif token.startswith("[fout]"):
             # Error message
