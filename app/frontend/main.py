@@ -3,14 +3,14 @@ import sys
 import os
 from typing import Optional
 
-from PySide6.QtCore import QUrl, QDir, Qt, QTimer
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QLinearGradient, QBrush, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QPlainTextEdit,
+    QProgressBar,
     QVBoxLayout,
     QWidget,
 )
@@ -18,7 +18,7 @@ from qasync import QEventLoop
 
 from .config import BACKEND_WS
 from .net.ws_client import WSClient
-from .theme import DARK_QSS
+from .theme import AITJE_QSS
 from .widgets.api_page import ApiPage
 from .widgets.chat_page import ChatPage
 from .widgets.contacts_page import ContactsPage
@@ -33,6 +33,17 @@ from .widgets.settings_page import SettingsPage
 
 
 class BootScreen(QWidget):
+    """Animated splash screen that mimics the AITJE loading state from the Figma design."""
+
+    STATUS_STEPS = [
+        (0, "Lokale AI wordt opgestart..."),
+        (20, "Neurale netwerken laden..."),
+        (45, "API endpoints voorbereiden..."),
+        (70, "Devices synchroniseren..."),
+        (90, "Bijna klaar..."),
+        (100, "Welkom! ✓"),
+    ]
+
     def __init__(
         self,
         logo_path: Optional[str] = None,
@@ -43,107 +54,146 @@ class BootScreen(QWidget):
 
         self.on_finished = on_finished
         self.duration_ms = duration_ms
+        self.progress_value = 0
 
         self.setObjectName("BootScreenRoot")
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         self.showFullScreen()
 
-        pixmap = QPixmap()
-        image_url = ""
-        if logo_path and os.path.exists(logo_path):
-            loaded = QPixmap(logo_path)
-            if not loaded.isNull():
-                pixmap = loaded
-                image_url = QUrl.fromLocalFile(logo_path).toString()
-
-        style_lines = [
-            "QWidget#BootScreenRoot {",
-            "    background-color: #000000;",
-        ]
-        if image_url:
-            style_lines += [
-                f"    background-image: url({image_url});",
-                "    background-repeat: no-repeat;",
-                "    background-position: center;",
-            ]
-        style_lines += [
-            "}",
-            "QPlainTextEdit#Terminal {",
-            "    background-color: rgba(0, 0, 0, 210);",
-            "    color: #00ff7f;",
-            "    border: 1px solid #00ff7f;",
-            "    font-family: \"Fira Code\", \"Consolas\", \"Courier New\", monospace;",
-            "    font-size: 12pt;",
-            "    padding: 8px;",
-            "}",
-        ]
-        self.setStyleSheet("\n".join(style_lines))
-        self.background_pixmap = pixmap
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(80, 80, 80, 80)
-        layout.setSpacing(0)
-
-        logo_label = QLabel("Loci Scientia")
-        logo_label.setObjectName("BootLogoLabel")
-        logo_label.setAlignment(Qt.AlignCenter)
-        logo_label.setStyleSheet(
-            "font-size: 32pt;"
-            "font-weight: 600;"
-            "letter-spacing: 6px;"
+        self.setStyleSheet(
+            """
+            QWidget#BootScreenRoot {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #fff7d6,
+                    stop:1 #f4f1ff
+                );
+                color: #0a0a0a;
+            }
+            QLabel#BootTitle {
+                font-size: 42pt;
+                font-weight: 700;
+                color: #0a0a0a;
+            }
+            QLabel#BootSubtitle {
+                font-size: 14pt;
+                color: #262626;
+            }
+            QLabel#BootPercent {
+                font-size: 16pt;
+                font-weight: 600;
+                color: #0a0a0a;
+            }
+            QProgressBar {
+                background: #f4f4f5;
+                border: 0;
+                border-radius: 16px;
+                height: 24px;
+                color: #0a0a0a;
+            }
+            QProgressBar::chunk {
+                border-radius: 16px;
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #facc15,
+                    stop:1 #f97316
+                );
+            }
+            """
         )
-        layout.addWidget(logo_label, 0, Qt.AlignHCenter)
-        layout.addSpacing(32)
 
-        self.terminal = QPlainTextEdit()
-        self.terminal.setObjectName("Terminal")
-        self.terminal.setReadOnly(True)
-        self.terminal.setLineWrapMode(QPlainTextEdit.NoWrap)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(80, 80, 80, 80)
+        outer.setSpacing(32)
+        outer.addStretch(1)
 
-        layout.addWidget(self.terminal)
+        center = QVBoxLayout()
+        center.setSpacing(24)
+        center.setAlignment(Qt.AlignCenter)
 
-        self.messages = [
-            "[BOOT] Initializing Loci kernel...",
-            "[OK]  Loading core modules...",
-            "[OK]  Mounting /knowledge...",
-            "[OK]  Starting neural interfaces...",
-            "[SYS] Scanning local devices...",
-            "[OK]  Connecting to Loci Network...",
-            "[OK]  Getting knowledge ready...",
-            "[OK]  Finding out the secrets of the universe...",
-            "[SYS] Installing dependencies for chat engine...",
-            "[OK]  Starting Loci Scientia services...",
-            "[DONE] System ready. Type 'loci --start' to begin.",
-            "",
-            "loci@localhost:~$ loci --start",
-        ]
+        if logo_path and os.path.exists(logo_path):
+            brand = QLabel()
+            brand.setAlignment(Qt.AlignCenter)
+            brand.setPixmap(QPixmap(logo_path).scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            center.addWidget(brand, 0, Qt.AlignCenter)
 
-        self.current_index = 0
-        self.interval_ms = max(150, int(self.duration_ms / (len(self.messages) + 1)))
+        self.egg_label = QLabel()
+        self.egg_label.setAlignment(Qt.AlignCenter)
+        self.egg_label.setPixmap(self._build_egg_pixmap(260, 320))
+        center.addWidget(self.egg_label, 0, Qt.AlignCenter)
+
+        title = QLabel("AITJE ontwaakt...")
+        title.setObjectName("BootTitle")
+        title.setAlignment(Qt.AlignCenter)
+        center.addWidget(title)
+
+        subtitle = QLabel("De antwoorden van het universum worden lokaal opgestart.")
+        subtitle.setObjectName("BootSubtitle")
+        subtitle.setAlignment(Qt.AlignCenter)
+        center.addWidget(subtitle)
+
+        outer.addLayout(center)
+
+        progress_layout = QVBoxLayout()
+        progress_layout.setSpacing(8)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        progress_layout.addWidget(self.progress_bar)
+
+        info_row = QHBoxLayout()
+        info_row.setContentsMargins(0, 0, 0, 0)
+
+        self.status_label = QLabel(self.STATUS_STEPS[0][1])
+        self.status_label.setObjectName("BootSubtitle")
+        info_row.addWidget(self.status_label, 1, Qt.AlignLeft)
+
+        self.percent_label = QLabel("0%")
+        self.percent_label.setObjectName("BootPercent")
+        info_row.addWidget(self.percent_label, 0, Qt.AlignRight)
+
+        progress_layout.addLayout(info_row)
+        outer.addLayout(progress_layout)
+        outer.addStretch(1)
 
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self._next_message)
-        self.timer.start(self.interval_ms)
+        total_ticks = max(1, duration_ms // 60)
+        self.increment = max(1, 100 // total_ticks)
+        self.timer.timeout.connect(self._advance)
+        self.timer.start(60)
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        if self.background_pixmap and not self.background_pixmap.isNull() and self.size().isValid():
-            scaled = self.background_pixmap.scaled(
-                self.size(),
-                Qt.KeepAspectRatioByExpanding,
-                Qt.SmoothTransformation,
-            )
-            painter.drawPixmap(0, 0, scaled)
-        painter.fillRect(self.rect(), QColor(0, 0, 0, 110))
+    def _build_egg_pixmap(self, width: int, height: int) -> QPixmap:
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        gradient = QLinearGradient(0, 0, 0, height)
+        gradient.setColorAt(0, QColor("#ffffff"))
+        gradient.setColorAt(1, QColor("#fef3c7"))
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(QPen(QColor("#f5e8b5"), 4))
+        painter.drawEllipse(10, 10, width - 20, height - 20)
+
+        # Simple crack lines to mimic the Figma egg
+        painter.setPen(QPen(QColor("#0f172a"), 2))
+        painter.drawLine(width * 0.45, height * 0.35, width * 0.5, height * 0.55)
+        painter.drawLine(width * 0.55, height * 0.38, width * 0.5, height * 0.6)
         painter.end()
-        super().paintEvent(event)
+        return pixmap
 
-    def _next_message(self):
-        if self.current_index < len(self.messages):
-            line = self.messages[self.current_index]
-            self.terminal.appendPlainText(line)
-            self.current_index += 1
-        else:
+    def _advance(self):
+        self.progress_value = min(100, self.progress_value + self.increment)
+        self.progress_bar.setValue(self.progress_value)
+        self.percent_label.setText(f"{self.progress_value}%")
+
+        for threshold, message in reversed(self.STATUS_STEPS):
+            if self.progress_value >= threshold:
+                self.status_label.setText(message)
+                break
+
+        if self.progress_value >= 100:
             self.timer.stop()
             QTimer.singleShot(400, self.finish)
 
@@ -156,79 +206,31 @@ class BootScreen(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Loci Scientia")
+        self.setWindowTitle("AITJE Dashboard")
         self.resize(1200, 800)
 
         self.ws_client = WSClient(BACKEND_WS)
 
-        # --- CODE VOOR ACHTERGRONDAFBEELDING (Aangepast) ---
-        # 1. Bepaal het absolute pad naar de afbeelding in dezelfde frontend map
-        relative_path = os.path.join(os.path.dirname(__file__), "images", "desktopimage.jpeg")
-        image_path = os.path.abspath(relative_path)
-        
-        print(f"DEBUG: Checking for image at path: {image_path}")
-        
-        icon = QIcon()
-        if not os.path.exists(image_path):
-             # Als de afbeelding niet gevonden wordt, print een waarschuwing
-             print("WAARSCHUWING: Achtergrondafbeelding niet gevonden op het berekende pad.")
-             image_url = ""
-        else:
-             # 2. Converteer naar een pad-URL met QUrl.fromLocalFile voor maximale compatibiliteit in Qt
-             image_url = QUrl.fromLocalFile(image_path).toString()
-             print(f"DEBUG: Using image URL: {image_url}")
-             icon.addFile(image_path)
-
-
-        # 3. Maak de root widget en stel de achtergrond in via CSS
         root = QWidget()
         root.setObjectName("RootWidget")
         self.setCentralWidget(root)
-        
-        # Stijl: Pas de achtergrondafbeelding toe op de root widget
-        if image_url:
-            root_style = f"""
-                QWidget#RootWidget {{
-                    background-image: url({image_url});
-                    background-repeat: no-repeat;
-                    background-position: center;
-                }}
-            """
-            root.setStyleSheet(root_style)
-        else:
-            # Fallback CSS als de afbeelding niet is gevonden
-            root.setStyleSheet("QWidget#RootWidget { background-color: #1e1e1e; }")
-
-        if not icon.isNull():
-            self.setWindowIcon(icon)
-
-        # --- EINDE CODE VOOR ACHTERGRONDAFBEELDING ---
 
         root_layout = QHBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
         self.sidebar = Sidebar()
-        self.sidebar.setFixedWidth(256)
-        
-        # Oplossing 2: Maak de sidebar transparant zodat de root achtergrond zichtbaar is
-        self.sidebar.setStyleSheet("background: transparent;")
-
+        self.sidebar.setFixedWidth(280)
         root_layout.addWidget(self.sidebar)
 
         self.center = QWidget()
-        
-        # Oplossing 2: Maak de center widget transparant
-        self.center.setStyleSheet("background: transparent;")
-        
+        self.center.setObjectName("CenterContainer")
         center_layout = QVBoxLayout(self.center)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
 
-        self.header = HeaderBar("Chat Assistant")
-        # Optioneel: Maak de header ook transparant als de image daar moet schijnen.
-        # self.header.setStyleSheet("background: transparent;")
-        
+        self.header = HeaderBar("AITJE Dashboard")
+        self.header.home_requested.connect(self._go_home)
         center_layout.addWidget(self.header)
 
         self.pages = {
@@ -264,17 +266,15 @@ class MainWindow(QMainWindow):
                 )
             )
         self.content = QWidget()
-        
-        # Oplossing 2: Zorg ervoor dat de content container ook transparant is
-        self.content.setStyleSheet("background: transparent;")
+        self.content.setObjectName("ContentArea")
 
         content_layout = QVBoxLayout(self.content)
-        content_layout.setContentsMargins(16, 16, 16, 16)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(16)
         for page in self.pages.values():
             content_layout.addWidget(page)
-            # Oplossing 2: Mogelijk moeten de individuele pagina's ook transparant zijn
-            page.setStyleSheet("background: transparent;")
-            
+            page.setObjectName("Card")
+
         center_layout.addWidget(self.content, 1)
         root_layout.addWidget(self.center, 1)
 
@@ -282,8 +282,7 @@ class MainWindow(QMainWindow):
         self.sidebar.set_current("chat")
         self.show_page("chat")
         
-        # Pas de DARK_QSS toe op de gehele MainWindow (behalve waar overschreven)
-        self.setStyleSheet(DARK_QSS) 
+        self.setStyleSheet(AITJE_QSS)
 
     def _handle_view_on_map_request(self, contact: dict) -> None:
         maps_page = self.pages.get("maps")
@@ -313,7 +312,11 @@ class MainWindow(QMainWindow):
             "settings": "Instellingen",
             "faq": "FAQ",
         }
-        self.header.set_title(titles.get(key, "Loci"))
+        self.header.set_title(titles.get(key, "AITJE"))
+
+    def _go_home(self):
+        self.sidebar.set_current("chat")
+        self.show_page("chat")
 
     def closeEvent(self, event):
         asyncio.create_task(self.ws_client.close())
@@ -325,11 +328,11 @@ def main():
 
     app_dir = os.path.dirname(__file__)
     app_images_dir = os.path.join(app_dir, "images")
-    app_icon_path = os.path.join(app_images_dir, "desktopimage.jpeg")
+    app_icon_path = os.path.join(app_images_dir, "aitje-logo.png")
     if os.path.exists(app_icon_path):
         app.setWindowIcon(QIcon(app_icon_path))
 
-    boot_logo_path = os.path.join(app_images_dir, "lociscientialogo.png")
+    boot_logo_path = app_icon_path
 
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)

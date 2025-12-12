@@ -1,212 +1,27 @@
-# 🧠 Loci Scientia Desktop
+# go-pmtiles
 
-Een moderne **desktopapplicatie** met:
+The single-file utility for creating and working with [PMTiles](https://github.com/protomaps/PMTiles) archives.
 
-- **PySide6 UI** (frontend)
-- **FastAPI backend** (API + WebSocket)
-- **Chat-interface, API-routebeheer en SSD-monitoring**
+## Installation
 
----
+See [Releases](https://github.com/protomaps/go-pmtiles/releases) for your OS and architecture.
 
-## 📁 Projectstructuur
+## Docs
 
-```
-app/
-  backend/
-    main.py
-    schemas.py
-    settings.py
-    store.py
-  frontend/
-    main.py
-    theme.py
-    net/ws_client.py
-    widgets/
-      sidebar.py
-      headerbar.py
-      chat_page.py
-      api_page.py
-      ssd_monitor.py
-  requirements.txt
+See [docs.protomaps.com/pmtiles/cli](https://docs.protomaps.com/pmtiles/cli) for usage.
+
+See [Go package docs](https://pkg.go.dev/github.com/protomaps/go-pmtiles/pmtiles) for API usage.
+
+## Development
+
+Run the program in development:
+
+```sh
+go run main.go
 ```
 
----
+Run the test suite:
 
-## ⚙️ Installatie & Setup
-
-> Deze instructies werken voor zowel **macOS/Linux** als **Windows**.
-
-### 🧩 1. Controleer of Python is geïnstalleerd
-
-#### macOS (zsh)
-
-```bash
-command -v python3 && python3 --version
+```sh
+go test ./pmtiles
 ```
-
-Als je géén versie ziet of iets van _“command not found”_, installeer Python via Homebrew:
-
-```bash
-# Installeer Homebrew (als je dat nog niet hebt)
-# /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-brew install python@3.11
-echo 'export PATH="/usr/local/opt/python@3.11/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-#### Windows (PowerShell)
-
-Download en installeer Python via  
-👉 https://www.python.org/downloads/  
-Zorg dat je **“Add Python to PATH”** aanvinkt tijdens installatie.
-
-Controleer daarna:
-
-```powershell
-py --version
-```
-
----
-
-### 🧱 2. Virtuele omgeving maken
-
-#### macOS/Linux
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-#### Windows
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-Je terminalprompt verandert nu (bijv. `(venv)`).
-
----
-
-### 🧰 3. Dependencies installeren
-
-Werk eerst pip bij en installeer daarna alle vereisten:
-
-```bash
-python -m pip install -U pip
-python -m pip install -r app/requirements.txt
-```
-
-#### Veelvoorkomende fout
-
-> `zsh: command not found: python`  
-> Gebruik dan `python3` in plaats van `python`.
-
-> `zsh: command not found: pip`  
-> Gebruik `python -m pip ...`.
-
----
-
-## 🚀 Applicatie starten
-
-### ⚡ Eén commando
-
-Als je alles tegelijk wilt starten en alleen verder wil zodra de backend klaar is, draai je vanaf de projectroot:
-
-```bash
-./lociscientia.sh
-```
-
-Het script zorgt ervoor dat:
-
-1. De virtuele omgeving bestaat en afhankelijkheden worden geïnstalleerd (éénmalig).
-2. De backend (`uvicorn ...`) in de achtergrond draait en wacht tot `/health` reageert.
-3. Pas als de backend klaar is, wordt de frontend gestart.
-4. `backend.log` alle backend-output verzamelt zodat je fouten kunt teruglezen.
-
-Stoppen doe je met Ctrl+C; het script sluit eerst de frontend en daarna de backend netjes af.
-
-### 🖥️ Backend (API + WebSocket)
-
-Laat dit venster open:
-
-```bash
-uvicorn app.backend.main:app --reload --host "${BACKEND_HOST:-127.0.0.1}" --port "${BACKEND_PORT:-8000}"
-```
-
-Gebruik dezelfde waarden als in `.env` (standaard `127.0.0.1:8000`). Als alles goed is zie je:
-
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000
-```
-
----
-
-### 🪟 Frontend (PySide6 Desktop UI)
-
-Open een **nieuw terminalvenster**, activeer opnieuw de venv en start:
-
-```bash
-source .venv/bin/activate  # (of .\.venv\Scripts\Activate.ps1 op Windows)
-python -m app.frontend.main
-```
-
-De **Loci Scientia Desktop UI** opent automatisch en verbindt met  
-➡️ de `BACKEND_HTTP` uit `.env` (standaard `http://127.0.0.1:8000`)
-
----
-
-## 🧩 Extra Tools (optioneel)
-
-Maak het makkelijker met `Makefile`-commando’s:
-
-```makefile
-# Makefile
-setup:
-	python -m venv .venv && source .venv/bin/activate && python -m pip install -U pip && python -m pip install -r app/requirements.txt
-
-backend:
-	source .venv/bin/activate && uvicorn app.backend.main:app --reload --host "${BACKEND_HOST:-127.0.0.1}" --port "${BACKEND_PORT:-8000}"
-
-frontend:
-	source .venv/bin/activate && python -m app.frontend.main
-```
-
-Gebruik dan:
-
-```bash
-make setup
-make backend
-make frontend
-```
-
----
-
-## 🧠 Embeddings & Qdrant
-
-Voor vectorzoekopdrachten gebruiken we [fastembed](https://github.com/qdrant/fastembed) via `qdrant-client[fastembed]`. Standaard draait `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. Om volledig offline te blijven:
-
-- Zet het uitgepakte model in `fastembed_models/sentence-transformers__paraphrase-multilingual-MiniLM-L12-v2` (of wijs een eigen map toe via `FASTEMBED_MODEL_DIR`). Die map moet het volledige ONNX-model, tokenizer, vocab-bestanden, enz. bevatten.
-- De backend laadt uitsluitend uit die map. Bestaat hij nog niet, dan krijg je een duidelijke foutmelding; zet dan **eenmalig** `FASTEMBED_ALLOW_DOWNLOAD=1` tijdens het starten zodat het model wordt gedownload en automatisch naar de projectmap wordt gekopieerd voor toekomstig offline gebruik.
-- Gebruik `FASTEMBED_CACHE_DIR` als je de aanvullende cache (standaard `~/.cache/fastembed`) elders wilt bewaren en `FASTEMBED_MODEL` wanneer je een ander fastembed-model kiest (plaats of kopieer dan eerst het juiste model naar de lokale map).
-
-De helper in `app/backend/rag/embedder.py` maakt de vectoren en dezelfde instellingen gelden voor zowel contacten als devices.
-
----
-
-## 💡 Troubleshooting
-
-| Probleem                                         | Oplossing                                                                         |
-| ------------------------------------------------ | --------------------------------------------------------------------------------- |
-| `ModuleNotFoundError: No module named 'fastapi'` | Virtuele omgeving niet actief → `source .venv/bin/activate` en installeer opnieuw |
-| `zsh: command not found: python`                 | Gebruik `python3` of installeer via Homebrew                                      |
-| `zsh: command not found: pip`                    | Gebruik `python -m pip install ...`                                               |
-| Backend start niet                               | Controleer of `uvicorn` geïnstalleerd is (`python -m pip show uvicorn`)           |
-
----
-
-## 🧬 Credits
-
-**Loci Scientia OS**  
-Cognitionis Scientia • Chat, API Management, Knowledge & Monitoring

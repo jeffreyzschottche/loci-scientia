@@ -34,7 +34,7 @@ Zorg voor token-gebaseerde authenticatie en veilige wachtwoordopslag (hashing). 
 
 Feature #4: Marketing website:::Maak een marketing-website voor het product. De site moet minimaal de volgende pagina’s bevatten:
 
-    Home: overzicht van het product met nadruk op kernbegrippen zoals “Loci Scientia”, lokale kennis, offline LLM, geen cloud/internet.
+    Home: overzicht van het product met nadruk op kernbegrippen zoals “AITJE”, lokale kennis, offline LLM, geen cloud/internet.
 
     Kenmerken: opsomming van kernfuncties (privacy, lokale verwerking, gebruiksgemak, geen internetverbinding nodig).
 

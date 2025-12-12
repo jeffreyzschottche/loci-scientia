@@ -23,8 +23,8 @@ class SettingsPage(QWidget):
 
         title = QLabel("Instellingen")
         title.setStyleSheet("font-size:20px; font-weight:600;")
-        subtitle = QLabel("Beheer de systeeminstellingen en voorkeuren voor Loci Scientia OS")
-        subtitle.setStyleSheet("color:#9ca3af;")
+        subtitle = QLabel("Beheer de systeeminstellingen en voorkeuren voor AITJE OS")
+        subtitle.setStyleSheet("color:#6b7280;")
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
@@ -88,7 +88,7 @@ class SettingsPage(QWidget):
         card = self._settings_card("Netwerk")
         grid = QGridLayout(card)
         grid.addWidget(QLabel("WiFi SSID"), 0, 0)
-        grid.addWidget(QLineEditPlaceholder("LociNet"), 0, 1)
+        grid.addWidget(QLineEditPlaceholder("AITJE-Net"), 0, 1)
         grid.addWidget(QLabel("VPN Status"), 1, 0)
         vpn = QLabel("Uitgeschakeld")
         vpn.setStyleSheet("color:#9ca3af;")
@@ -133,5 +133,5 @@ class QLineEditPlaceholder(QLabel):
     def __init__(self, text: str):
         super().__init__(text)
         self.setStyleSheet(
-            "border:1px solid #374151; border-radius:8px; padding:6px 8px; color:#d1d5db;"
+            "border:1px solid #d4d4d8; border-radius:10px; padding:8px 10px; color:#52525b;"
         )

@@ -16,11 +16,11 @@ class Sidebar(QWidget):
         header.setFixedHeight(80)
         head_layout = QVBoxLayout(header)
         head_layout.setContentsMargins(16, 16, 16, 0)
-        logo = QLabel("Loci Scientia")
-        logo.setStyleSheet("font-size:18px; font-weight:600;")
+        logo = QLabel("AITJE")
+        logo.setStyleSheet("font-size:20px; font-weight:700; letter-spacing:2px;")
         head_layout.addWidget(logo)
-        subtitle = QLabel("Offline LLM Console")
-        subtitle.setStyleSheet("color:#9ca3af; font-size:12px;")
+        subtitle = QLabel("Lokale AI console")
+        subtitle.setStyleSheet("color:#a1a1aa; font-size:12px;")
         head_layout.addWidget(subtitle)
         layout.addWidget(header)
 
@@ -54,8 +54,8 @@ class Sidebar(QWidget):
             layout.addWidget(btn)
 
         layout.addStretch(1)
-        footer = QLabel("Loci Scientia OS v1.0\nCognitionis Scientia")
-        footer.setStyleSheet("color:#6b7280; font-size:11px; padding:12px;")
+        footer = QLabel("AITJE v1.0\nLokale intelligentie")
+        footer.setStyleSheet("color:#a1a1aa; font-size:11px; padding:12px;")
         layout.addWidget(footer)
 
     def _on_nav(self, key: str):

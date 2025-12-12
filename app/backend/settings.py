@@ -10,6 +10,9 @@ class Settings(BaseModel):
     port: int = 8000
     ws_path: str = "/ws"
     offline_assets_dir: Optional[Path] = None
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "gemma3:4b"
+    ollama_timeout: float = 60.0
 
 
 def get_settings() -> "Settings":
@@ -17,7 +20,24 @@ def get_settings() -> "Settings":
     offline_assets_dir: Optional[Path] = None
     if assets_dir:
         offline_assets_dir = Path(assets_dir).expanduser().resolve()
-    return Settings(offline_assets_dir=offline_assets_dir)
+    ollama_base_url = (
+        os.environ.get("OLLAMA_BASE_URL")
+        or os.environ.get("OLLAMA_HOST")
+        or "http://127.0.0.1:11434"
+    )
+    # Zorg dat de base URL geen trailing slash heeft, zodat joinen voorspelbaar is.
+    ollama_base_url = ollama_base_url.rstrip("/")
+    ollama_model = os.environ.get("OLLAMA_MODEL") or "gemma3:4b"
+    try:
+        ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "60"))
+    except ValueError:
+        ollama_timeout = 60.0
+    return Settings(
+        offline_assets_dir=offline_assets_dir,
+        ollama_base_url=ollama_base_url,
+        ollama_model=ollama_model,
+        ollama_timeout=ollama_timeout,
+    )
 
 
 settings = get_settings()
