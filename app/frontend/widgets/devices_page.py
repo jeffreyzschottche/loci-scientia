@@ -70,7 +70,7 @@ class DevicesPage(QWidget):
         grid_wrapper.setStyleSheet(
             """
             QFrame {
-                background-color: #f5f5f5;
+                background-color: #ffffff;
                 border-radius: 28px;
                 border: 1px solid #ececec;
             }

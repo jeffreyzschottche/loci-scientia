@@ -4,8 +4,17 @@ QMainWindow, QWidget#RootWidget {
   background: #ffffff;
   color: #111111;
 }
-#Sidebar {
+#CenterContainer, #ContentArea {
+  background: #f5f5f5;
+}
+QScrollArea {
+  background: #f5f5f5;
+  border: none;
+}
+#Sidebar, #Sidebar QWidget {
   background: #ffffff;
+}
+#Sidebar {
   border-right: 1px solid #ececec;
 }
 #Header {

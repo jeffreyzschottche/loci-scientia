@@ -32,27 +32,36 @@ class HeaderBar(QWidget):
         layout.addWidget(brand, 0, Qt.AlignVCenter)
         layout.addStretch(1)
 
-        self.status = QLabel("● Device online")
-        self.status.setStyleSheet(
-            "color:#facc15; font-weight:600; letter-spacing:0.08em;"
-        )
+        self.status = QLabel()
+        self.status.setObjectName("HeaderStatus")
+        self.set_online(True)
         layout.addWidget(self.status, 0, Qt.AlignVCenter)
 
         self.home_btn = QPushButton("Chat")
+        self.home_btn.setObjectName("HeaderHomeButton")
         self.home_btn.setCursor(Qt.PointingHandCursor)
         self.home_btn.setStyleSheet(
             "QPushButton {"
             "  background-color: #facc15;"
             "  color: #050505;"
             "  font-weight: 600;"
-            "  border-radius: 999px;"
+            "  border-radius: 28px;"
             "  padding: 12px 32px;"
             "  border: 0;"
             "}"
             "QPushButton:hover { background-color: #050505; color: #facc15; }"
         )
+        self.home_btn.setMinimumHeight(44)
         self.home_btn.clicked.connect(self.home_requested.emit)
         layout.addWidget(self.home_btn, 0, Qt.AlignVCenter)
 
     def set_title(self, title: str):
         self.title.setText(title)
+
+    def set_online(self, online: bool):
+        text = "● ONLINE" if online else "● OFFLINE"
+        color = "#16a34a" if online else "#ef4444"
+        self.status.setText(text)
+        self.status.setStyleSheet(
+            f"color:{color}; font-weight:600; letter-spacing:0.08em;"
+        )

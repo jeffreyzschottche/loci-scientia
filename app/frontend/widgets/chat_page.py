@@ -2,7 +2,7 @@ import asyncio
 import json
 
 import requests
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Qt, Signal, Slot
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QFrame,
@@ -36,6 +36,26 @@ class ChatPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
+        controls = QHBoxLayout()
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.addStretch(1)
+        self.new_chat_btn = QPushButton("Start nieuwe chat")
+        self.new_chat_btn.setCursor(Qt.PointingHandCursor)
+        self.new_chat_btn.setStyleSheet(
+            "QPushButton {"
+            "  background: transparent;"
+            "  border: 1px solid #d4d4d8;"
+            "  border-radius: 24px;"
+            "  padding: 6px 18px;"
+            "  color: #4b5563;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { border-color:#111111; color:#111111; }"
+        )
+        self.new_chat_btn.clicked.connect(self._start_new_chat)
+        controls.addWidget(self.new_chat_btn, 0, Qt.AlignRight)
+        layout.addLayout(controls)
+
         self.history = QTextEdit()
         self.history.setReadOnly(True)
         self.history.setPlaceholderText("Welkom bij AITJE…")
@@ -48,8 +68,8 @@ class ChatPage(QWidget):
         input_layout.setSpacing(8)
 
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Stel een vraag aan de assistent…")
-        self.send_btn = QPushButton("Send")
+        self.input.setPlaceholderText("Stel een vraag aan Aitje.")
+        self.send_btn = QPushButton("Stuur")
         input_layout.addWidget(self.input, 1)
         input_layout.addWidget(self.send_btn)
         layout.addWidget(input_card)
@@ -59,6 +79,11 @@ class ChatPage(QWidget):
         self.signals.token.connect(self._on_token)
         self.signals.done.connect(self._on_done)
         self.signals.queue_position.connect(self._on_queue_position)
+
+    def _start_new_chat(self):
+        """Reset the conversation history."""
+        self.history.clear()
+        self.current_message = ""
 
     @Slot()
     def _on_send(self):
