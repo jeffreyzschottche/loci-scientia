@@ -1,1 +1,89 @@
-2025/12/18 16:50:14 main.go:159: Serving  /mnt/hgfs/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/12/18 18:08:20 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/12/18 18:08:31 server.go:156: fetching europe 0-16384
+2025/12/18 18:08:32 server.go:200: fetched europe 0-16384
+2025/12/18 18:08:32 server.go:156: fetching europe 127-11904
+2025/12/18 18:08:32 server.go:200: fetched europe 127-11904
+2025/12/18 18:08:32 server.go:156: fetching europe 13148-13185
+2025/12/18 18:08:32 server.go:200: fetched europe 13148-13185
+2025/12/18 18:08:32 main.go:156: served 200 %2Feurope%2F3%2F3%2F2.mvt in 342.305ms
+2025/12/18 18:08:32 main.go:156: served 200 %2Feurope%2F3%2F4%2F2.mvt in 344.6585ms
+2025/12/18 18:08:32 main.go:156: served 200 %2Feurope%2F3%2F4%2F3.mvt in 343.789875ms
+2025/12/18 18:08:32 main.go:156: served 200 %2Feurope%2F3%2F3%2F3.mvt in 338.85625ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F4%2F8%2F5.mvt in 8.231458ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F4%2F8%2F4.mvt in 3.035375ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F4%2F7%2F5.mvt in 4.838792ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F4%2F9%2F5.mvt in 5.281375ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F4%2F7%2F4.mvt in 3.089666ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F5%2F16%2F10.mvt in 26.879125ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F6%2F33%2F21.mvt in 24.578833ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F5%2F16%2F11.mvt in 40.392042ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F5%2F17%2F10.mvt in 48.14475ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F6%2F34%2F21.mvt in 25.9ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F6%2F33%2F20.mvt in 19.434292ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F6%2F34%2F20.mvt in 11.499542ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F7%2F67%2F42.mvt in 14.249208ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F7%2F67%2F43.mvt in 18.318125ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F7%2F66%2F42.mvt in 16.425833ms
+2025/12/18 18:08:34 main.go:156: served 200 %2Feurope%2F7%2F66%2F43.mvt in 7.769ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F8%2F134%2F85.mvt in 5.647875ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F8%2F135%2F85.mvt in 18.82975ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F9%2F269%2F170.mvt in 13.083ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F9%2F269%2F171.mvt in 9.046458ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F9%2F268%2F170.mvt in 5.754667ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F9%2F268%2F171.mvt in 4.364708ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F9%2F270%2F170.mvt in 14.86325ms
+2025/12/18 18:08:35 main.go:156: served 200 %2Feurope%2F9%2F270%2F171.mvt in 15.604ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F269%2F172.mvt in 99.778458ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F269%2F173.mvt in 68.326125ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F270%2F173.mvt in 62.919625ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F270%2F174.mvt in 34.966333ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F268%2F172.mvt in 124.975ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F269%2F174.mvt in 47.034583ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F269%2F175.mvt in 36.429083ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F270%2F172.mvt in 145.826458ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F269%2F176.mvt in 42.457875ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F268%2F173.mvt in 129.7415ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F268%2F174.mvt in 95.841333ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F270%2F175.mvt in 75.81575ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F270%2F176.mvt in 65.953541ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F268%2F176.mvt in 54.671042ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F268%2F175.mvt in 100.295542ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F269%2F177.mvt in 19.394375ms
+2025/12/18 18:08:36 main.go:156: served 200 %2Feurope%2F9%2F270%2F177.mvt in 5.402791ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F269%2F181.mvt in 14.106208ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F270%2F181.mvt in 21.752333ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F270%2F182.mvt in 24.865709ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F269%2F182.mvt in 28.740291ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F270%2F183.mvt in 4.186833ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F269%2F183.mvt in 5.662625ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F270%2F184.mvt in 14.3515ms
+2025/12/18 18:08:37 main.go:156: served 200 %2Feurope%2F9%2F269%2F184.mvt in 12.792375ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F8%2F135%2F91.mvt in 105.453333ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F8%2F135%2F92.mvt in 106.793167ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F8%2F134%2F91.mvt in 119.856458ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F8%2F134%2F92.mvt in 115.736166ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F7%2F67%2F45.mvt in 18.008292ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F7%2F67%2F46.mvt in 10.673ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F7%2F68%2F45.mvt in 28.241791ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F7%2F68%2F46.mvt in 28.110708ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F7%2F66%2F45.mvt in 9.879542ms
+2025/12/18 18:08:39 main.go:156: served 200 %2Feurope%2F7%2F66%2F46.mvt in 13.132417ms
+2025/12/18 18:09:06 main.go:156: served 200 %2Feurope%2F6%2F33%2F23.mvt in 18.50475ms
+2025/12/18 18:09:06 main.go:156: served 200 %2Feurope%2F6%2F33%2F22.mvt in 20.450625ms
+2025/12/18 18:09:06 main.go:156: served 200 %2Feurope%2F6%2F34%2F22.mvt in 6.156291ms
+2025/12/18 18:09:06 main.go:156: served 200 %2Feurope%2F6%2F34%2F23.mvt in 5.988917ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F5%2F16%2F11.mvt in 347.422875ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F5%2F16%2F12.mvt in 335.907041ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F5%2F17%2F10.mvt in 144.99825ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F5%2F17%2F11.mvt in 348.624959ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F5%2F17%2F12.mvt in 345.488167ms
+2025/12/18 18:09:10 main.go:156: served 304 %2Feurope%2F5%2F16%2F10.mvt in 154.0245ms
+2025/12/18 18:09:10 main.go:156: served 304 %2Feurope%2F4%2F8%2F5.mvt in 13.117833ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F4%2F8%2F6.mvt in 12.097292ms
+2025/12/18 18:09:10 main.go:156: served 304 %2Feurope%2F4%2F7%2F5.mvt in 2.364542ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F4%2F7%2F6.mvt in 654.125µs
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F3%2F4%2F1.mvt in 1.710833ms
+2025/12/18 18:09:10 main.go:156: served 200 %2Feurope%2F3%2F3%2F1.mvt in 10.410208ms
+2025/12/18 18:09:13 main.go:156: served 204 %2Feurope%2F3%2F5%2F2.mvt in 57.583µs
+2025/12/18 18:09:13 main.go:156: served 204 %2Feurope%2F3%2F5%2F1.mvt in 36.583µs
+2025/12/18 18:09:13 main.go:156: served 204 %2Feurope%2F3%2F5%2F3.mvt in 34.75µs

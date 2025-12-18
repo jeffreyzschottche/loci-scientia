@@ -155,7 +155,7 @@ class NetworkStatusPage(QWidget):
             row = QHBoxLayout()
             name = QLabel(iface.upper())
             name.setStyleSheet(
-                "font-family:monospace; letter-spacing:0.35em; color:#111111;"
+                "font-family:'SFMono-Regular','Menlo','Courier New',monospace; letter-spacing:0.35em; color:#111111;"
             )
             status = QLabel("Onbekend")
             row.addWidget(name)

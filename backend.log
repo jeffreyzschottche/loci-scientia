@@ -1,23 +1,33 @@
 INFO:     Will watch for changes in these directories: ['/Users/jeffreyzschottche/Sites/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [59947] using WatchFiles
+INFO:     Started reloader process [70915] using WatchFiles
 /Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
   warnings.warn(
-INFO:     Started server process [59956]
+INFO:     Started server process [70924]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:56278 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56281 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56283 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56284 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56285 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56286 - "GET /devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56289 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
-/Users/jeffreyzschottche/Sites/loci-scientia/app/backend/rag/embedder.py:133: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
-  return TextEmbedding(
-INFO:     127.0.0.1:56319 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57733 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57735 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57737 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57739 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57740 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57741 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57746 - "GET /sprites/v4/light%402x.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57745 - "GET /sprites/v4/light%402x.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57745 - "GET /fonts/Noto%20Sans%20Italic/0-255.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57746 - "GET /fonts/Noto%20Sans%20Regular/0-255.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57751 - "GET /fonts/Noto%20Sans%20Regular/1536-1791.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57752 - "GET /fonts/Noto%20Sans%20Regular/11520-11775.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57753 - "GET /fonts/Noto%20Sans%20Medium/0-255.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57754 - "GET /fonts/Noto%20Sans%20Regular/768-1023.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57745 - "GET /fonts/Noto%20Sans%20Regular/1024-1279.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57745 - "GET /fonts/Noto%20Sans%20Medium/256-511.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57745 - "GET /fonts/Noto%20Sans%20Regular/256-511.pbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57765 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57766 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57770 - "GET /fonts/Noto%20Sans%20Regular/512-767.pbf HTTP/1.1" 200 OK
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [59956]
-INFO:     Stopping reloader process [59947]
+INFO:     Finished server process [70924]
+INFO:     Stopping reloader process [70915]

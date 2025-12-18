@@ -4,7 +4,18 @@ from typing import Any, Dict, List, Optional, Set
 
 import requests
 
-from PySide6.QtCore import Qt, QUrl, QObject, Signal, Slot
+from PySide6.QtCore import (
+    Qt,
+    QUrl,
+    QObject,
+    QRect,
+    QSize,
+    Signal,
+    Slot,
+    QEvent,
+    QModelIndex,
+)
+from PySide6.QtGui import QColor, QLinearGradient, QMouseEvent, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QCheckBox,
@@ -19,6 +30,10 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QAbstractItemView,
+    QStyledItemDelegate,
+    QStyle,
+    QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
 )
@@ -50,8 +65,102 @@ class MapBridge(QObject):
         self.locationPinned.emit(lon, lat, info)
 
 
+class ContactListDelegate(QStyledItemDelegate):
+    """Custom delegate to mimic the softer list cards from the Figma design."""
+
+    def __init__(self, icon: QPixmap, parent: Optional[QObject] = None) -> None:
+        super().__init__(parent)
+        self._icon = icon
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
+        _ = option
+        _ = index
+        return QSize(0, 78)
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        contact = index.data(Qt.UserRole) or {}
+        name = contact.get("name") or "Onbekend"
+        context_bits = [
+            contact.get("location_label") or contact.get("location_street"),
+            contact.get("location_city"),
+            contact.get("location_country"),
+        ]
+        meta = ", ".join([bit for bit in context_bits if bit]) or "Geen locatie-informatie"
+        is_checked = index.data(Qt.CheckStateRole) == Qt.Checked
+
+        container = option.rect.adjusted(8, 4, -8, -4)
+        base_color = QColor("#ffffff")
+        if is_checked:
+            base_color = QColor("#fff4d6")
+        elif option.state & QStyle.State_MouseOver:
+            base_color = QColor("#f8fafc")
+        painter.setBrush(base_color)
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(container, 20, 20)
+
+        if option.state & QStyle.State_Selected:
+            painter.setPen(QColor("#facc15"))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(container.adjusted(0, 0, -1, -1), 20, 20)
+            painter.setPen(Qt.NoPen)
+
+        indicator = self._checkbox_rect(container)
+        painter.setBrush(QColor("#facc15") if is_checked else QColor("#e5e7eb"))
+        painter.drawEllipse(indicator)
+        if is_checked:
+            inner = indicator.adjusted(6, 6, -6, -6)
+            painter.setBrush(QColor("#111111"))
+            painter.drawEllipse(inner)
+
+        icon_rect = QRect(indicator.right() + 12, container.center().y() - 16, 32, 32)
+        if not self._icon.isNull():
+            painter.drawPixmap(icon_rect, self._icon)
+
+        text_left = icon_rect.right() + 12
+        text_width = max(0, container.right() - text_left - 12)
+        name_rect = QRect(text_left, container.top() + 10, text_width, 24)
+        meta_rect = QRect(text_left, container.bottom() - 28, text_width, 20)
+
+        name_font = painter.font()
+        name_font.setBold(True)
+        name_font.setPointSize(11)
+        painter.setFont(name_font)
+        painter.setPen(QColor("#0f172a"))
+        painter.drawText(name_rect, Qt.AlignLeft | Qt.AlignVCenter, name)
+
+        meta_font = painter.font()
+        meta_font.setBold(False)
+        meta_font.setPointSize(9)
+        painter.setFont(meta_font)
+        painter.setPen(QColor("#6b7280"))
+        painter.drawText(meta_rect, Qt.AlignLeft | Qt.AlignVCenter, meta)
+
+        painter.restore()
+
+    def editorEvent(self, event, model, option, index):
+        if isinstance(event, QMouseEvent) and event.type() == QEvent.MouseButtonRelease:
+            if event.button() == Qt.LeftButton:
+                container = option.rect.adjusted(8, 4, -8, -4)
+                pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                if self._checkbox_rect(container).contains(pos):
+                    current = index.data(Qt.CheckStateRole) or Qt.Unchecked
+                    next_state = Qt.Unchecked if current == Qt.Checked else Qt.Checked
+                    return model.setData(index, next_state, Qt.CheckStateRole)
+        return super().editorEvent(event, model, option, index)
+
+    def _checkbox_rect(self, outer: QRect) -> QRect:
+        size = 22
+        x = outer.left() + 12
+        y = outer.center().y() - size // 2
+        return QRect(x, y, size, size)
+
+
 class MapsPage(QWidget):
     contact_changed = Signal(str)
+
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -63,6 +172,8 @@ class MapsPage(QWidget):
         self._contacts_by_id: Dict[str, dict] = {}
         self._updating_select_all = False
         self._pending_contact_id_for_pin: Optional[str] = None
+        self._contact_icon = self._build_contact_icon()
+        self._contact_icon = self._build_contact_icon()
 
         content = QWidget()
         content_layout = QHBoxLayout(content)
@@ -77,6 +188,28 @@ class MapsPage(QWidget):
         layout.addWidget(content, 1)
         self._last_location: Optional[Dict[str, Any]] = None
         self._load_contacts_for_map()
+
+    def _build_contact_icon(self) -> QPixmap:
+        size = 32
+        pix = QPixmap(size, size)
+        pix.fill(Qt.transparent)
+        painter = QPainter(pix)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        gradient = QLinearGradient(0, 0, size, size)
+        gradient.setColorAt(0, QColor("#f97316"))
+        gradient.setColorAt(1, QColor("#f43f5e"))
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(0, 0, size, size)
+
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawEllipse(size // 2 - 6, size // 2 - 6, 12, 12)
+        painter.setBrush(QColor("#f97316"))
+        painter.drawEllipse(size // 2 - 3, size // 2 - 3, 6, 6)
+
+        painter.end()
+        return pix
 
     def _build_map_view(self) -> QFrame:
         area = QFrame()
@@ -400,28 +533,33 @@ class MapsPage(QWidget):
         layout.addWidget(self.webview, 0, 0, 1, 2)
 
         meta = QLabel("Europa\ncenter 10°E, 50°N")
-        meta.setStyleSheet("background:#111827; padding:8px; border-radius:8px;")
+        meta.setObjectName("MapMeta")
         layout.addWidget(meta, 0, 0, Qt.AlignTop | Qt.AlignLeft)
 
-        zoom_controls = QVBoxLayout()
+        controls_box = QFrame()
+        controls_box.setObjectName("MapControls")
+        controls_layout = QVBoxLayout(controls_box)
+        controls_layout.setContentsMargins(12, 12, 12, 12)
+        controls_layout.setSpacing(10)
+
         plus = QPushButton("+")
         minus = QPushButton("-")
         for btn in (plus, minus):
-            btn.setFixedSize(32, 32)
-            btn.setStyleSheet(
-                "background:#111827; border-radius:8px; border:1px solid #1f2937;"
-            )
-            zoom_controls.addWidget(btn)
-        zoom_controls.addStretch(1)
+            btn.setFixedSize(44, 44)
+            btn.setObjectName("MapZoomButton")
+            btn.setCursor(Qt.PointingHandCursor)
+            controls_layout.addWidget(btn)
+
+        controls_layout.addStretch(1)
 
         self.pin_button = QPushButton("Voeg locatie toe")
-        self.pin_button.setStyleSheet(
-            "background:#f97316; color:white; border-radius:8px; padding:8px;"
-        )
+        self.pin_button.setObjectName("MapPrimaryButton")
+        self.pin_button.setFixedHeight(46)
+        self.pin_button.setCursor(Qt.PointingHandCursor)
         self.pin_button.clicked.connect(self._start_pin_mode)
-        zoom_controls.addWidget(self.pin_button)
+        controls_layout.addWidget(self.pin_button)
 
-        layout.addLayout(zoom_controls, 0, 1, Qt.AlignTop | Qt.AlignRight)
+        layout.addWidget(controls_box, 0, 1, Qt.AlignTop | Qt.AlignRight)
 
         plus.clicked.connect(self.zoom_in)
         minus.clicked.connect(self.zoom_out)
@@ -431,65 +569,79 @@ class MapsPage(QWidget):
     def _build_contacts_panel(self) -> QFrame:
         panel = QFrame()
         panel.setObjectName("Card")
-        panel.setFixedWidth(300)
+        panel.setFixedWidth(320)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(18)
 
-        header = QHBoxLayout()
-        title = QLabel("Contacten op kaart")
-        title.setStyleSheet("font-weight:600;")
+        header = QVBoxLayout()
+        title = QLabel("Locaties")
+        title.setObjectName("ContactPanelTitle")
         header.addWidget(title)
-        header.addStretch(1)
-        reload = QPushButton("Herlaad")
-        reload.setFixedSize(72, 28)
-        reload.setToolTip("Herlaad contacten")
-        reload.clicked.connect(self._load_contacts_for_map)
-        header.addWidget(reload)
+        subtitle = QLabel("Bekijk contactlocaties op de kaart")
+        subtitle.setObjectName("ContactPanelSubtitle")
+        header.addWidget(subtitle)
         layout.addLayout(header)
 
-        self.contacts_hint = QLabel(
-            "Selecteer welke contacten met opgeslagen locatie zichtbaar zijn op de kaart."
-        )
-        self.contacts_hint.setWordWrap(True)
-        self.contacts_hint.setStyleSheet("color:#9ca3af; font-size:12px;")
-        layout.addWidget(self.contacts_hint)
-
+        filter_row = QHBoxLayout()
         self.select_all_checkbox = QCheckBox("Alle contacten tonen")
+        self.select_all_checkbox.setObjectName("ContactSelectAll")
         self.select_all_checkbox.setTristate(True)
         self.select_all_checkbox.setEnabled(False)
         self.select_all_checkbox.stateChanged.connect(self._toggle_select_all)
-        layout.addWidget(self.select_all_checkbox)
+        filter_row.addWidget(self.select_all_checkbox, 1)
+        reload = QPushButton("Herlaad")
+        reload.setObjectName("ContactReloadButton")
+        reload.setFixedHeight(36)
+        reload.setToolTip("Herlaad contacten")
+        reload.clicked.connect(self._load_contacts_for_map)
+        filter_row.addWidget(reload)
+        layout.addLayout(filter_row)
 
         self.contacts_empty = QLabel(
             "Nog geen contacten met GPS-coördinaten. Koppel een locatie om deze hier te tonen."
         )
         self.contacts_empty.setWordWrap(True)
-        self.contacts_empty.setStyleSheet("color:#9ca3af; font-size:12px;")
+        self.contacts_empty.setObjectName("ContactEmptyState")
         layout.addWidget(self.contacts_empty)
 
         self.contacts_list = QListWidget()
-        self.contacts_list.setAlternatingRowColors(True)
+        self.contacts_list.setObjectName("ContactList")
+        self.contacts_list.setAlternatingRowColors(False)
+        self.contacts_list.setSpacing(6)
+        self.contacts_list.setMouseTracking(True)
+        self.contacts_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.contacts_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.contacts_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self._contacts_delegate = ContactListDelegate(self._contact_icon, self.contacts_list)
+        self.contacts_list.setItemDelegate(self._contacts_delegate)
         self.contacts_list.itemChanged.connect(self._handle_contact_toggle)
         self.contacts_list.currentItemChanged.connect(
             lambda *_: self._update_contact_action_state()
         )
         layout.addWidget(self.contacts_list, 1)
 
-        actions = QVBoxLayout()
-        actions.setSpacing(6)
+        actions = QGridLayout()
+        actions.setHorizontalSpacing(12)
+        actions.setVerticalSpacing(10)
+        actions.setColumnStretch(0, 1)
+        actions.setColumnStretch(1, 1)
         self.edit_contact_btn = QPushButton("Bewerk contact")
-        self.edit_contact_btn.clicked.connect(self._edit_selected_contact)
-        actions.addWidget(self.edit_contact_btn)
         self.pin_contact_btn = QPushButton("Nieuwe locatie pinnen")
-        self.pin_contact_btn.clicked.connect(self._pin_selected_contact)
-        actions.addWidget(self.pin_contact_btn)
         self.clear_location_btn = QPushButton("Verwijder locatie")
-        self.clear_location_btn.clicked.connect(self._clear_selected_location)
-        actions.addWidget(self.clear_location_btn)
         self.delete_contact_btn = QPushButton("Verwijder contact")
+        self.edit_contact_btn.setObjectName("ContactSecondaryButton")
+        self.pin_contact_btn.setObjectName("ContactSecondaryButton")
+        self.clear_location_btn.setObjectName("ContactSecondaryButton")
+        self.delete_contact_btn.setObjectName("ContactDangerButton")
+        self.edit_contact_btn.clicked.connect(self._edit_selected_contact)
+        self.pin_contact_btn.clicked.connect(self._pin_selected_contact)
+        self.clear_location_btn.clicked.connect(self._clear_selected_location)
         self.delete_contact_btn.clicked.connect(self._delete_selected_contact)
-        actions.addWidget(self.delete_contact_btn)
+        actions.addWidget(self.edit_contact_btn, 0, 0)
+        actions.addWidget(self.pin_contact_btn, 0, 1)
+        actions.addWidget(self.clear_location_btn, 1, 0)
+        actions.addWidget(self.delete_contact_btn, 1, 1)
         layout.addLayout(actions)
         for button in (
             self.edit_contact_btn,

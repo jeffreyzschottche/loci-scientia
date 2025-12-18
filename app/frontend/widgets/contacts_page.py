@@ -7,10 +7,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -21,6 +20,121 @@ from ..config import BACKEND_HTTP, BACKEND_TIMEOUT
 from .contact_form import ContactFormDialog
 
 
+class ContactCard(QFrame):
+    edit_requested = Signal(dict)
+    delete_requested = Signal(dict)
+    map_requested = Signal(dict)
+    add_location_requested = Signal(dict)
+
+    def __init__(self, contact: dict):
+        super().__init__()
+        self.contact = contact
+        self.setObjectName("Card")
+        self.setStyleSheet(
+            "QFrame#Card { background:#ffffff; border:1px solid #e5e7eb; border-radius:20px; }"
+        )
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 14, 20, 14)
+        layout.setSpacing(16)
+
+        info = QVBoxLayout()
+        info.setSpacing(4)
+
+        name_row = QHBoxLayout()
+        name_label = QLabel(contact.get("name", "Onbekend"))
+        name_label.setStyleSheet("font-size:18px; font-weight:700;")
+        name_row.addWidget(name_label)
+        name_row.addStretch(1)
+        layout.addLayout(info, 1)
+
+        contact_icon = QLabel("👤")
+        contact_icon.setFixedSize(36, 36)
+        contact_icon.setAlignment(Qt.AlignCenter)
+        contact_icon.setStyleSheet(
+            "background:#ffffff; border:1px solid #e4e4e7; border-radius:18px; font-size:16px;"
+        )
+
+        info.addLayout(name_row)
+        info.addWidget(self._line_with_icon("✉", contact.get("email", "")))
+        info.addWidget(self._line_with_icon("☎", contact.get("phone", "")))
+        info.addWidget(self._build_location_row())
+
+        actions = QHBoxLayout()
+        actions.setSpacing(6)
+        edit_btn = QPushButton("Bewerk")
+        edit_btn.setCursor(Qt.PointingHandCursor)
+        edit_btn.setStyleSheet(
+            "QPushButton { border:1px solid #d4d4d8; border-radius:999px; padding:6px 16px; }"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        delete_btn = QPushButton("Verwijder")
+        delete_btn.setCursor(Qt.PointingHandCursor)
+        delete_btn.setStyleSheet(
+            "QPushButton { background:#111111; color:#ffffff; border-radius:999px; padding:6px 16px; }"
+            "QPushButton:hover { background:#facc15; color:#050505; }"
+        )
+        edit_btn.clicked.connect(lambda: self.edit_requested.emit(contact))
+        delete_btn.clicked.connect(lambda: self.delete_requested.emit(contact))
+        actions.addWidget(edit_btn)
+        actions.addWidget(delete_btn)
+        actions.addStretch(1)
+        info.addLayout(actions)
+
+    def _line_with_icon(self, icon: str, text: str) -> QWidget:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        icon_label = QLabel(icon)
+        icon_label.setFixedWidth(18)
+        label = QLabel(text)
+        label.setStyleSheet("color:#4b5563;")
+        row.addWidget(icon_label, 0, Qt.AlignTop)
+        row.addWidget(label, 1)
+        container = QWidget()
+        container.setLayout(row)
+        return container
+
+    def _build_location_row(self) -> QWidget:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        icon_label = QLabel("📍")
+        icon_label.setFixedWidth(18)
+        row.addWidget(icon_label, 0, Qt.AlignTop)
+
+        location_line = self.contact.get("location_label") or self.contact.get(
+            "location_street"
+        )
+        city = self.contact.get("location_city")
+        if location_line and city:
+            location_line = f"{location_line}, {city}"
+        label = QLabel(location_line or "Geen locatie gekoppeld")
+        label.setStyleSheet("color:#4b5563;")
+        row.addWidget(label, 1)
+
+        has_location = (
+            self.contact.get("location_lat") is not None
+            and self.contact.get("location_lon") is not None
+        )
+        action_btn = QPushButton("Op kaart" if has_location else "Locatie koppelen")
+        action_btn.setCursor(Qt.PointingHandCursor)
+        action_btn.setStyleSheet(
+            "QPushButton { border:1px solid #d4d4d8; border-radius:999px; padding:4px 14px; font-size:12px; }"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        if has_location:
+            action_btn.clicked.connect(lambda: self.map_requested.emit(self.contact))
+        else:
+            action_btn.clicked.connect(
+                lambda: self.add_location_requested.emit(self.contact)
+            )
+        row.addWidget(action_btn, 0, Qt.AlignRight)
+
+        container = QWidget()
+        container.setLayout(row)
+        return container
+
+
 class ContactsPage(QWidget):
     view_on_map_requested = Signal(dict)
     add_location_requested = Signal(dict, bool)
@@ -29,284 +143,92 @@ class ContactsPage(QWidget):
     def __init__(self):
         super().__init__()
         self.contacts: list[dict] = []
-        self.current_contact: dict | None = None
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        layout.addWidget(self._build_list(), 0)
-        self.detail = self._build_detail_card()
-        layout.addWidget(self.detail, 1)
-        self.reload_contacts()
-
-    def _build_list(self) -> QFrame:
-        panel = QFrame()
-        panel.setObjectName("Card")
-        panel.setFixedWidth(320)
-        panel_layout = QVBoxLayout(panel)
-        panel_layout.setContentsMargins(16, 16, 16, 16)
-        panel_layout.setSpacing(12)
-
         header = QHBoxLayout()
+        title_section = QVBoxLayout()
         title = QLabel("Contacten")
-        title.setStyleSheet(
-            "font-size:18px; font-weight:700; letter-spacing:0.08em;"
-        )
-        header.addWidget(title)
-        add_btn = QPushButton("+")
-        add_btn.setFixedSize(32, 32)
+        title.setStyleSheet("font-size:32px; font-weight:800; letter-spacing:0.02em;")
+        subtitle = QLabel("Beheer je contacten en bekijk ze op de kaart")
+        subtitle.setStyleSheet("color:#6b7280; font-size:14px; letter-spacing:0.04em;")
+        title_section.addWidget(title)
+        title_section.addWidget(subtitle)
+        header.addLayout(title_section)
+        header.addStretch(1)
+        add_btn = QPushButton("+ Contact toevoegen")
+        add_btn.setCursor(Qt.PointingHandCursor)
         add_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15;"
-            "  color:#050505;"
-            "  border-radius:16px;"
-            "  font-weight:700;"
-            "}"
+            "QPushButton { background:#facc15; color:#050505; padding:10px 26px; border-radius:999px; font-weight:600; }"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
         add_btn.clicked.connect(self._open_add_dialog)
-        header.addWidget(add_btn, 0, Qt.AlignRight)
-        panel_layout.addLayout(header)
+        header.addWidget(add_btn)
+        layout.addLayout(header)
 
         search = QLineEdit()
         search.setPlaceholderText("Zoek contacten…")
-        panel_layout.addWidget(search)
+        search.textChanged.connect(self._filter_contacts)
+        layout.addWidget(search)
 
-        self.list_widget = QListWidget()
-        self.list_widget.currentRowChanged.connect(self._update_detail)
-        panel_layout.addWidget(self.list_widget, 1)
-        self.count_label = QLabel("0 contacten")
-        self.count_label.setStyleSheet(
-            "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
         )
-        panel_layout.addWidget(self.count_label, 0, Qt.AlignRight)
-        return panel
+        self.list_container = QWidget()
+        self.list_container.setStyleSheet("background: transparent;")
+        self.list_layout = QVBoxLayout(self.list_container)
+        self.list_layout.setContentsMargins(0, 0, 0, 0)
+        self.list_layout.setSpacing(12)
+        self.scroll_area.setWidget(self.list_container)
+        layout.addWidget(self.scroll_area, 1)
 
-    def _build_detail_card(self) -> QFrame:
-        card = QFrame()
-        card.setObjectName("Card")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(12)
+        self.count_label = QLabel("Totaal: 0 contacten")
+        self.count_label.setStyleSheet("color:#6b7280; font-size:12px;")
+        layout.addWidget(self.count_label, 0, Qt.AlignLeft)
 
-        self.name = QLabel()
-        self.name.setStyleSheet(
-            "font-size:30px; font-weight:800; letter-spacing:0.02em; color:#111111;"
-        )
-        self.company = QLabel()
-        self.company.setStyleSheet(
-            "color:#6b7280; font-size:12px; letter-spacing:0.2em;"
-        )
-        layout.addWidget(self.name)
-        layout.addWidget(self.company)
+        self.filtered_contacts: list[dict] = []
+        self.reload_contacts()
 
-        self.email = QLabel()
-        self.phone = QLabel()
-        layout.addWidget(self.email)
-        layout.addWidget(self.phone)
+    def _filter_contacts(self, query: str):
+        query = query.strip().lower()
+        if not query:
+            self.filtered_contacts = list(self.contacts)
+        else:
+            self.filtered_contacts = [
+                c
+                for c in self.contacts
+                if query in (c.get("name") or "").lower()
+                or query in (c.get("email") or "").lower()
+                or query in (c.get("phone") or "").lower()
+            ]
+        self._render_contacts()
 
-        self.notes = QLabel()
-        self.notes.setWordWrap(True)
-        self.notes.setStyleSheet("color:#4b5563;")
-        layout.addWidget(self.notes)
+    def _render_contacts(self):
+        while self.list_layout.count():
+            item = self.list_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
-        self.location_title = QLabel("Locatie")
-        self.location_title.setStyleSheet(
-            "font-weight:700; margin-top:16px; letter-spacing:0.3em; font-size:12px;"
-        )
-        self.location_summary = QLabel("Nog geen locatie gekoppeld.")
-        self.location_summary.setWordWrap(True)
-        self.location_summary.setStyleSheet("color:#6b7280;")
-        self.location_coords = QLabel()
-        self.location_coords.setStyleSheet("color:#9ca3af; font-size:11px; letter-spacing:0.2em;")
-
-        layout.addWidget(self.location_title)
-        layout.addWidget(self.location_summary)
-        layout.addWidget(self.location_coords)
-
-        self.add_location_btn = QPushButton("Voeg locatie toe via kaart")
-        self.add_location_btn.setEnabled(False)
-        self.add_location_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15;"
-            "  color:#050505;"
-            "  border-radius:999px;"
-            "  padding:10px 28px;"
-            "  font-weight:600;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        self.add_location_btn.clicked.connect(self._request_location_assignment)
-        layout.addWidget(self.add_location_btn, 0, Qt.AlignLeft)
-        self.add_location_btn.hide()
-
-        self.change_location_btn = QPushButton("Wijzig locatie via kaart")
-        self.change_location_btn.setStyleSheet(
-            "QPushButton {"
-            "  border:1px solid rgba(33,33,33,0.2);"
-            "  border-radius:999px;"
-            "  padding:10px 28px;"
-            "  font-weight:600;"
-            "  background:transparent;"
-            "}"
-            "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
-        )
-        self.change_location_btn.clicked.connect(self._request_location_update)
-        layout.addWidget(self.change_location_btn, 0, Qt.AlignLeft)
-        self.change_location_btn.hide()
-
-        self.remove_location_btn = QPushButton("Verwijder locatie")
-        self.remove_location_btn.clicked.connect(self._remove_location)
-        self.remove_location_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15;"
-            "  color:#050505;"
-            "  border-radius:999px;"
-            "  padding:10px 28px;"
-            "  font-weight:600;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        layout.addWidget(self.remove_location_btn, 0, Qt.AlignLeft)
-        self.remove_location_btn.hide()
-
-        self.view_on_map_btn = QPushButton("Bekijk op kaart")
-        self.view_on_map_btn.setEnabled(False)
-        self.view_on_map_btn.setStyleSheet(
-            "QPushButton {"
-            "  border:1px solid rgba(33,33,33,0.2);"
-            "  border-radius:999px;"
-            "  padding:10px 28px;"
-            "  font-weight:600;"
-            "  background:transparent;"
-            "}"
-            "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
-        )
-        self.view_on_map_btn.clicked.connect(self._open_map_for_contact)
-        layout.addWidget(self.view_on_map_btn, 0, Qt.AlignLeft)
-        self.view_on_map_btn.hide()
-
-        actions = QHBoxLayout()
-        actions.setSpacing(8)
-        self.edit_contact_btn = QPushButton("Bewerk contact")
-        self.edit_contact_btn.clicked.connect(self._open_edit_dialog)
-        self.edit_contact_btn.setStyleSheet(
-            "QPushButton {"
-            "  border:1px solid rgba(33,33,33,0.2);"
-            "  border-radius:999px;"
-            "  padding:8px 22px;"
-            "  font-weight:600;"
-            "  background:transparent;"
-            "}"
-            "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
-        )
-        actions.addWidget(self.edit_contact_btn)
-        self.delete_contact_btn = QPushButton("Verwijder contact")
-        self.delete_contact_btn.clicked.connect(self._delete_current_contact)
-        self.delete_contact_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15;"
-            "  color:#050505;"
-            "  border-radius:999px;"
-            "  padding:8px 22px;"
-            "  font-weight:600;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        actions.addWidget(self.delete_contact_btn)
-        actions.addStretch(1)
-        layout.addLayout(actions)
-        self.edit_contact_btn.setEnabled(False)
-        self.delete_contact_btn.setEnabled(False)
-
-        layout.addStretch(1)
-        return card
-
-    def _update_detail(self, index: int) -> None:
-        if index < 0 or index >= len(self.contacts):
-            self.current_contact = None
-            self.view_on_map_btn.setEnabled(False)
-            self.view_on_map_btn.hide()
-            self.add_location_btn.setEnabled(False)
-            self.add_location_btn.hide()
-            self.change_location_btn.hide()
-            self.remove_location_btn.hide()
-            self.edit_contact_btn.setEnabled(False)
-            self.delete_contact_btn.setEnabled(False)
-            return
-        contact = self.contacts[index]
-        self.current_contact = contact
-        self.name.setText(contact.get("name", ""))
-        company = contact.get("company", "") or ""
-        self.company.setText(company)
-        self.email.setText(f"✉ {contact.get('email', '')}")
-        self.phone.setText(f"☎ {contact.get('phone', '')}")
-        self.notes.setText(contact.get("notes", ""))
-
-        summary, coords = self._format_location(contact)
-        self.location_summary.setText(summary)
-        self.location_coords.setText(coords)
-        has_coords = contact.get("location_lat") is not None and contact.get(
-            "location_lon"
-        ) is not None
-        self.view_on_map_btn.setEnabled(has_coords)
-        self.view_on_map_btn.setVisible(has_coords)
-        self.add_location_btn.setVisible(not has_coords)
-        self.add_location_btn.setEnabled(not has_coords)
-        self.change_location_btn.setVisible(has_coords)
-        self.change_location_btn.setEnabled(has_coords)
-        self.remove_location_btn.setVisible(has_coords)
-        self.remove_location_btn.setEnabled(has_coords)
-        self.edit_contact_btn.setEnabled(True)
-        self.delete_contact_btn.setEnabled(True)
-
-    def _format_location(self, contact: dict) -> tuple[str, str]:
-        label = contact.get("location_label") or contact.get("location_street")
-        city = contact.get("location_city")
-        region = contact.get("location_region")
-        country = contact.get("location_country")
-        lat = contact.get("location_lat")
-        lon = contact.get("location_lon")
-        context_bits = [bit for bit in [city, region, country] if bit]
-        summary = label or city or "Nog geen locatie gekoppeld."
-        if label and context_bits:
-            summary = f"{label} — {', '.join(context_bits)}"
-        elif context_bits and not label:
-            summary = ", ".join(context_bits)
-        coords = ""
-        if lat is not None and lon is not None:
-            coords = f"GPS: {lat:.5f}, {lon:.5f}"
-        return summary, coords
-
-    def _open_map_for_contact(self) -> None:
-        if not self.current_contact:
-            return
-        lat = self.current_contact.get("location_lat")
-        lon = self.current_contact.get("location_lon")
-        if lat is None or lon is None:
-            QMessageBox.information(
-                self,
-                "Geen locatie",
-                "Dit contact heeft nog geen GPS-locatie.",
-            )
-            return
-        self.view_on_map_requested.emit(self.current_contact)
-
-    def _request_location_assignment(self) -> None:
-        if not self.current_contact:
-            return
-        self.add_location_requested.emit(self.current_contact, False)
-
-    def _request_location_update(self) -> None:
-        if not self.current_contact:
-            return
-        self.add_location_requested.emit(self.current_contact, True)
-
-    def _current_contact_id(self) -> str | None:
-        if not self.current_contact:
-            return None
-        cid = self.current_contact.get("id")
-        return str(cid) if cid is not None else None
+        if not self.filtered_contacts:
+            placeholder = QLabel("Geen contacten gevonden.")
+            placeholder.setStyleSheet("color:#9ca3af; font-style:italic;")
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setMinimumHeight(160)
+            self.list_layout.addWidget(placeholder)
+        else:
+            for contact in self.filtered_contacts:
+                card = ContactCard(contact)
+                card.edit_requested.connect(self._handle_edit_requested)
+                card.delete_requested.connect(self._handle_delete_requested)
+                card.map_requested.connect(self._handle_view_map)
+                card.add_location_requested.connect(self._handle_location_assignment)
+                self.list_layout.addWidget(card)
 
     def reload_contacts(self, *, select_id: str | None = None) -> None:
         try:
@@ -315,32 +237,24 @@ class ContactsPage(QWidget):
             self.contacts = resp.json()
         except Exception:
             self.contacts = []
+        self.filtered_contacts = list(self.contacts)
+        self.count_label.setText(f"Totaal: {len(self.contacts)} contacten")
+        self._render_contacts()
 
-        self.list_widget.clear()
-        for person in self.contacts:
-            item = QListWidgetItem(person.get("name", "Onbekend"))
-            self.list_widget.addItem(item)
-        self.count_label.setText(f"{len(self.contacts)} contacten")
-        target_index = 0
-        if select_id:
-            for idx, person in enumerate(self.contacts):
-                pid = person.get("id")
-                if pid is not None and str(pid) == str(select_id):
-                    target_index = idx
-                    break
-        if self.contacts:
-            self.list_widget.setCurrentRow(target_index)
-            self._update_detail(target_index)
-        else:
-            self.current_contact = None
-            self.view_on_map_btn.setEnabled(False)
-            self.view_on_map_btn.hide()
-            self.add_location_btn.setEnabled(False)
-            self.add_location_btn.hide()
-            self.change_location_btn.hide()
-            self.remove_location_btn.hide()
-            self.edit_contact_btn.setEnabled(False)
-            self.delete_contact_btn.setEnabled(False)
+    def _handle_view_map(self, contact: dict):
+        lat = contact.get("location_lat")
+        lon = contact.get("location_lon")
+        if lat is None or lon is None:
+            QMessageBox.information(
+                self,
+                "Geen locatie",
+                "Dit contact heeft nog geen GPS-locatie.",
+            )
+            return
+        self.view_on_map_requested.emit(contact)
+
+    def _handle_location_assignment(self, contact: dict):
+        self.add_location_requested.emit(contact, False)
 
     def _open_add_dialog(self) -> None:
         dialog = ContactFormDialog(self)
@@ -365,45 +279,31 @@ class ContactsPage(QWidget):
 
         contact_id = contact.get("id")
         self.reload_contacts(select_id=str(contact_id) if contact_id is not None else None)
+        updated = self._find_contact_by_id(contact_id)
         if contact_id is not None:
             self.contacts_updated.emit(str(contact_id))
-        needs_location = contact.get("location_lat") is None or contact.get(
-            "location_lon"
-        ) is None
-        link_via_map = mode == "save_and_map" and needs_location
-        if needs_location and not link_via_map:
-            choice = QMessageBox.question(
-                self,
-                "Locatie toevoegen",
-                "Contact is opgeslagen. Wil je nu een locatie koppelen via de kaart?",
-            )
-            link_via_map = choice == QMessageBox.Yes
-        if link_via_map:
-            force_pin = bool(contact.get("location_lat") is not None and contact.get("location_lon") is not None)
-            self.add_location_requested.emit(contact, force_pin)
+        if updated:
+            self._maybe_request_location(updated, mode)
 
-    def _open_edit_dialog(self) -> None:
-        if not self.current_contact:
-            return
-        contact_id = self._current_contact_id()
+    def _handle_edit_requested(self, contact: dict):
         dialog = ContactFormDialog(
             self,
             title="Contact bewerken",
-            initial=self.current_contact,
+            initial=contact,
         )
-        if dialog.exec() != QDialog.Accepted or not contact_id:
+        if dialog.exec() != QDialog.Accepted:
             return
-
+        contact_id = contact.get("id")
+        if contact_id is None:
+            return
         payload = dialog.payload()
         mode = dialog.save_mode()
         try:
-            resp = requests.patch(
+            requests.patch(
                 f"{BACKEND_HTTP}/contacts/{contact_id}",
                 json=payload,
                 timeout=BACKEND_TIMEOUT,
             )
-            resp.raise_for_status()
-            updated = resp.json()
         except Exception as exc:
             QMessageBox.critical(
                 self,
@@ -411,73 +311,54 @@ class ContactsPage(QWidget):
                 f"Contact kon niet worden bijgewerkt:\n{exc}",
             )
             return
+        self.reload_contacts(select_id=str(contact_id))
+        updated = self._find_contact_by_id(contact_id)
+        if updated:
+            self._maybe_request_location(updated, mode)
+        self.contacts_updated.emit(str(contact_id))
 
-        self.contacts_updated.emit(contact_id)
-        self.reload_contacts(select_id=contact_id)
-        if mode == "save_and_map":
-            self.add_location_requested.emit(updated, True)
-
-    def _delete_current_contact(self) -> None:
-        contact_id = self._current_contact_id()
-        if not contact_id or not self.current_contact:
+    def _handle_delete_requested(self, contact: dict):
+        contact_id = contact.get("id")
+        if contact_id is None:
             return
         confirm = QMessageBox.question(
             self,
-            "Verwijderen",
-            f"Weet je zeker dat je {self.current_contact.get('name', 'dit contact')} wilt verwijderen?",
+            "Bevestig",
+            f"Weet je zeker dat je {contact.get('name')} wilt verwijderen?",
         )
         if confirm != QMessageBox.Yes:
             return
         try:
-            resp = requests.delete(
-                f"{BACKEND_HTTP}/contacts/{contact_id}",
-                timeout=BACKEND_TIMEOUT,
+            requests.delete(
+                f"{BACKEND_HTTP}/contacts/{contact_id}", timeout=BACKEND_TIMEOUT
             )
-            resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Fout",
-                f"Contact kon niet worden verwijderd:\n{exc}",
-            )
+            QMessageBox.critical(self, "Fout", f"Kon contact niet verwijderen:\n{exc}")
             return
-        self.contacts_updated.emit(contact_id)
         self.reload_contacts()
+        self.contacts_updated.emit(str(contact_id))
 
-    def _remove_location(self) -> None:
-        contact_id = self._current_contact_id()
-        if not contact_id:
+    def _find_contact_by_id(self, contact_id):
+        if contact_id is None:
+            return None
+        for contact in self.contacts:
+            if str(contact.get("id")) == str(contact_id):
+                return contact
+        return None
+
+    def _maybe_request_location(self, contact: dict, mode: str):
+        needs_location = contact.get("location_lat") is None or contact.get(
+            "location_lon"
+        ) is None
+        if not needs_location:
             return
-        confirm = QMessageBox.question(
-            self,
-            "Locatie verwijderen",
-            "Weet je zeker dat je de locatiegegevens voor dit contact wilt verwijderen?",
-        )
-        if confirm != QMessageBox.Yes:
-            return
-        payload = {
-            "location_label": None,
-            "location_street": None,
-            "location_city": None,
-            "location_region": None,
-            "location_country": None,
-            "location_context": None,
-            "location_lat": None,
-            "location_lon": None,
-        }
-        try:
-            resp = requests.patch(
-                f"{BACKEND_HTTP}/contacts/{contact_id}",
-                json=payload,
-                timeout=BACKEND_TIMEOUT,
-            )
-            resp.raise_for_status()
-        except Exception as exc:
-            QMessageBox.critical(
+        link_via_map = mode == "save_and_map"
+        if not link_via_map:
+            choice = QMessageBox.question(
                 self,
-                "Fout",
-                f"Locatie kon niet worden verwijderd:\n{exc}",
+                "Locatie toevoegen",
+                "Wil je via de kaart een locatie koppelen?",
             )
-            return
-        self.contacts_updated.emit(contact_id)
-        self.reload_contacts(select_id=contact_id)
+            link_via_map = choice == QMessageBox.Yes
+        if link_via_map:
+            self.add_location_requested.emit(contact, False)
