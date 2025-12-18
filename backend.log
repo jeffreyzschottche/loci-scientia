@@ -1,27 +1,31 @@
 INFO:     Will watch for changes in these directories: ['/Users/jeffreyzschottche/Sites/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [20038] using WatchFiles
+INFO:     Started reloader process [56012] using WatchFiles
 /Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
   warnings.warn(
-INFO:     Started server process [20047]
+INFO:     Started server process [56021]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:58203 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58205 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58207 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58208 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58209 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58210 - "GET /devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58213 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
-/Users/jeffreyzschottche/Sites/loci-scientia/app/backend/rag/embedder.py:133: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
-  return TextEmbedding(
-INFO:     127.0.0.1:58243 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58248 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58251 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58254 - "GET /sprites/v4/light%402x.json HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:58255 - "GET /sprites/v4/light%402x.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55565 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55567 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55569 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55570 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55571 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55572 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55576 - "GET /sprites/v4/light%402x.json HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55577 - "GET /sprites/v4/light%402x.png HTTP/1.1" 404 Not Found
+WARNING:  WatchFiles detected changes in 'app/frontend/main.py'. Reloading...
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [20047]
-INFO:     Stopping reloader process [20038]
+INFO:     Finished server process [56021]
+/Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO:     Started server process [56207]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56207]
+INFO:     Stopping reloader process [56012]

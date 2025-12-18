@@ -33,22 +33,34 @@ class DevicesPage(QWidget):
         header = QVBoxLayout()
         header.setSpacing(4)
         title = QLabel("Connected Devices & Gebruikersbeheer")
-        title.setStyleSheet("font-size:20px; font-weight:600;")
+        title.setStyleSheet("font-size:28px; font-weight:800; letter-spacing:0.02em;")
         subtitle = QLabel(
             "Beheer verbonden apparaten en gebruikersaccounts voor het systeem"
         )
-        subtitle.setStyleSheet("color:#9ca3af; font-size:13px;")
+        subtitle.setStyleSheet(
+            "color:#6b7280; font-size:12px; letter-spacing:0.15em;"
+        )
         header.addWidget(title)
         header.addWidget(subtitle)
         layout.addLayout(header)
 
         top_actions = QHBoxLayout()
         self.summary_label = QLabel("0 devices")
+        self.summary_label.setStyleSheet(
+            "color:#6b7280; letter-spacing:0.2em; font-size:11px;"
+        )
         top_actions.addWidget(self.summary_label)
         top_actions.addStretch(1)
         add_btn = QPushButton("Apparaat toevoegen")
         add_btn.setStyleSheet(
-            "background:#2563eb; color:white; border-radius:8px; padding:6px 12px;"
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:999px;"
+            "  padding:10px 28px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
         )
         add_btn.clicked.connect(self._open_add_dialog)
         top_actions.addWidget(add_btn)
@@ -58,8 +70,9 @@ class DevicesPage(QWidget):
         grid_wrapper.setStyleSheet(
             """
             QFrame {
-                background-color: #0f172a;
-                border-radius: 16px;
+                background-color: #f5f5f5;
+                border-radius: 28px;
+                border: 1px solid #ececec;
             }
             """
         )
@@ -80,12 +93,12 @@ class DevicesPage(QWidget):
         card.setStyleSheet(
             """
             QFrame#DeviceCard {
-                background-color: #1f2937;
-                border-radius: 12px;
-                border: 1px solid rgba(255,255,255,0.05);
+                background-color: #ffffff;
+                border-radius: 24px;
+                border: 1px solid #ececec;
             }
             QLabel {
-                color: #e5e7eb;
+                color: #111111;
             }
             """
         )
@@ -95,7 +108,7 @@ class DevicesPage(QWidget):
 
         header = QHBoxLayout()
         name = QLabel(device.get("device_name", "Onbekend apparaat"))
-        name.setStyleSheet("font-weight:600;")
+        name.setStyleSheet("font-weight:700; letter-spacing:0.02em; color:#111111;")
         header.addWidget(name)
         header.addStretch(1)
 
@@ -103,7 +116,7 @@ class DevicesPage(QWidget):
         edit_btn.setToolTip("Bewerken")
         edit_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         edit_btn.clicked.connect(partial(self._open_edit_dialog, device))
-        edit_btn.setStyleSheet("color:#cbd5f5;")
+        edit_btn.setStyleSheet("color:#facc15;")
         header.addWidget(edit_btn)
 
         delete_btn = QToolButton()
@@ -122,7 +135,7 @@ class DevicesPage(QWidget):
             ("Telefoon", device.get("phone", "")),
         ):
             row = QLabel(f"{label}: {value or '-'}")
-            row.setStyleSheet("color:#94a3b8;")
+            row.setStyleSheet("color:#4b5563; letter-spacing:0.04em;")
             meta.addWidget(row)
         layout.addLayout(meta)
 

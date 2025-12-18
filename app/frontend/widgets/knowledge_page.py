@@ -1,3 +1,5 @@
+import webbrowser
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
@@ -23,16 +25,17 @@ class KnowledgePage(QWidget):
         header = QHBoxLayout()
         title_box = QVBoxLayout()
         title = QLabel("Kennisbank")
-        title.setStyleSheet("font-size:18px; font-weight:600;")
-        subtitle = QLabel("Beheer kennisbank documenten en SD kaart opslag")
-        subtitle.setStyleSheet("color:#9ca3af;")
+        title.setStyleSheet("font-size:28px; font-weight:800; letter-spacing:0.02em;")
+        subtitle = QLabel("BEHEER KENNISBANK DOCUMENTEN EN SD KAART OPSLAG")
+        subtitle.setStyleSheet(
+            "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
+        )
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
         header.addLayout(title_box, 1)
 
-        refresh = self._pill_button("⟳ Sync Google Drive")
         upload = self._pill_button("⬆ Upload Document", primary=True)
-        header.addWidget(refresh, 0, Qt.AlignRight)
+        upload.clicked.connect(self._open_upload_portal)
         header.addWidget(upload, 0, Qt.AlignRight)
         layout.addLayout(header)
 
@@ -40,20 +43,37 @@ class KnowledgePage(QWidget):
         layout.addWidget(self._vector_status_card())
         layout.addWidget(self._documents_table())
 
-    @staticmethod
-    def _pill_button(text: str, primary: bool = False) -> QPushButton:
+    def _pill_button(self, text: str, primary: bool = False) -> QPushButton:
         btn = QPushButton(text)
         btn.setCursor(Qt.PointingHandCursor)
         if primary:
             btn.setStyleSheet(
-                "background:#2563eb; color:white; border-radius:8px; padding:8px 16px;"
+                "QPushButton {"
+                "  background:#facc15;"
+                "  color:#050505;"
+                "  border-radius:999px;"
+                "  padding:10px 28px;"
+                "  font-weight:600;"
+                "}"
+                "QPushButton:hover { background:#050505; color:#facc15; }"
             )
         else:
             btn.setStyleSheet(
-                "background:transparent; border:1px solid #374151; "
-                "color:white; border-radius:8px; padding:8px 16px;"
+                "QPushButton {"
+                "  background:transparent;"
+                "  border:1px solid rgba(33,33,33,0.2);"
+                "  color:#111111;"
+                "  border-radius:999px;"
+                "  padding:10px 28px;"
+                "  font-weight:600;"
+                "}"
+                "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
             )
         return btn
+
+    @staticmethod
+    def _open_upload_portal() -> None:
+        webbrowser.open("https://www.aitje.jeffrai.nl")
 
     def _stats_grid(self) -> QGridLayout:
         stats = [
@@ -83,10 +103,12 @@ class KnowledgePage(QWidget):
             card.setObjectName("Card")
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(16, 16, 16, 16)
-            label = QLabel(stat["title"])
-            label.setStyleSheet("color:#9ca3af;")
+            label = QLabel(stat["title"].upper())
+            label.setStyleSheet(
+                "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
+            )
             value = QLabel(stat["value"])
-            value.setStyleSheet("font-size:24px; font-weight:600;")
+            value.setStyleSheet("font-size:28px; font-weight:700; color:#111111;")
             card_layout.addWidget(label)
             card_layout.addWidget(value)
             if stat["progress"] is not None:
@@ -95,7 +117,7 @@ class KnowledgePage(QWidget):
                 bar.setValue(stat["progress"])
                 card_layout.addWidget(bar)
             detail = QLabel(stat["detail"])
-            detail.setStyleSheet("color:#9ca3af;")
+            detail.setStyleSheet("color:#4b5563;")
             card_layout.addWidget(detail)
             grid.addWidget(card, 0, idx)
         return grid
@@ -106,7 +128,7 @@ class KnowledgePage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         title = QLabel("Vector Database Status")
-        title.setStyleSheet("font-size:16px; font-weight:600;")
+        title.setStyleSheet("font-size:20px; font-weight:700; letter-spacing:0.02em;")
         layout.addWidget(title)
 
         meta_grid = QGridLayout()
@@ -118,10 +140,12 @@ class KnowledgePage(QWidget):
             ("Index Status", "Optimaal"),
         ]
         for idx, (label, value) in enumerate(entries):
-            lbl = QLabel(label)
-            lbl.setStyleSheet("color:#9ca3af;")
+            lbl = QLabel(label.upper())
+            lbl.setStyleSheet(
+                "color:#6b7280; letter-spacing:0.3em; font-size:11px;"
+            )
             val = QLabel(value)
-            val.setStyleSheet("font-weight:600;")
+            val.setStyleSheet("font-weight:600; color:#111111;")
             meta_grid.addWidget(lbl, 0, idx)
             meta_grid.addWidget(val, 1, idx)
         layout.addLayout(meta_grid)
@@ -134,7 +158,9 @@ class KnowledgePage(QWidget):
         card_layout.setContentsMargins(0, 0, 0, 0)
 
         title = QLabel("Kennisbank Documenten")
-        title.setStyleSheet("font-size:16px; font-weight:600; padding:16px;")
+        title.setStyleSheet(
+            "font-size:20px; font-weight:700; padding:16px; letter-spacing:0.02em;"
+        )
         card_layout.addWidget(title)
 
         table = QTableWidget()
@@ -146,7 +172,7 @@ class KnowledgePage(QWidget):
         table.setShowGrid(False)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionMode(QTableWidget.NoSelection)
-        table.setAlternatingRowColors(True)
+        table.setAlternatingRowColors(False)
         rows = [
             (
                 "Technische Handleiding.pdf",
@@ -178,6 +204,10 @@ class KnowledgePage(QWidget):
             for col_idx, value in enumerate(row):
                 item = QTableWidgetItem(value)
                 table.setItem(row_idx, col_idx, item)
+        table.horizontalHeader().setStyleSheet(
+            "QHeaderView::section { background:#ffffff; color:#111111; border:0; font-weight:600; }"
+        )
+        table.setStyleSheet("QTableWidget { background:#ffffff; }")
         table.resizeColumnsToContents()
         card_layout.addWidget(table)
         return card

@@ -48,10 +48,22 @@ class ContactsPage(QWidget):
         panel_layout.setSpacing(12)
 
         header = QHBoxLayout()
-        header.addWidget(QLabel("Contacten"))
+        title = QLabel("Contacten")
+        title.setStyleSheet(
+            "font-size:18px; font-weight:700; letter-spacing:0.08em;"
+        )
+        header.addWidget(title)
         add_btn = QPushButton("+")
         add_btn.setFixedSize(32, 32)
-        add_btn.setStyleSheet("background:#2563eb; color:white; border-radius:8px;")
+        add_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:16px;"
+            "  font-weight:700;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         add_btn.clicked.connect(self._open_add_dialog)
         header.addWidget(add_btn, 0, Qt.AlignRight)
         panel_layout.addLayout(header)
@@ -64,6 +76,9 @@ class ContactsPage(QWidget):
         self.list_widget.currentRowChanged.connect(self._update_detail)
         panel_layout.addWidget(self.list_widget, 1)
         self.count_label = QLabel("0 contacten")
+        self.count_label.setStyleSheet(
+            "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
+        )
         panel_layout.addWidget(self.count_label, 0, Qt.AlignRight)
         return panel
 
@@ -75,9 +90,13 @@ class ContactsPage(QWidget):
         layout.setSpacing(12)
 
         self.name = QLabel()
-        self.name.setStyleSheet("font-size:20px; font-weight:600;")
+        self.name.setStyleSheet(
+            "font-size:30px; font-weight:800; letter-spacing:0.02em; color:#111111;"
+        )
         self.company = QLabel()
-        self.company.setStyleSheet("color:#9ca3af;")
+        self.company.setStyleSheet(
+            "color:#6b7280; font-size:12px; letter-spacing:0.2em;"
+        )
         layout.addWidget(self.name)
         layout.addWidget(self.company)
 
@@ -88,16 +107,18 @@ class ContactsPage(QWidget):
 
         self.notes = QLabel()
         self.notes.setWordWrap(True)
-        self.notes.setStyleSheet("color:#9ca3af;")
+        self.notes.setStyleSheet("color:#4b5563;")
         layout.addWidget(self.notes)
 
         self.location_title = QLabel("Locatie")
-        self.location_title.setStyleSheet("font-weight:600; margin-top:16px;")
+        self.location_title.setStyleSheet(
+            "font-weight:700; margin-top:16px; letter-spacing:0.3em; font-size:12px;"
+        )
         self.location_summary = QLabel("Nog geen locatie gekoppeld.")
         self.location_summary.setWordWrap(True)
-        self.location_summary.setStyleSheet("color:#9ca3af;")
+        self.location_summary.setStyleSheet("color:#6b7280;")
         self.location_coords = QLabel()
-        self.location_coords.setStyleSheet("color:#9ca3af; font-size:11px;")
+        self.location_coords.setStyleSheet("color:#9ca3af; font-size:11px; letter-spacing:0.2em;")
 
         layout.addWidget(self.location_title)
         layout.addWidget(self.location_summary)
@@ -105,22 +126,62 @@ class ContactsPage(QWidget):
 
         self.add_location_btn = QPushButton("Voeg locatie toe via kaart")
         self.add_location_btn.setEnabled(False)
+        self.add_location_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:999px;"
+            "  padding:10px 28px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         self.add_location_btn.clicked.connect(self._request_location_assignment)
         layout.addWidget(self.add_location_btn, 0, Qt.AlignLeft)
         self.add_location_btn.hide()
 
         self.change_location_btn = QPushButton("Wijzig locatie via kaart")
+        self.change_location_btn.setStyleSheet(
+            "QPushButton {"
+            "  border:1px solid rgba(33,33,33,0.2);"
+            "  border-radius:999px;"
+            "  padding:10px 28px;"
+            "  font-weight:600;"
+            "  background:transparent;"
+            "}"
+            "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
+        )
         self.change_location_btn.clicked.connect(self._request_location_update)
         layout.addWidget(self.change_location_btn, 0, Qt.AlignLeft)
         self.change_location_btn.hide()
 
         self.remove_location_btn = QPushButton("Verwijder locatie")
         self.remove_location_btn.clicked.connect(self._remove_location)
+        self.remove_location_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:999px;"
+            "  padding:10px 28px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         layout.addWidget(self.remove_location_btn, 0, Qt.AlignLeft)
         self.remove_location_btn.hide()
 
         self.view_on_map_btn = QPushButton("Bekijk op kaart")
         self.view_on_map_btn.setEnabled(False)
+        self.view_on_map_btn.setStyleSheet(
+            "QPushButton {"
+            "  border:1px solid rgba(33,33,33,0.2);"
+            "  border-radius:999px;"
+            "  padding:10px 28px;"
+            "  font-weight:600;"
+            "  background:transparent;"
+            "}"
+            "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
+        )
         self.view_on_map_btn.clicked.connect(self._open_map_for_contact)
         layout.addWidget(self.view_on_map_btn, 0, Qt.AlignLeft)
         self.view_on_map_btn.hide()
@@ -129,9 +190,29 @@ class ContactsPage(QWidget):
         actions.setSpacing(8)
         self.edit_contact_btn = QPushButton("Bewerk contact")
         self.edit_contact_btn.clicked.connect(self._open_edit_dialog)
+        self.edit_contact_btn.setStyleSheet(
+            "QPushButton {"
+            "  border:1px solid rgba(33,33,33,0.2);"
+            "  border-radius:999px;"
+            "  padding:8px 22px;"
+            "  font-weight:600;"
+            "  background:transparent;"
+            "}"
+            "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
+        )
         actions.addWidget(self.edit_contact_btn)
         self.delete_contact_btn = QPushButton("Verwijder contact")
         self.delete_contact_btn.clicked.connect(self._delete_current_contact)
+        self.delete_contact_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:999px;"
+            "  padding:8px 22px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         actions.addWidget(self.delete_contact_btn)
         actions.addStretch(1)
         layout.addLayout(actions)
@@ -156,7 +237,8 @@ class ContactsPage(QWidget):
         contact = self.contacts[index]
         self.current_contact = contact
         self.name.setText(contact.get("name", ""))
-        self.company.setText(contact.get("company", ""))
+        company = contact.get("company", "") or ""
+        self.company.setText(company)
         self.email.setText(f"✉ {contact.get('email', '')}")
         self.phone.setText(f"☎ {contact.get('phone', '')}")
         self.notes.setText(contact.get("notes", ""))

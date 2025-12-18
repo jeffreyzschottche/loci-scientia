@@ -17,10 +17,14 @@ class Sidebar(QWidget):
         head_layout = QVBoxLayout(header)
         head_layout.setContentsMargins(16, 16, 16, 0)
         logo = QLabel("AITJE")
-        logo.setStyleSheet("font-size:20px; font-weight:700; letter-spacing:2px;")
+        logo.setStyleSheet(
+            "font-size:24px; font-weight:800; letter-spacing:0.4em; color:#111111;"
+        )
         head_layout.addWidget(logo)
         subtitle = QLabel("Lokale AI console")
-        subtitle.setStyleSheet("color:#a1a1aa; font-size:12px;")
+        subtitle.setStyleSheet(
+            "color:#9ca3af; font-size:11px; letter-spacing:0.45em;"
+        )
         head_layout.addWidget(subtitle)
         layout.addWidget(header)
 
@@ -45,7 +49,9 @@ class Sidebar(QWidget):
             btn_layout.setSpacing(12)
             icon_label = QLabel(icon)
             icon_label.setFixedWidth(20)
+            icon_label.setStyleSheet("font-size:16px; color:#212121;")
             text_label = QLabel(label)
+            text_label.setStyleSheet("font-weight:600; letter-spacing:0.02em;")
             btn_layout.addWidget(icon_label)
             btn_layout.addWidget(text_label)
             btn_layout.addStretch(1)
@@ -55,7 +61,9 @@ class Sidebar(QWidget):
 
         layout.addStretch(1)
         footer = QLabel("AITJE v1.0\nLokale intelligentie")
-        footer.setStyleSheet("color:#a1a1aa; font-size:11px; padding:12px;")
+        footer.setStyleSheet(
+            "color:#9ca3af; font-size:11px; padding:12px; letter-spacing:0.2em;"
+        )
         layout.addWidget(footer)
 
     def _on_nav(self, key: str):

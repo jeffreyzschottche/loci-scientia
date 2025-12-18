@@ -71,11 +71,20 @@ class ApiPage(QWidget):
         layout.setSpacing(12)
 
         header = QHBoxLayout()
-        description = QLabel("Beheer API endpoints, poorten en toegangssleutels")
-        description.setStyleSheet("color:#9ca3af;")
+        description = QLabel("BEHEER API ENDPOINTS, POORTEN EN TOEGANGSSLEUTELS")
+        description.setStyleSheet(
+            "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
+        )
         add_btn = QPushButton("+ Nieuwe API Route")
         add_btn.setStyleSheet(
-            "color:white; background:#2563eb; padding:6px 10px; border-radius:6px;"
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  padding:10px 28px;"
+            "  border-radius:999px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
         )
         add_btn.clicked.connect(self._add_route)
         header.addWidget(description)
@@ -105,10 +114,12 @@ class ApiPage(QWidget):
             card = self._card()
             box = QVBoxLayout(card)
             box.setContentsMargins(12, 12, 12, 12)
-            title = QLabel(label)
-            title.setStyleSheet("color:#9ca3af;")
+            title = QLabel(label.upper())
+            title.setStyleSheet(
+                "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
+            )
             metric = QLabel(value)
-            metric.setStyleSheet("font-size:20px;")
+            metric.setStyleSheet("font-size:26px; font-weight:700; color:#111111;")
             box.addWidget(title)
             box.addWidget(metric)
             row.addWidget(card, 0, idx)
@@ -123,7 +134,7 @@ class ApiPage(QWidget):
     def _show_error(self, message: str):
         err = QLabel(message)
         err.setWordWrap(True)
-        err.setStyleSheet("color:#f87171;")
+        err.setStyleSheet("color:#f87171; font-weight:600;")
         self.grid.addWidget(err, 0, 0)
 
     def _reload(self):
@@ -168,9 +179,10 @@ class ApiPage(QWidget):
             grid.setVerticalSpacing(8)
 
             name = QLabel(route["name"])
-            status = QLabel("Actief" if route["active"] else "Inactief")
+            status = QLabel(("Actief" if route["active"] else "Inactief").upper())
+            tone = "#facc15" if route["active"] else "#6b7280"
             status.setStyleSheet(
-                "color: " + ("#10b981" if route["active"] else "#f59e0b") + ";"
+                f"color:{tone}; font-weight:600; letter-spacing:0.12em; font-size:11px;"
             )
             grid.addWidget(name, 0, 0)
             grid.addWidget(status, 0, 1)
@@ -186,7 +198,26 @@ class ApiPage(QWidget):
 
             actions = QHBoxLayout()
             edit = QPushButton("Bewerken")
+            edit.setStyleSheet(
+                "QPushButton {"
+                "  border:1px solid rgba(33,33,33,0.2);"
+                "  border-radius:999px;"
+                "  padding:8px 22px;"
+                "  color:#111111;"
+                "  background:transparent;"
+                "}"
+                "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
+            )
             delete = QPushButton("Verwijderen")
+            delete.setStyleSheet(
+                "QPushButton {"
+                "  background:#facc15;"
+                "  color:#050505;"
+                "  border-radius:999px;"
+                "  padding:8px 22px;"
+                "}"
+                "QPushButton:hover { background:#050505; color:#facc15; }"
+            )
             edit.clicked.connect(lambda _=False, rid=route["id"]: self._edit_route(rid))
             delete.clicked.connect(lambda _=False, rid=route["id"]: self._delete_route(rid))
             actions.addWidget(edit)
