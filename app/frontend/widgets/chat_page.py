@@ -5,6 +5,8 @@ import json
 import requests
 from datetime import datetime
 from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtGui import QTextDocument
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -366,8 +368,17 @@ class ChatPage(QWidget):
             copy_btn.setObjectName("CopyButton")
             copy_btn.setCursor(Qt.PointingHandCursor)
             copy_btn.setFixedHeight(26)
-            copy_btn.clicked.connect(lambda _, lbl=label: self._copy_label_text(lbl))
+            copy_btn.clicked.connect(
+                lambda _, lbl=label, btn=copy_btn: self._handle_copy_click(lbl, btn)
+            )
             top_row.addWidget(copy_btn, 0, Qt.AlignRight)
+
+            print_btn = QPushButton("Print")
+            print_btn.setObjectName("CopyButton")
+            print_btn.setCursor(Qt.PointingHandCursor)
+            print_btn.setFixedHeight(26)
+            print_btn.clicked.connect(lambda _, lbl=label: self._print_label_text(lbl))
+            top_row.addWidget(print_btn, 0, Qt.AlignRight)
 
         bubble_layout.addLayout(top_row)
         bubble_layout.addWidget(label)
@@ -420,6 +431,29 @@ class ChatPage(QWidget):
         text = label.property("_plain_text") or label.text()
         if isinstance(text, str):
             self._copy_text(text)
+
+    def _handle_copy_click(self, label: QLabel, button: QPushButton):
+        self._copy_label_text(label)
+        original = button.text()
+        button.setText("Gekopieerd")
+        button.setEnabled(False)
+
+        def _restore():
+            button.setText(original)
+            button.setEnabled(True)
+
+        QTimer.singleShot(2000, _restore)
+
+    def _print_label_text(self, label: QLabel):
+        text = label.property("_plain_text") or label.text()
+        if not isinstance(text, str):
+            return
+        printer = QPrinter()
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() == QPrintDialog.Accepted:
+            doc = QTextDocument()
+            doc.setPlainText(text)
+            doc.print_(printer)
 
     def _set_label_text(self, label: QLabel, text: str):
         safe = html.escape(text).replace("\n", "<br>")

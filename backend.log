@@ -1,32 +1,22 @@
 INFO:     Will watch for changes in these directories: ['/Users/jeffreyzschottche/Sites/loci-scientia']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [46476] using WatchFiles
+INFO:     Started reloader process [46911] using WatchFiles
 /Users/jeffreyzschottche/Sites/loci-scientia/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
   warnings.warn(
-INFO:     Started server process [46485]
+INFO:     Started server process [46921]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:62948 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62950 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62952 - "GET /routes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62953 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62954 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62955 - "GET /devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62992 - "GET /sprites/v4/light%402x.png HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62991 - "GET /sprites/v4/light%402x.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62991 - "GET /fonts/Noto%20Sans%20Italic/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62992 - "GET /fonts/Noto%20Sans%20Regular/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62991 - "GET /fonts/Noto%20Sans%20Regular/1536-1791.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62997 - "GET /fonts/Noto%20Sans%20Regular/11520-11775.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62998 - "GET /fonts/Noto%20Sans%20Medium/0-255.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62997 - "GET /fonts/Noto%20Sans%20Regular/768-1023.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62998 - "GET /fonts/Noto%20Sans%20Regular/1024-1279.pbf HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63000 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63010 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63077 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63079 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63081 - "GET /routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63082 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63083 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63084 - "GET /devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63090 - "POST /api/v1/ask/stream HTTP/1.1" 200 OK
 /Users/jeffreyzschottche/Sites/loci-scientia/app/backend/rag/embedder.py:133: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
   return TextEmbedding(
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [46485]
-INFO:     Stopping reloader process [46476]
+INFO:     Finished server process [46921]
+INFO:     Stopping reloader process [46911]
