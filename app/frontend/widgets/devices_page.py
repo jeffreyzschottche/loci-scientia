@@ -36,20 +36,10 @@ class DevicesPage(QWidget):
         title_block = QVBoxLayout()
         title_block.setSpacing(2)
         title_block.setContentsMargins(0, 0, 0, 0)
-        title = QLabel("Connected Devices & Gebruikersbeheer")
-        title.setStyleSheet("font-size:28px; font-weight:800; letter-spacing:0.02em;")
-        subtitle = QLabel(
-            "Beheer verbonden apparaten en gebruikersaccounts voor het systeem"
-        )
-        subtitle.setStyleSheet(
-            "color:#6b7280; font-size:12px; letter-spacing:0.15em;"
-        )
         self.summary_label = QLabel("0 devices")
         self.summary_label.setStyleSheet(
             "color:#6b7280; letter-spacing:0.2em; font-size:11px;"
         )
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
         title_block.addWidget(self.summary_label)
         header.addLayout(title_block)
         header.addStretch(1)

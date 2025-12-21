@@ -24,16 +24,7 @@ class KnowledgePage(QWidget):
         layout.setSpacing(16)
 
         header = QHBoxLayout()
-        title_box = QVBoxLayout()
-        title = QLabel("Kennisbank")
-        title.setStyleSheet("font-size:28px; font-weight:800; letter-spacing:0.02em;")
-        subtitle = QLabel("BEHEER KENNISBANK DOCUMENTEN EN SD KAART OPSLAG")
-        subtitle.setStyleSheet(
-            "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
-        )
-        title_box.addWidget(title)
-        title_box.addWidget(subtitle)
-        header.addLayout(title_box, 1)
+        header.addStretch(1)
 
         upload = self._pill_button("⬆ Upload Document", primary=True)
         upload.clicked.connect(self._open_upload_portal)

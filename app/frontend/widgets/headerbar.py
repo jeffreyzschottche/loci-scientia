@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 class HeaderBar(QWidget):
     home_requested = Signal()
 
-    def __init__(self, title: str):
+    def __init__(self, title: str, subtitle: str = "Lokale AI-console"):
         super().__init__()
         self.setObjectName("Header")
         layout = QHBoxLayout(self)
@@ -22,7 +22,7 @@ class HeaderBar(QWidget):
         self.title.setStyleSheet(
             "font-size:26px; font-weight:800; letter-spacing:0.02em; color:#111111;"
         )
-        self.subtitle = QLabel("Lokale AI-console")
+        self.subtitle = QLabel(subtitle)
         self.subtitle.setStyleSheet(
             "color:#9ca3af; font-size:11px; letter-spacing:0.45em;"
         )
@@ -57,6 +57,9 @@ class HeaderBar(QWidget):
 
     def set_title(self, title: str):
         self.title.setText(title)
+
+    def set_subtitle(self, subtitle: str):
+        self.subtitle.setText(subtitle)
 
     def set_online(self, online: bool):
         text = "● ONLINE" if online else "● OFFLINE"

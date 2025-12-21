@@ -32,9 +32,7 @@ class NetworkStatusPage(QWidget):
         layout.setSpacing(16)
 
         header = QHBoxLayout()
-        title = QLabel("Netwerk Status")
-        title.setStyleSheet("font-size:28px; font-weight:800; letter-spacing:0.02em;")
-        header.addWidget(title)
+        header.setContentsMargins(0, 0, 0, 0)
         header.addStretch(1)
         refresh = QPushButton("Vernieuwen")
         refresh.clicked.connect(self.refresh_stats)

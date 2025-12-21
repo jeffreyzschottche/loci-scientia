@@ -73,15 +73,6 @@ class ApiPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
 
-        hero = QVBoxLayout()
-        title = QLabel("API Management")
-        title.setStyleSheet("font-size:32px; font-weight:800; letter-spacing:0.02em;")
-        subtitle = QLabel("Beheer je API keys en bekijk gebruik statistieken")
-        subtitle.setStyleSheet("color:#6b7280; font-size:14px; letter-spacing:0.04em;")
-        hero.addWidget(title)
-        hero.addWidget(subtitle)
-        layout.addLayout(hero)
-
         self.stats_cards = []
         stats_row = QHBoxLayout()
         stats_row.setSpacing(16)

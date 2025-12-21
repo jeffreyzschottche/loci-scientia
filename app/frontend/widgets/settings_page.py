@@ -21,15 +21,6 @@ class SettingsPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
 
-        title = QLabel("Instellingen")
-        title.setStyleSheet("font-size:30px; font-weight:800; letter-spacing:0.02em;")
-        subtitle = QLabel("BEHEER DE SYSTEEMINSTELLINGEN EN VOORKEUREN VOOR AITJE OS")
-        subtitle.setStyleSheet(
-            "color:#6b7280; letter-spacing:0.35em; font-size:11px;"
-        )
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-
         tabs = QTabWidget()
         tabs.setObjectName("SettingsTabs")
         tabs.addTab(self._appearance_tab(), "Uiterlijk")

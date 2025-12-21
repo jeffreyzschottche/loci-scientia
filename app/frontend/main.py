@@ -310,11 +310,23 @@ class MainWindow(QMainWindow):
             "maps": "Maps",
             "contacts": "Contacten",
             "net": "Netwerk Status",
-            "devices": "Connected Devices",
+            "devices": "Connected Devices & Gebruikersbeheer",
             "settings": "Instellingen",
             "faq": "FAQ",
         }
+        subtitles = {
+            "chat": "Start een gesprek met je lokale AI-assistent",
+            "api": "Beheer je API keys en bekijk gebruik statistieken",
+            "kb": "Beheer kennisbankdocumenten en SD-kaartopslag",
+            "maps": "Bekijk contactlocaties op de kaart",
+            "contacts": "Beheer je contacten en bekijk ze op de kaart",
+            "net": "Realtime overzicht van netwerk- en systeemstatus",
+            "devices": "Beheer verbonden apparaten en gebruikersaccounts voor het systeem",
+            "settings": "Beheer de systeeminstellingen en voorkeuren voor AITJE OS",
+            "faq": "Veelgestelde vragen en antwoorden",
+        }
         self.header.set_title(titles.get(key, "AITJE"))
+        self.header.set_subtitle(subtitles.get(key, "Lokale AI-console"))
 
     def _go_home(self):
         self.sidebar.set_current("chat")
