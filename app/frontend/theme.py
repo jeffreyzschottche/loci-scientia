@@ -77,10 +77,27 @@ QPushButton:hover {
   color: #111111;
   border-color: rgba(17, 17, 17, 0.3);
 }
-QPushButton[active="true"] {
-  background: #ffffff;
-  color: #111111;
-  border-color: #facc15;
+#Sidebar QPushButton {
+  padding: 4px 16px;
+  min-height: 30px;
+  border-radius: 15px;
+  border: none;
+}
+#Sidebar QPushButton QLabel {
+  background: transparent;
+}
+#Sidebar QPushButton:hover {
+  background: rgba(250, 204, 21, 0.12);
+}
+#Sidebar QPushButton[active="true"] {
+  background: #facc15;
+  color: #050505;
+  border: none;
+  border-radius: 15px;
+  min-height: 30px;
+}
+#Sidebar QPushButton[active="true"] QLabel {
+  color: #050505;
 }
 QFrame#Card, QWidget#Card {
   background: #ffffff;
