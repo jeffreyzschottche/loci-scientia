@@ -87,6 +87,11 @@ QFrame#Card, QWidget#Card {
   border: 1px solid #ececec;
   border-radius: 28px;
 }
+QFrame#MapFrame {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
 QFrame#Card[variant="dark"], QWidget#Card[variant="dark"] {
   background: #111111;
   border: 1px solid rgba(255, 255, 255, 0.12);

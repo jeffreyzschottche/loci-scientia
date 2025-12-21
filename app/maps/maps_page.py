@@ -181,9 +181,10 @@ class MapsPage(QWidget):
 
     def _build_map_view(self) -> QFrame:
         area = QFrame()
-        area.setObjectName("Card")
+        area.setObjectName("MapFrame")
         layout = QGridLayout(area)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         self.webview = QWebEngineView()
         self._project_root = Path(__file__).resolve().parents[2]
@@ -522,7 +523,12 @@ class MapsPage(QWidget):
         self.pin_button.clicked.connect(self._start_pin_mode)
         controls_layout.addWidget(self.pin_button)
 
-        layout.addWidget(controls_box, 0, 1, Qt.AlignTop | Qt.AlignRight)
+        controls_wrapper = QWidget()
+        wrapper_layout = QVBoxLayout(controls_wrapper)
+        wrapper_layout.setContentsMargins(10, 10, 10, 10)
+        wrapper_layout.setSpacing(0)
+        wrapper_layout.addWidget(controls_box, 0, Qt.AlignTop | Qt.AlignRight)
+        layout.addWidget(controls_wrapper, 0, 1, Qt.AlignTop | Qt.AlignRight)
 
         plus.clicked.connect(self.zoom_in)
         minus.clicked.connect(self.zoom_out)

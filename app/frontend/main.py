@@ -221,7 +221,7 @@ class MainWindow(QMainWindow):
         self.center = QWidget()
         self.center.setObjectName("CenterContainer")
         center_layout = QVBoxLayout(self.center)
-        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setContentsMargins(0, 16, 0, 0)
         center_layout.setSpacing(0)
 
         self.header = HeaderBar("AITJE Dashboard")
