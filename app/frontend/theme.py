@@ -165,22 +165,26 @@ QFrame#MapControls {
 }
 QPushButton#MapZoomButton {
   background: #ffffff;
-  color: #111111;
+  color: #050505;
   border-radius: 18px;
   border: 1px solid #e5e7eb;
   font-weight: 700;
   font-size: 18px;
+  padding: 0;
+  text-align: center;
 }
 QPushButton#MapZoomButton:hover {
   border-color: #facc15;
+  color: #050505;
+  background: #facc15;
 }
 QPushButton#MapPrimaryButton {
   background: #facc15;
   color: #111111;
-  border-radius: 999px;
+  border-radius: 15px;
   border: none;
   font-weight: 700;
-  padding: 12px 18px;
+  padding: 8px 16px;
 }
 QPushButton#MapPrimaryButton:hover {
   background: #fbbf24;
@@ -225,20 +229,22 @@ QCheckBox#ContactSelectAll::indicator:indeterminate {
 }
 QPushButton#ContactReloadButton {
   background: #ffffff;
-  border-radius: 999px;
+  border-radius: 15px;
   border: 1px solid #e5eaf0;
   font-weight: 600;
-  padding: 0 18px;
+  font-size: 13px;
+  padding: 0 14px;
 }
 QPushButton#ContactReloadButton:hover {
   border-color: #facc15;
 }
 QPushButton#ContactSecondaryButton {
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid #e2e8f0;
-  padding: 12px 16px;
+  padding: 10px 14px;
   font-weight: 600;
+  font-size: 13px;
 }
 QPushButton#ContactSecondaryButton:hover {
   border-color: #facc15;
@@ -251,10 +257,11 @@ QPushButton#ContactSecondaryButton:disabled {
 QPushButton#ContactDangerButton {
   background: #fee2e2;
   color: #991b1b;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid #fecaca;
-  padding: 12px 16px;
+  padding: 10px 14px;
   font-weight: 600;
+  font-size: 13px;
 }
 QPushButton#ContactDangerButton:hover {
   background: #fecaca;

@@ -222,9 +222,7 @@ class ApiPage(QWidget):
 
     def _render_route(self, route: dict):
         entry = QFrame()
-        entry.setStyleSheet(
-            "background:#fdfdfd; border:1px solid #f2f2f2; border-radius:18px;"
-        )
+        entry.setStyleSheet("background:#fdfdfd; border:none; border-radius:18px;")
         row = QHBoxLayout(entry)
         row.setContentsMargins(16, 12, 16, 12)
         row.setSpacing(16)
@@ -260,10 +258,10 @@ class ApiPage(QWidget):
         bg, border, text_color = active_styles if is_active else inactive_styles
         status.setAlignment(Qt.AlignCenter)
         status.setStyleSheet(
-            f"background:{bg}; border:1px solid {border}; border-radius:20px;"
+            f"background:{bg}; border:1px solid {border}; border-radius:14px;"
             f"padding:4px 16px; color:{text_color}; font-weight:600;"
         )
-        status.setFixedHeight(40)
+        status.setFixedHeight(28)
         actions.addWidget(status, 0, Qt.AlignRight)
 
         buttons = QHBoxLayout()

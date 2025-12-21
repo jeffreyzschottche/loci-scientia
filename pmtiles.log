@@ -1,1 +1,98 @@
-2025/12/21 13:21:42 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/12/21 20:56:51 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F4%2F2.mvt in 479.333µs
+2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F3%2F2.mvt in 226.125µs
+2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F4%2F3.mvt in 230.5µs
+2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F3%2F3.mvt in 82.542µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F8%2F5.mvt in 314.375µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F8%2F4.mvt in 132.042µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F7%2F5.mvt in 146.875µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F9%2F5.mvt in 153.292µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F7%2F4.mvt in 56.625µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F16%2F10.mvt in 117.75µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F17%2F10.mvt in 81.209µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F16%2F11.mvt in 168.875µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F17%2F11.mvt in 120.458µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F33%2F21.mvt in 103.833µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F34%2F21.mvt in 130.708µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F33%2F20.mvt in 115.25µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F34%2F20.mvt in 196.334µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F67%2F42.mvt in 182.708µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F67%2F43.mvt in 135.291µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F66%2F42.mvt in 106.375µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F66%2F43.mvt in 174.292µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F134%2F85.mvt in 270.042µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F135%2F85.mvt in 124.958µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F134%2F84.mvt in 100.083µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F134%2F86.mvt in 199.541µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F135%2F84.mvt in 127.875µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F135%2F86.mvt in 72µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F269%2F170.mvt in 350.708µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F269%2F171.mvt in 99.75µs
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F268%2F170.mvt in 91.208µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F268%2F171.mvt in 161.916µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F270%2F170.mvt in 39µs
+2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
+2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
+2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F270%2F171.mvt in 166.458µs

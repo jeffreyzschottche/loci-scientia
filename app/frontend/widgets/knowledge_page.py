@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QHeaderView,
 )
 
 
@@ -51,7 +52,7 @@ class KnowledgePage(QWidget):
                 "QPushButton {"
                 "  background:#facc15;"
                 "  color:#050505;"
-                "  border-radius:999px;"
+                "  border-radius:20px;"
                 "  padding:10px 28px;"
                 "  font-weight:600;"
                 "}"
@@ -63,12 +64,13 @@ class KnowledgePage(QWidget):
                 "  background:transparent;"
                 "  border:1px solid rgba(33,33,33,0.2);"
                 "  color:#111111;"
-                "  border-radius:999px;"
+                "  border-radius:20px;"
                 "  padding:10px 28px;"
                 "  font-weight:600;"
                 "}"
                 "QPushButton:hover { border-color:rgba(33,33,33,0.45); }"
             )
+        btn.setFixedHeight(40)
         return btn
 
     @staticmethod
@@ -115,6 +117,18 @@ class KnowledgePage(QWidget):
                 bar = QProgressBar()
                 bar.setRange(0, 100)
                 bar.setValue(stat["progress"])
+                bar.setFixedHeight(16)
+                bar.setStyleSheet(
+                    "QProgressBar {"
+                    "  border:1px solid #facc15;"
+                    "  border-radius:8px;"
+                    "  background:#fefce8;"
+                    "}"
+                    "QProgressBar::chunk {"
+                    "  background-color:#facc15;"
+                    "  border-radius:8px;"
+                    "}"
+                )
                 card_layout.addWidget(bar)
             detail = QLabel(stat["detail"])
             detail.setStyleSheet("color:#4b5563;")
@@ -173,6 +187,7 @@ class KnowledgePage(QWidget):
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionMode(QTableWidget.NoSelection)
         table.setAlternatingRowColors(False)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         rows = [
             (
                 "Technische Handleiding.pdf",
@@ -204,10 +219,14 @@ class KnowledgePage(QWidget):
             for col_idx, value in enumerate(row):
                 item = QTableWidgetItem(value)
                 table.setItem(row_idx, col_idx, item)
-        table.horizontalHeader().setStyleSheet(
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setStyleSheet(
             "QHeaderView::section { background:#ffffff; color:#111111; border:0; font-weight:600; }"
         )
-        table.setStyleSheet("QTableWidget { background:#ffffff; }")
-        table.resizeColumnsToContents()
+        table.setStyleSheet(
+            "QTableWidget { background:#ffffff; border:0; }"
+            "QTableWidget::item { border-bottom:1px solid #f4f4f5; }"
+        )
         card_layout.addWidget(table)
         return card

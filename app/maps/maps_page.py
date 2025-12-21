@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
 )
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -197,15 +198,15 @@ class MapsPage(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         gradient = QLinearGradient(0, 0, size, size)
-        gradient.setColorAt(0, QColor("#f97316"))
-        gradient.setColorAt(1, QColor("#f43f5e"))
+        gradient.setColorAt(0, QColor("#fef3c7"))
+        gradient.setColorAt(1, QColor("#facc15"))
         painter.setBrush(gradient)
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(0, 0, size, size)
 
-        painter.setBrush(QColor("#ffffff"))
+        painter.setBrush(QColor("#fffbeb"))
         painter.drawEllipse(size // 2 - 6, size // 2 - 6, 12, 12)
-        painter.setBrush(QColor("#f97316"))
+        painter.setBrush(QColor("#111111"))
         painter.drawEllipse(size // 2 - 3, size // 2 - 3, 6, 6)
 
         painter.end()
@@ -288,13 +289,13 @@ class MapsPage(QWidget):
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      border: 2px solid white;
-      background: #f97316;
+      border: 2px solid #111111;
+      background: #facc15;
       cursor: pointer;
       box-shadow: 0 0 8px rgba(0, 0, 0, 0.65);
     }}
     .loci-marker.contact {{
-      background: #2563eb;
+      background: #facc15;
     }}
   </style>
 </head>
@@ -532,10 +533,6 @@ class MapsPage(QWidget):
         self.webview.setHtml(html, QUrl("http://localhost/"))
         layout.addWidget(self.webview, 0, 0, 1, 2)
 
-        meta = QLabel("Europa\ncenter 10°E, 50°N")
-        meta.setObjectName("MapMeta")
-        layout.addWidget(meta, 0, 0, Qt.AlignTop | Qt.AlignLeft)
-
         controls_box = QFrame()
         controls_box.setObjectName("MapControls")
         controls_layout = QVBoxLayout(controls_box)
@@ -544,17 +541,20 @@ class MapsPage(QWidget):
 
         plus = QPushButton("+")
         minus = QPushButton("-")
+        zoom_row = QHBoxLayout()
+        zoom_row.setSpacing(8)
         for btn in (plus, minus):
             btn.setFixedSize(44, 44)
             btn.setObjectName("MapZoomButton")
             btn.setCursor(Qt.PointingHandCursor)
-            controls_layout.addWidget(btn)
+            zoom_row.addWidget(btn)
+        controls_layout.addLayout(zoom_row)
 
         controls_layout.addStretch(1)
 
         self.pin_button = QPushButton("Voeg locatie toe")
         self.pin_button.setObjectName("MapPrimaryButton")
-        self.pin_button.setFixedHeight(46)
+        self.pin_button.setFixedHeight(30)
         self.pin_button.setCursor(Qt.PointingHandCursor)
         self.pin_button.clicked.connect(self._start_pin_mode)
         controls_layout.addWidget(self.pin_button)
@@ -592,7 +592,7 @@ class MapsPage(QWidget):
         filter_row.addWidget(self.select_all_checkbox, 1)
         reload = QPushButton("Herlaad")
         reload.setObjectName("ContactReloadButton")
-        reload.setFixedHeight(36)
+        reload.setFixedHeight(30)
         reload.setToolTip("Herlaad contacten")
         reload.clicked.connect(self._load_contacts_for_map)
         filter_row.addWidget(reload)
@@ -627,7 +627,7 @@ class MapsPage(QWidget):
         actions.setColumnStretch(0, 1)
         actions.setColumnStretch(1, 1)
         self.edit_contact_btn = QPushButton("Bewerk contact")
-        self.pin_contact_btn = QPushButton("Nieuwe locatie pinnen")
+        self.pin_contact_btn = QPushButton("Voeg locatie toe")
         self.clear_location_btn = QPushButton("Verwijder locatie")
         self.delete_contact_btn = QPushButton("Verwijder contact")
         self.edit_contact_btn.setObjectName("ContactSecondaryButton")
@@ -649,6 +649,8 @@ class MapsPage(QWidget):
             self.clear_location_btn,
             self.delete_contact_btn,
         ):
+            button.setFixedHeight(36)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             button.setEnabled(False)
 
         self.contacts_empty.hide()
