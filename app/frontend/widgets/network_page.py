@@ -42,24 +42,26 @@ class NetworkStatusPage(QWidget):
             "QPushButton {"
             "  color:#111111;"
             "  border:1px solid rgba(33,33,33,0.2);"
-            "  border-radius:999px;"
+            "  border-radius:20px;"
             "  padding:8px 24px;"
             "  background:transparent;"
             "}"
             "QPushButton:hover { border-color: rgba(33,33,33,0.45); }"
         )
+        refresh.setFixedHeight(40)
         header.addWidget(refresh)
         login = QPushButton("Beheerder Login")
         login.setStyleSheet(
             "QPushButton {"
             "  background:#facc15;"
             "  color:#050505;"
-            "  border-radius:999px;"
+            "  border-radius:20px;"
             "  padding:8px 28px;"
             "  font-weight:600;"
             "}"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
+        login.setFixedHeight(40)
         header.addWidget(login)
         layout.addLayout(header)
 
@@ -114,6 +116,11 @@ class NetworkStatusPage(QWidget):
         value.setStyleSheet("font-size:26px; font-weight:700; color:#111111;")
         bar = QProgressBar()
         bar.setRange(0, 100)
+        bar.setFixedHeight(20)
+        bar.setStyleSheet(
+            "QProgressBar { border-radius:10px; border:1px solid #facc15; background:#fefce8; }"
+            "QProgressBar::chunk { border-radius:10px; background:#facc15; }"
+        )
         layout.addWidget(label)
         layout.addWidget(value)
         layout.addWidget(bar)

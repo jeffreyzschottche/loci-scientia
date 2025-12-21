@@ -56,30 +56,23 @@ class DevicesPage(QWidget):
             "QPushButton {"
             "  background:#facc15;"
             "  color:#050505;"
-            "  border-radius:999px;"
+            "  border-radius:20px;"
             "  padding:10px 28px;"
             "  font-weight:600;"
             "}"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
+        add_btn.setFixedHeight(40)
         add_btn.clicked.connect(self._open_add_dialog)
         top_actions.addWidget(add_btn)
         layout.addLayout(top_actions)
 
-        grid_wrapper = QFrame()
-        grid_wrapper.setStyleSheet(
-            """
-            QFrame {
-                background-color: #ffffff;
-                border-radius: 28px;
-                border: 1px solid #ececec;
-            }
-            """
-        )
+        grid_wrapper = QWidget()
         grid_wrapper_layout = QVBoxLayout(grid_wrapper)
-        grid_wrapper_layout.setContentsMargins(16, 16, 16, 16)
+        grid_wrapper_layout.setContentsMargins(0, 0, 0, 0)
 
         self.grid = QGridLayout()
+        self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(16)
         grid_wrapper_layout.addLayout(self.grid)
         layout.addWidget(grid_wrapper)
@@ -94,8 +87,9 @@ class DevicesPage(QWidget):
             """
             QFrame#DeviceCard {
                 background-color: #ffffff;
-                border-radius: 24px;
-                border: 1px solid #ececec;
+                border-radius: 28px;
+                border: 1px solid #e5e7eb;
+                box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
             }
             QLabel {
                 color: #111111;
@@ -114,16 +108,24 @@ class DevicesPage(QWidget):
 
         edit_btn = QToolButton()
         edit_btn.setToolTip("Bewerken")
-        edit_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        edit_btn.setText("✏️")
+        edit_btn.setIconSize(edit_btn.size())
         edit_btn.clicked.connect(partial(self._open_edit_dialog, device))
-        edit_btn.setStyleSheet("color:#facc15;")
+        edit_btn.setStyleSheet(
+            "QToolButton { border:none; font-size:16px; }"
+            "QToolButton:hover { opacity:0.8; }"
+        )
         header.addWidget(edit_btn)
 
         delete_btn = QToolButton()
         delete_btn.setToolTip("Verwijderen")
-        delete_btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+        delete_btn.setText("🗑️")
+        delete_btn.setIconSize(delete_btn.size())
         delete_btn.clicked.connect(partial(self._confirm_delete, device))
-        delete_btn.setStyleSheet("color:#f87171;")
+        delete_btn.setStyleSheet(
+            "QToolButton { border:none; font-size:16px; }"
+            "QToolButton:hover { opacity:0.8; }"
+        )
         header.addWidget(delete_btn)
 
         layout.addLayout(header)
@@ -135,7 +137,9 @@ class DevicesPage(QWidget):
             ("Telefoon", device.get("phone", "")),
         ):
             row = QLabel(f"{label}: {value or '-'}")
-            row.setStyleSheet("color:#4b5563; letter-spacing:0.04em;")
+            row.setStyleSheet(
+                "color:#111111; background:#f9fafb; border-radius:20px; padding:10px 16px;"
+            )
             meta.addWidget(row)
         layout.addLayout(meta)
 
