@@ -211,12 +211,12 @@ QLabel#AssistantAvatar {
   font-size: 14px;
 }
 QLabel#UserAvatar {
-  background: #ffffff;
-  color: #111111;
-  border: 1px solid #e5e7eb;
+  background: transparent;
+  color: #050505;
+  border: none;
   border-radius: 50%;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
 }
 QPushButton#CopyButton {
   background: #f3f4f6;

@@ -25,6 +25,7 @@ MAX_BUBBLE_WIDTH = 680
 ROW_GAP = 12
 SIDE_PADDING = 28
 ASSISTANT_AVATAR_SIZE = 32
+ASSISTANT_MAX_WIDTH = 820
 
 
 class ChatSignals(QObject):
@@ -145,6 +146,7 @@ class ChatPage(QWidget):
         self.input.clear()
         self.current_message = ""  # Reset message buffer
         self.current_reply_label = None
+        self._show_typing_indicator()
         asyncio.create_task(self._stream(text))
 
     async def _stream(self, prompt: str):
@@ -250,7 +252,10 @@ class ChatPage(QWidget):
     def _on_token(self, token: str):
         """Append token to the current message."""
         if token.startswith("[fout]"):
-            self.current_reply_label = self._append_message("assistant", token)
+            if self.current_reply_label is None:
+                self.current_reply_label = self._append_message("assistant", token)
+            else:
+                self._set_label_text(self.current_reply_label, token)
             self.current_message = token
             return
 
@@ -270,6 +275,10 @@ class ChatPage(QWidget):
     @Slot()
     def _on_done(self):
         """Finalize the current message."""
+        if self.current_reply_label and not self.current_message:
+            self._set_label_text(
+                self.current_reply_label, "Geen antwoord beschikbaar."
+            )
         self.current_message = ""
         self.current_reply_label = None
 
@@ -313,7 +322,7 @@ class ChatPage(QWidget):
         row_outer_layout.setSpacing(0)
 
         row_inner = QWidget()
-        row_inner.setMaximumWidth(MAX_BUBBLE_WIDTH)
+        row_inner.setMaximumWidth(ASSISTANT_MAX_WIDTH if role == "assistant" else MAX_BUBBLE_WIDTH)
         row_inner.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         inner_layout = QHBoxLayout(row_inner)
         inner_layout.setContentsMargins(0, 0, 0, 0)
@@ -323,7 +332,8 @@ class ChatPage(QWidget):
         bubble.setObjectName("UserBubble" if role == "user" else "AssistantBubble")
         if role == "user":
             bubble.setStyleSheet("background:#111111; border:1px solid #111111; border-radius:20px;")
-        bubble.setMaximumWidth(int(MAX_BUBBLE_WIDTH * (0.82 if role == "user" else 0.9)))
+        max_width = ASSISTANT_MAX_WIDTH if role == "assistant" else MAX_BUBBLE_WIDTH
+        bubble.setMaximumWidth(int(max_width * (0.82 if role == "user" else 1.0)))
         bubble.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         bubble_layout = QVBoxLayout(bubble)
         bubble_layout.setContentsMargins(18, 14, 18, 14)
@@ -390,11 +400,17 @@ class ChatPage(QWidget):
         return label
 
     def _build_assistant_avatar(self) -> QLabel:
-        avatar = QLabel("🤖")
+        avatar = QLabel("🥚")
         avatar.setObjectName("AssistantAvatar")
         avatar.setAlignment(Qt.AlignCenter)
         avatar.setFixedSize(ASSISTANT_AVATAR_SIZE, ASSISTANT_AVATAR_SIZE)
         return avatar
+
+    def _show_typing_indicator(self):
+        if self.current_reply_label is not None:
+            return
+        self.current_reply_label = self._append_message("assistant", "💬")
+        self.current_message = ""
 
     def _copy_text(self, text: str):
         clipboard = QApplication.clipboard()

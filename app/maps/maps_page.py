@@ -49,6 +49,7 @@ from app.frontend.config import (
     PMTILES_TILE_TEMPLATE,
 )
 from app.frontend.widgets.contact_form import ContactFormDialog
+from app.frontend.widgets.dialog_style import MODAL_QSS
 
 
 class MapBridge(QObject):
@@ -689,6 +690,7 @@ class MapsPage(QWidget):
 
         dialog = QDialog(self)
         dialog.setWindowTitle("Locatie koppelen aan contact")
+        dialog.setStyleSheet(MODAL_QSS)
         form = QFormLayout(dialog)
         form.setContentsMargins(16, 16, 16, 16)
         form.setSpacing(12)

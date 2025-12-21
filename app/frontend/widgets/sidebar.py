@@ -23,7 +23,7 @@ class Sidebar(QWidget):
         logo = QLabel()
         logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         images_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "images"))
-        image_path = os.path.join(images_dir, "aitje.jpeg")
+        image_path = os.path.join(images_dir, "aitje.png")
         if os.path.exists(image_path):
             pixmap = QPixmap(image_path).scaled(
                 140, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation

@@ -20,9 +20,9 @@ QComboBox,
 QSpinBox {
   background: #ffffff;
   border: 1px solid #111111;
-  border-radius: 20px;
-  padding: 10px 16px;
-  min-height: 42px;
+  border-radius: 18px;
+  padding: 8px 14px;
+  min-height: 36px;
   color: #0f172a;
 }
 QLineEdit:focus,
@@ -45,10 +45,11 @@ QDialogButtonBox {
 QPushButton {
   background: #facc15;
   color: #050505;
-  border-radius: 20px;
   border: none;
-  padding: 10px 22px;
+  padding: 8px 20px;
   font-weight: 600;
+  min-height: 32px;
+  border-radius: 16px;
 }
 QPushButton:hover {
   background: #050505;
