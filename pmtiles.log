@@ -1,98 +1,65 @@
-2025/12/21 20:56:51 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
-2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F4%2F2.mvt in 479.333µs
-2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F3%2F2.mvt in 226.125µs
-2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F4%2F3.mvt in 230.5µs
-2025/12/21 20:57:02 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:02 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:02 main.go:156: served 404 %2Feurope%2F3%2F3%2F3.mvt in 82.542µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F8%2F5.mvt in 314.375µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F8%2F4.mvt in 132.042µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F7%2F5.mvt in 146.875µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F9%2F5.mvt in 153.292µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F4%2F7%2F4.mvt in 56.625µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F16%2F10.mvt in 117.75µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F17%2F10.mvt in 81.209µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F16%2F11.mvt in 168.875µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F5%2F17%2F11.mvt in 120.458µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F33%2F21.mvt in 103.833µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F34%2F21.mvt in 130.708µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F33%2F20.mvt in 115.25µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F6%2F34%2F20.mvt in 196.334µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F67%2F42.mvt in 182.708µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F67%2F43.mvt in 135.291µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F66%2F42.mvt in 106.375µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F7%2F66%2F43.mvt in 174.292µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F134%2F85.mvt in 270.042µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F135%2F85.mvt in 124.958µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F134%2F84.mvt in 100.083µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F134%2F86.mvt in 199.541µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F135%2F84.mvt in 127.875µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F8%2F135%2F86.mvt in 72µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F269%2F170.mvt in 350.708µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F269%2F171.mvt in 99.75µs
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F268%2F170.mvt in 91.208µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F268%2F171.mvt in 161.916µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F270%2F170.mvt in 39µs
-2025/12/21 20:57:09 server.go:156: fetching europe 0-16384
-2025/12/21 20:57:09 server.go:164: failed to fetch europe 0-0, open /Volumes/Expansion/loci-maps/europe.pmtiles: no such file or directory
-2025/12/21 20:57:09 main.go:156: served 404 %2Feurope%2F9%2F270%2F171.mvt in 166.458µs
+2025/12/21 21:27:32 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
+2025/12/21 21:27:54 server.go:156: fetching europe 0-16384
+2025/12/21 21:27:54 server.go:200: fetched europe 0-16384
+2025/12/21 21:27:54 server.go:156: fetching europe 127-11904
+2025/12/21 21:27:54 server.go:200: fetched europe 127-11904
+2025/12/21 21:27:54 server.go:156: fetching europe 13148-13185
+2025/12/21 21:27:54 server.go:200: fetched europe 13148-13185
+2025/12/21 21:27:54 main.go:156: served 200 %2Feurope%2F3%2F4%2F2.mvt in 81.062917ms
+2025/12/21 21:27:54 main.go:156: served 200 %2Feurope%2F3%2F3%2F2.mvt in 82.481417ms
+2025/12/21 21:27:54 main.go:156: served 200 %2Feurope%2F3%2F4%2F3.mvt in 48.885708ms
+2025/12/21 21:27:54 main.go:156: served 200 %2Feurope%2F3%2F3%2F3.mvt in 47.618833ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F4%2F8%2F5.mvt in 8.243916ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F4%2F8%2F4.mvt in 4.20775ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F4%2F7%2F5.mvt in 3.626334ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F4%2F9%2F5.mvt in 4.311667ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F4%2F8%2F6.mvt in 3.830625ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F4%2F7%2F4.mvt in 2.717042ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F6%2F33%2F22.mvt in 47.573459ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F6%2F34%2F22.mvt in 46.099708ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F6%2F33%2F23.mvt in 34.459958ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F6%2F33%2F21.mvt in 44.991083ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F6%2F34%2F23.mvt in 35.10875ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F7%2F67%2F45.mvt in 16.981709ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F7%2F67%2F44.mvt in 16.51ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F7%2F68%2F45.mvt in 14.154125ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F7%2F67%2F46.mvt in 6.098292ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F8%2F135%2F91.mvt in 19.183792ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F8%2F135%2F92.mvt in 25.233834ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F8%2F134%2F91.mvt in 33.452667ms
+2025/12/21 21:27:56 main.go:156: served 200 %2Feurope%2F8%2F134%2F92.mvt in 27.121417ms
+2025/12/21 21:27:57 main.go:156: served 200 %2Feurope%2F9%2F270%2F183.mvt in 11.201209ms
+2025/12/21 21:27:57 main.go:156: served 200 %2Feurope%2F9%2F269%2F183.mvt in 4.443041ms
+2025/12/21 21:27:57 main.go:156: served 200 %2Feurope%2F9%2F270%2F184.mvt in 10.489167ms
+2025/12/21 21:27:57 main.go:156: served 200 %2Feurope%2F9%2F269%2F184.mvt in 5.752042ms
+2025/12/21 21:27:57 main.go:156: served 200 %2Feurope%2F9%2F270%2F182.mvt in 9.757375ms
+2025/12/21 21:27:57 main.go:156: served 200 %2Feurope%2F9%2F269%2F182.mvt in 10.068042ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F181.mvt in 104.735375ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F181.mvt in 113.530166ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F179.mvt in 60.298083ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F178.mvt in 31.68075ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F180.mvt in 105.329959ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F180.mvt in 106.040625ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F178.mvt in 57.045958ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F179.mvt in 97.12875ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F177.mvt in 34.58725ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F177.mvt in 38.035917ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F176.mvt in 33.986125ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F176.mvt in 32.556625ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F175.mvt in 5.287666ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F268%2F176.mvt in 7.737209ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F175.mvt in 4.116667ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F268%2F175.mvt in 5.458041ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F173.mvt in 5.743084ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F173.mvt in 5.642125ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F268%2F173.mvt in 8.464333ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F172.mvt in 4.464625ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F172.mvt in 5.2785ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F268%2F172.mvt in 3.400041ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F171.mvt in 7.963916ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F268%2F171.mvt in 4.064458ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F171.mvt in 9.719333ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F269%2F170.mvt in 11.151209ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F268%2F170.mvt in 9.9775ms
+2025/12/21 21:28:00 main.go:156: served 200 %2Feurope%2F9%2F270%2F170.mvt in 4.541ms
+SIGQUIT: quit

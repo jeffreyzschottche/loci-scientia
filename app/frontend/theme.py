@@ -15,6 +15,38 @@ QScrollArea {
   background: #f5f5f5;
   border: none;
 }
+QScrollBar:vertical, QScrollBar:horizontal {
+  background: transparent;
+  border: none;
+}
+QScrollBar:vertical {
+  width: 10px;
+  margin: 12px 4px 12px 4px;
+}
+QScrollBar:horizontal {
+  height: 10px;
+  margin: 4px 12px 4px 12px;
+}
+QScrollBar::handle {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+  min-height: 32px;
+}
+QScrollBar::handle:horizontal {
+  min-width: 32px;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+  border: none;
+  background: transparent;
+  width: 0;
+  height: 0;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+  background: transparent;
+}
 #Sidebar, #Sidebar QWidget {
   background: #ffffff;
 }

@@ -55,8 +55,8 @@ class ContactCard(QFrame):
         )
 
         info.addLayout(name_row)
-        info.addWidget(self._line_with_icon("✉", contact.get("email", "")))
-        info.addWidget(self._line_with_icon("☎", contact.get("phone", "")))
+        info.addWidget(self._line_with_icon("✉️", contact.get("email", "")))
+        info.addWidget(self._line_with_icon("☎️", contact.get("phone", "")))
         info.addWidget(self._build_location_row())
 
         actions = QHBoxLayout()
@@ -64,15 +64,17 @@ class ContactCard(QFrame):
         edit_btn = QPushButton("Bewerk")
         edit_btn.setCursor(Qt.PointingHandCursor)
         edit_btn.setStyleSheet(
-            "QPushButton { border:1px solid #d4d4d8; border-radius:999px; padding:6px 16px; }"
+            "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 16px; }"
             "QPushButton:hover { border-color:#111111; }"
         )
+        edit_btn.setFixedHeight(40)
         delete_btn = QPushButton("Verwijder")
         delete_btn.setCursor(Qt.PointingHandCursor)
         delete_btn.setStyleSheet(
-            "QPushButton { background:#111111; color:#ffffff; border-radius:999px; padding:6px 16px; }"
+            "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 16px; }"
             "QPushButton:hover { background:#facc15; color:#050505; }"
         )
+        delete_btn.setFixedHeight(40)
         edit_btn.clicked.connect(lambda: self.edit_requested.emit(contact))
         delete_btn.clicked.connect(lambda: self.delete_requested.emit(contact))
         actions.addWidget(edit_btn)
@@ -119,9 +121,10 @@ class ContactCard(QFrame):
         action_btn = QPushButton("Op kaart" if has_location else "Locatie koppelen")
         action_btn.setCursor(Qt.PointingHandCursor)
         action_btn.setStyleSheet(
-            "QPushButton { border:1px solid #d4d4d8; border-radius:999px; padding:4px 14px; font-size:12px; }"
+            "QPushButton { border:1px solid #d4d4d8; border-radius:14px; padding:4px 14px; font-size:12px; }"
             "QPushButton:hover { border-color:#111111; }"
         )
+        action_btn.setFixedHeight(28)
         if has_location:
             action_btn.clicked.connect(lambda: self.map_requested.emit(self.contact))
         else:
@@ -160,9 +163,10 @@ class ContactsPage(QWidget):
         add_btn = QPushButton("+ Contact toevoegen")
         add_btn.setCursor(Qt.PointingHandCursor)
         add_btn.setStyleSheet(
-            "QPushButton { background:#facc15; color:#050505; padding:10px 26px; border-radius:999px; font-weight:600; }"
+            "QPushButton { background:#facc15; color:#050505; padding:10px 26px; border-radius:20px; font-weight:600; }"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
+        add_btn.setFixedHeight(40)
         add_btn.clicked.connect(self._open_add_dialog)
         header.addWidget(add_btn)
         layout.addLayout(header)

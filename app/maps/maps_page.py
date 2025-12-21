@@ -15,10 +15,9 @@ from PySide6.QtCore import (
     QEvent,
     QModelIndex,
 )
-from PySide6.QtGui import QColor, QLinearGradient, QMouseEvent, QPainter, QPixmap
+from PySide6.QtGui import QColor, QMouseEvent, QPainter
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -69,9 +68,8 @@ class MapBridge(QObject):
 class ContactListDelegate(QStyledItemDelegate):
     """Custom delegate to mimic the softer list cards from the Figma design."""
 
-    def __init__(self, icon: QPixmap, parent: Optional[QObject] = None) -> None:
+    def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._icon = icon
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
         _ = option
@@ -94,34 +92,28 @@ class ContactListDelegate(QStyledItemDelegate):
 
         container = option.rect.adjusted(8, 4, -8, -4)
         base_color = QColor("#ffffff")
+        border_color = QColor("#f1f5f9")
         if is_checked:
             base_color = QColor("#fff4d6")
+            border_color = QColor("#fde68a")
         elif option.state & QStyle.State_MouseOver:
             base_color = QColor("#f8fafc")
         painter.setBrush(base_color)
-        painter.setPen(Qt.NoPen)
+        painter.setPen(border_color)
         painter.drawRoundedRect(container, 20, 20)
 
-        if option.state & QStyle.State_Selected:
-            painter.setPen(QColor("#facc15"))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawRoundedRect(container.adjusted(0, 0, -1, -1), 20, 20)
-            painter.setPen(Qt.NoPen)
-
         indicator = self._checkbox_rect(container)
-        painter.setBrush(QColor("#facc15") if is_checked else QColor("#e5e7eb"))
+        painter.setBrush(QColor("#facc15") if is_checked else QColor("#ffffff"))
+        painter.setPen(QColor("#facc15") if is_checked else QColor("#e5e7eb"))
         painter.drawEllipse(indicator)
         if is_checked:
             inner = indicator.adjusted(6, 6, -6, -6)
-            painter.setBrush(QColor("#111111"))
+            painter.setBrush(QColor("#050505"))
+            painter.setPen(Qt.NoPen)
             painter.drawEllipse(inner)
 
-        icon_rect = QRect(indicator.right() + 12, container.center().y() - 16, 32, 32)
-        if not self._icon.isNull():
-            painter.drawPixmap(icon_rect, self._icon)
-
-        text_left = icon_rect.right() + 12
-        text_width = max(0, container.right() - text_left - 12)
+        text_left = indicator.right() + 16
+        text_width = max(0, container.right() - text_left - 16)
         name_rect = QRect(text_left, container.top() + 10, text_width, 24)
         meta_rect = QRect(text_left, container.bottom() - 28, text_width, 20)
 
@@ -146,15 +138,15 @@ class ContactListDelegate(QStyledItemDelegate):
             if event.button() == Qt.LeftButton:
                 container = option.rect.adjusted(8, 4, -8, -4)
                 pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
-                if self._checkbox_rect(container).contains(pos):
+                if container.contains(pos):
                     current = index.data(Qt.CheckStateRole) or Qt.Unchecked
                     next_state = Qt.Unchecked if current == Qt.Checked else Qt.Checked
                     return model.setData(index, next_state, Qt.CheckStateRole)
         return super().editorEvent(event, model, option, index)
 
     def _checkbox_rect(self, outer: QRect) -> QRect:
-        size = 22
-        x = outer.left() + 12
+        size = 24
+        x = outer.left() + 16
         y = outer.center().y() - size // 2
         return QRect(x, y, size, size)
 
@@ -171,10 +163,7 @@ class MapsPage(QWidget):
         self._active_contact_ids: Set[str] = set()
         self._block_contact_signals = False
         self._contacts_by_id: Dict[str, dict] = {}
-        self._updating_select_all = False
         self._pending_contact_id_for_pin: Optional[str] = None
-        self._contact_icon = self._build_contact_icon()
-        self._contact_icon = self._build_contact_icon()
 
         content = QWidget()
         content_layout = QHBoxLayout(content)
@@ -189,28 +178,6 @@ class MapsPage(QWidget):
         layout.addWidget(content, 1)
         self._last_location: Optional[Dict[str, Any]] = None
         self._load_contacts_for_map()
-
-    def _build_contact_icon(self) -> QPixmap:
-        size = 32
-        pix = QPixmap(size, size)
-        pix.fill(Qt.transparent)
-        painter = QPainter(pix)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        gradient = QLinearGradient(0, 0, size, size)
-        gradient.setColorAt(0, QColor("#fef3c7"))
-        gradient.setColorAt(1, QColor("#facc15"))
-        painter.setBrush(gradient)
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(0, 0, size, size)
-
-        painter.setBrush(QColor("#fffbeb"))
-        painter.drawEllipse(size // 2 - 6, size // 2 - 6, 12, 12)
-        painter.setBrush(QColor("#111111"))
-        painter.drawEllipse(size // 2 - 3, size // 2 - 3, 6, 6)
-
-        painter.end()
-        return pix
 
     def _build_map_view(self) -> QFrame:
         area = QFrame()
@@ -285,17 +252,8 @@ class MapsPage(QWidget):
     .maplibregl-ctrl-logo {{
       display: none !important;
     }}
-    .loci-marker {{
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 2px solid #111111;
-      background: #facc15;
-      cursor: pointer;
-      box-shadow: 0 0 8px rgba(0, 0, 0, 0.65);
-    }}
-    .loci-marker.contact {{
-      background: #facc15;
+    .maplibregl-marker {{
+      box-shadow: none !important;
     }}
   </style>
 </head>
@@ -333,10 +291,18 @@ class MapsPage(QWidget):
       if (activePinMarker) {{
         activePinMarker.remove();
       }}
-      const el = document.createElement("button");
-      el.className = "loci-marker";
-      activePinMarker = new maplibregl.Marker(el).setLngLat(lngLat).addTo(window.map);
+      activePinMarker = new maplibregl.Marker().setLngLat(lngLat).addTo(window.map);
     }};
+
+    const clearActivePinMarker = () => {{
+      if (activePinMarker) {{
+        activePinMarker.remove();
+        activePinMarker = null;
+      }}
+      pendingPin = false;
+      hideStatus();
+    }};
+    window.clearActivePinMarker = clearActivePinMarker;
 
     const describeLocation = (event) => {{
       const layers = [
@@ -408,10 +374,7 @@ class MapsPage(QWidget):
         }}
         let marker = contactMarkers.get(contactId);
         if (!marker) {{
-          const el = document.createElement("button");
-          el.className = "loci-marker contact";
-          el.title = contact.name || contact.label || "Contact";
-          marker = new maplibregl.Marker(el)
+          marker = new maplibregl.Marker()
             .setLngLat([contact.lon, contact.lat])
             .addTo(window.map);
           if (contact.info) {{
@@ -584,12 +547,7 @@ class MapsPage(QWidget):
         layout.addLayout(header)
 
         filter_row = QHBoxLayout()
-        self.select_all_checkbox = QCheckBox("Alle contacten tonen")
-        self.select_all_checkbox.setObjectName("ContactSelectAll")
-        self.select_all_checkbox.setTristate(True)
-        self.select_all_checkbox.setEnabled(False)
-        self.select_all_checkbox.stateChanged.connect(self._toggle_select_all)
-        filter_row.addWidget(self.select_all_checkbox, 1)
+        filter_row.addStretch(1)
         reload = QPushButton("Herlaad")
         reload.setObjectName("ContactReloadButton")
         reload.setFixedHeight(30)
@@ -613,7 +571,7 @@ class MapsPage(QWidget):
         self.contacts_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.contacts_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.contacts_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self._contacts_delegate = ContactListDelegate(self._contact_icon, self.contacts_list)
+        self._contacts_delegate = ContactListDelegate(self.contacts_list)
         self.contacts_list.setItemDelegate(self._contacts_delegate)
         self.contacts_list.itemChanged.connect(self._handle_contact_toggle)
         self.contacts_list.currentItemChanged.connect(
@@ -672,6 +630,12 @@ class MapsPage(QWidget):
     def _handle_map_ready(self, _ok: bool) -> None:
         self._sync_contact_markers()
 
+    def _clear_pin_marker_overlay(self) -> None:
+        if hasattr(self, "webview"):
+            self.webview.page().runJavaScript(
+                "if (window.clearActivePinMarker) { window.clearActivePinMarker(); }"
+            )
+
     def _start_pin_mode(self) -> None:
         if not hasattr(self, "webview"):
             return
@@ -696,64 +660,6 @@ class MapsPage(QWidget):
             self._active_contact_ids.discard(contact_id)
         focus_id = contact_id if checked else None
         self._sync_contact_markers(focus_contact_id=focus_id)
-        self._update_select_all_state()
-
-    def _toggle_select_all(self, state: int) -> None:
-        if self._updating_select_all:
-            return
-        if not hasattr(self, "contacts_list"):
-            return
-        if self.contacts_list.count() == 0:
-            self._update_select_all_state()
-            return
-        if state == Qt.PartiallyChecked:
-            return
-        checked = state == Qt.Checked
-        target_state = Qt.Checked if checked else Qt.Unchecked
-        self._block_contact_signals = True
-        for index in range(self.contacts_list.count()):
-            item = self.contacts_list.item(index)
-            item.setCheckState(target_state)
-        self._block_contact_signals = False
-        if checked:
-            selected_ids: Set[str] = set()
-            for index in range(self.contacts_list.count()):
-                contact = self.contacts_list.item(index).data(Qt.UserRole) or {}
-                contact_id_value = contact.get("id")
-                if contact_id_value is not None:
-                    selected_ids.add(str(contact_id_value))
-            self._active_contact_ids = selected_ids
-        else:
-            self._active_contact_ids.clear()
-        self._sync_contact_markers()
-        self._update_select_all_state()
-
-    def _update_select_all_state(self) -> None:
-        if not hasattr(self, "select_all_checkbox") or not hasattr(
-            self, "contacts_list"
-        ):
-            return
-        total = self.contacts_list.count()
-        checked = 0
-        for index in range(self.contacts_list.count()):
-            if self.contacts_list.item(index).checkState() == Qt.Checked:
-                checked += 1
-        if total == 0:
-            state = Qt.Unchecked
-            enabled = False
-        elif checked == 0:
-            state = Qt.Unchecked
-            enabled = True
-        elif checked == total:
-            state = Qt.Checked
-            enabled = True
-        else:
-            state = Qt.PartiallyChecked
-            enabled = True
-        self._updating_select_all = True
-        self.select_all_checkbox.setEnabled(enabled)
-        self.select_all_checkbox.setCheckState(state)
-        self._updating_select_all = False
 
     def _on_location_pinned(self, lon: float, lat: float, info: Dict[str, Any]) -> None:
         self._last_location = {
@@ -766,9 +672,12 @@ class MapsPage(QWidget):
             "country": info.get("country"),
             "context": info.get("context"),
         }
-        self._open_location_dialog()
+        accepted = self._open_location_dialog()
+        self._clear_pin_marker_overlay()
+        if not accepted:
+            return
 
-    def _open_location_dialog(self) -> None:
+    def _open_location_dialog(self) -> bool:
         location = self._last_location or {}
         contacts = self._fetch_contacts()
 
@@ -839,7 +748,10 @@ class MapsPage(QWidget):
         buttons.accepted.connect(save_location)
         buttons.rejected.connect(dialog.reject)
 
-        dialog.exec()
+        result = dialog.exec()
+        if result != QDialog.Accepted:
+            self._pending_contact_id_for_pin = None
+        return result == QDialog.Accepted
 
     def _fetch_contacts(self) -> List[dict]:
         try:
@@ -894,7 +806,6 @@ class MapsPage(QWidget):
             for person_id in previous_selection
             if person_id in self._contacts_by_id
         }
-        self._update_select_all_state()
         self._sync_contact_markers()
         if focus_contact_id:
             self._set_contact_checked(focus_contact_id, True)
@@ -1146,7 +1057,6 @@ class MapsPage(QWidget):
         self.contacts_list.addItem(item)
         self.contacts_list.show()
         self.contacts_empty.hide()
-        self._update_select_all_state()
 
     def focus_on_contact(self, contact: dict) -> None:
         if not contact:
