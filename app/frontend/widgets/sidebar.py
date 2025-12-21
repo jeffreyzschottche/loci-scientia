@@ -1,4 +1,7 @@
+import os
+
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout
 
 
@@ -17,10 +20,20 @@ class Sidebar(QWidget):
         head_layout = QVBoxLayout(header)
         head_layout.setContentsMargins(16, 32, 16, 0)
         head_layout.setSpacing(4)
-        logo = QLabel("AITJE")
-        logo.setStyleSheet(
-            "font-size:24px; font-weight:800; letter-spacing:0.4em; color:#111111;"
-        )
+        logo = QLabel()
+        logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        images_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "images"))
+        image_path = os.path.join(images_dir, "aitje.jpeg")
+        if os.path.exists(image_path):
+            pixmap = QPixmap(image_path).scaled(
+                140, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            logo.setPixmap(pixmap)
+        else:
+            logo.setText("AITJE")
+            logo.setStyleSheet(
+                "font-size:24px; font-weight:800; letter-spacing:0.4em; color:#111111;"
+            )
         head_layout.addWidget(logo)
         subtitle = QLabel("Lokale AI console")
         subtitle.setStyleSheet(

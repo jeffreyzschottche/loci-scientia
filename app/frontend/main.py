@@ -106,16 +106,18 @@ class BootScreen(QWidget):
         center.setSpacing(24)
         center.setAlignment(Qt.AlignCenter)
 
+        hero_pixmap = None
         if logo_path and os.path.exists(logo_path):
-            brand = QLabel()
-            brand.setAlignment(Qt.AlignCenter)
-            brand.setPixmap(QPixmap(logo_path).scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            center.addWidget(brand, 0, Qt.AlignCenter)
-
-        self.egg_label = QLabel()
-        self.egg_label.setAlignment(Qt.AlignCenter)
-        self.egg_label.setPixmap(self._build_egg_pixmap(260, 320))
-        center.addWidget(self.egg_label, 0, Qt.AlignCenter)
+            hero_pixmap = QPixmap(logo_path)
+        hero_label = QLabel()
+        hero_label.setAlignment(Qt.AlignCenter)
+        if hero_pixmap and not hero_pixmap.isNull():
+            hero_label.setPixmap(
+                hero_pixmap.scaled(260, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+        else:
+            hero_label.setPixmap(self._build_egg_pixmap(260, 320))
+        center.addWidget(hero_label, 0, Qt.AlignCenter)
 
         title = QLabel("AITJE ontwaakt...")
         title.setObjectName("BootTitle")
@@ -134,6 +136,7 @@ class BootScreen(QWidget):
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
+        self.progress_bar.setTextVisible(False)
         progress_layout.addWidget(self.progress_bar)
 
         info_row = QHBoxLayout()
