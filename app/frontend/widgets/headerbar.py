@@ -45,13 +45,13 @@ class HeaderBar(QWidget):
             "  background-color: #facc15;"
             "  color: #050505;"
             "  font-weight: 600;"
-            "  border-radius: 28px;"
+            "  border-radius: 20px;"
             "  padding: 12px 32px;"
             "  border: 0;"
             "}"
             "QPushButton:hover { background-color: #050505; color: #facc15; }"
         )
-        self.home_btn.setMinimumHeight(44)
+        self.home_btn.setMinimumHeight(40)
         self.home_btn.clicked.connect(self.home_requested.emit)
         layout.addWidget(self.home_btn, 0, Qt.AlignVCenter)
 

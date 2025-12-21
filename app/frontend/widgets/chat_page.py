@@ -56,7 +56,7 @@ class ChatPage(QWidget):
             "QPushButton {"
             "  background: transparent;"
             "  border: 1px solid #d4d4d8;"
-            "  border-radius: 24px;"
+            "  border-radius: 20px;"
             "  padding: 6px 18px;"
             "  color: #4b5563;"
             "  font-weight:600;"
@@ -66,6 +66,8 @@ class ChatPage(QWidget):
         self.new_chat_btn.clicked.connect(self._start_new_chat)
         controls.addWidget(self.new_chat_btn, 0, Qt.AlignRight)
         layout.addLayout(controls)
+        self.new_chat_btn.setMinimumHeight(40)
+
 
         self.history_card = QFrame()
         self.history_card.setObjectName("ChatWrapper")
@@ -113,6 +115,19 @@ class ChatPage(QWidget):
         self.signals.token.connect(self._on_token)
         self.signals.done.connect(self._on_done)
         self.signals.queue_position.connect(self._on_queue_position)
+        self.send_btn.setStyleSheet(
+            "QPushButton {"
+            "  background: black;"
+            "  border: 1px solid black;"
+            "  border-radius: 20px;"
+            "  padding: 6px 18px;"
+            "  color: white;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { color:#facc15; }"
+        )
+        self.send_btn.setMinimumHeight(40)
+
 
     def _start_new_chat(self):
         """Reset the conversation history."""
