@@ -27,11 +27,15 @@ class DevicesPage(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(16)
+        layout.setContentsMargins(16, 0, 16, 8)
+        layout.setSpacing(6)
 
-        header = QVBoxLayout()
-        header.setSpacing(4)
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        header.setContentsMargins(0, 0, 0, 0)
+        title_block = QVBoxLayout()
+        title_block.setSpacing(2)
+        title_block.setContentsMargins(0, 0, 0, 0)
         title = QLabel("Connected Devices & Gebruikersbeheer")
         title.setStyleSheet("font-size:28px; font-weight:800; letter-spacing:0.02em;")
         subtitle = QLabel(
@@ -40,17 +44,15 @@ class DevicesPage(QWidget):
         subtitle.setStyleSheet(
             "color:#6b7280; font-size:12px; letter-spacing:0.15em;"
         )
-        header.addWidget(title)
-        header.addWidget(subtitle)
-        layout.addLayout(header)
-
-        top_actions = QHBoxLayout()
         self.summary_label = QLabel("0 devices")
         self.summary_label.setStyleSheet(
             "color:#6b7280; letter-spacing:0.2em; font-size:11px;"
         )
-        top_actions.addWidget(self.summary_label)
-        top_actions.addStretch(1)
+        title_block.addWidget(title)
+        title_block.addWidget(subtitle)
+        title_block.addWidget(self.summary_label)
+        header.addLayout(title_block)
+        header.addStretch(1)
         add_btn = QPushButton("Apparaat toevoegen")
         add_btn.setStyleSheet(
             "QPushButton {"
@@ -64,8 +66,8 @@ class DevicesPage(QWidget):
         )
         add_btn.setFixedHeight(40)
         add_btn.clicked.connect(self._open_add_dialog)
-        top_actions.addWidget(add_btn)
-        layout.addLayout(top_actions)
+        header.addWidget(add_btn)
+        layout.addLayout(header)
 
         grid_wrapper = QWidget()
         grid_wrapper_layout = QVBoxLayout(grid_wrapper)

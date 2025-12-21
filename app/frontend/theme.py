@@ -130,6 +130,16 @@ QTabWidget::pane {
   border-radius: 28px;
   margin-top: 12px;
 }
+QTabWidget#SettingsTabs::pane {
+  border: none;
+  background: transparent;
+  margin-top: 12px;
+}
+QTabWidget#SettingsTabs::tab-bar {
+  alignment: left;
+  margin-left: 8px;
+  margin-right: 8px;
+}
 QTabBar::tab {
   background: #f7f5ef;
   border: 1px solid transparent;
@@ -143,6 +153,23 @@ QTabBar::tab:selected {
   background: #facc15;
   color: #111111;
   border-color: #facc15;
+}
+QTabBar#SettingsTabsBar::tab {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 18px;
+  padding: 10px 22px;
+  margin: 0 6px;
+  color: #6b7280;
+  font-weight: 600;
+}
+QTabBar#SettingsTabsBar::tab:selected {
+  background: #facc15;
+  color: #050505;
+}
+QTabBar#SettingsTabsBar::tab:hover {
+  background: #e5e7eb;
+  color: #111111;
 }
 QFrame#UserBubble, QWidget#UserBubble {
   background: #111111;

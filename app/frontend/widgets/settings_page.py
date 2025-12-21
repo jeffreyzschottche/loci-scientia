@@ -31,11 +31,13 @@ class SettingsPage(QWidget):
         layout.addWidget(subtitle)
 
         tabs = QTabWidget()
+        tabs.setObjectName("SettingsTabs")
         tabs.addTab(self._appearance_tab(), "Uiterlijk")
         tabs.addTab(self._system_tab(), "Systeem")
         tabs.addTab(self._network_tab(), "Netwerk")
         tabs.addTab(self._security_tab(), "Beveiliging")
         tabs.addTab(self._advanced_tab(), "Geavanceerd")
+        tabs.tabBar().setObjectName("SettingsTabsBar")
         layout.addWidget(tabs, 1)
 
     def _appearance_tab(self) -> QWidget:

@@ -1,5 +1,1 @@
-2025/12/21 21:41:53 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
-SIGQUIT: quit
-PC=0x196d4d9ec m=0 sigcode=0
-
-goroutine 0 gp=0x106b0b400 m=0 mp=0x106b0ce00 [idle]:
+2025/12/21 21:58:41 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
