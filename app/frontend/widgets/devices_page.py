@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QStyle,
     QToolButton,
     QVBoxLayout,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 import requests
 
 from ..config import BACKEND_HTTP
+from .dialog_style import MODAL_QSS
 
 
 class DevicesPage(QWidget):
@@ -169,8 +171,18 @@ class DevicesPage(QWidget):
         dialog.setWindowTitle(
             "Apparaat bewerken" if is_edit else "Nieuw apparaat & gebruiker"
         )
+        dialog.setStyleSheet(MODAL_QSS)
 
-        form = QFormLayout(dialog)
+        dialog_layout = QVBoxLayout(dialog)
+        dialog_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        dialog_layout.addWidget(scroll_area)
+        form_host = QWidget()
+        scroll_area.setWidget(form_host)
+        form = QFormLayout(form_host)
+        form.setContentsMargins(24, 24, 24, 24)
         user_name_edit = QLineEdit()
         email_edit = QLineEdit()
         password_edit = QLineEdit()

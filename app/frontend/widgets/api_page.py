@@ -13,12 +13,14 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QPlainTextEdit,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from ..config import API_ROUTES_DEFAULT_PORT, BACKEND_HTTP
+from .dialog_style import MODAL_QSS
 
 API_BASE = BACKEND_HTTP
 
@@ -27,7 +29,17 @@ class ApiDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Nieuwe API Route")
-        form = QFormLayout(self)
+        self.setStyleSheet(MODAL_QSS)
+        wrapper = QVBoxLayout(self)
+        wrapper.setContentsMargins(0, 0, 0, 0)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        wrapper.addWidget(scroll_area)
+        form_host = QWidget()
+        scroll_area.setWidget(form_host)
+        form = QFormLayout(form_host)
+        form.setContentsMargins(24, 24, 24, 24)
         self.name = QLineEdit()
         self.method = QComboBox()
         self.method.addItems(["GET", "POST", "PUT", "DELETE"])
