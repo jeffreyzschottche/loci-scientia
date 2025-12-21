@@ -136,9 +136,10 @@ class ApiPage(QWidget):
         new_key.setCursor(Qt.PointingHandCursor)
         new_key.setStyleSheet(
             "QPushButton { background:#facc15; color:#050505; padding:10px 26px;"
-            "border-radius:999px; font-weight:600; }"
+            "border-radius:20px; font-weight:600; }"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
+        new_key.setFixedHeight(40)
         new_key.clicked.connect(self._add_route)
         keys_header.addWidget(new_key)
         keys_layout.addLayout(keys_header)
@@ -252,25 +253,34 @@ class ApiPage(QWidget):
 
         actions = QVBoxLayout()
         actions.setSpacing(6)
-        status = QLabel("Actief" if route.get("active") else "Inactief")
+        is_active = bool(route.get("active"))
+        status = QLabel("Actief" if is_active else "Inactief")
+        active_styles = ("#fef9c3", "#facc15", "#111111")
+        inactive_styles = ("#f5f5f5", "#d4d4d8", "#6b7280")
+        bg, border, text_color = active_styles if is_active else inactive_styles
+        status.setAlignment(Qt.AlignCenter)
         status.setStyleSheet(
-            "color:#16a34a; font-weight:600;" if route.get("active") else "color:#9ca3af;"
+            f"background:{bg}; border:1px solid {border}; border-radius:20px;"
+            f"padding:4px 16px; color:{text_color}; font-weight:600;"
         )
+        status.setFixedHeight(40)
         actions.addWidget(status, 0, Qt.AlignRight)
 
         buttons = QHBoxLayout()
         edit = QPushButton("Bewerken")
         edit.setCursor(Qt.PointingHandCursor)
         edit.setStyleSheet(
-            "QPushButton { border:1px solid #d4d4d8; border-radius:999px; padding:6px 18px; }"
+            "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 18px; }"
             "QPushButton:hover { border-color:#111111; }"
         )
+        edit.setFixedHeight(40)
         delete = QPushButton("Verwijderen")
         delete.setCursor(Qt.PointingHandCursor)
         delete.setStyleSheet(
-            "QPushButton { background:#111111; color:#ffffff; border-radius:999px; padding:6px 18px; }"
+            "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 18px; }"
             "QPushButton:hover { background:#facc15; color:#050505; }"
         )
+        delete.setFixedHeight(40)
         edit.clicked.connect(lambda _=False, rid=route["id"]: self._edit_route(rid))
         delete.clicked.connect(lambda _=False, rid=route["id"]: self._delete_route(rid))
         buttons.addWidget(edit)
