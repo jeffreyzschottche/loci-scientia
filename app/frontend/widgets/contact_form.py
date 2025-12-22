@@ -9,8 +9,12 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QWidget,
+    QVBoxLayout,
 )
 
+from .dialog_style import MODAL_QSS
 
 class ContactFormDialog(QDialog):
     """Reusable contact form dialog that can prefill location data."""
@@ -25,11 +29,20 @@ class ContactFormDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
+        self.setStyleSheet(MODAL_QSS)
         self._payload_cache: Optional[Dict[str, Any]] = None
         self._save_mode: str = "save"
 
-        form = QFormLayout(self)
-        form.setContentsMargins(16, 16, 16, 16)
+        wrapper = QVBoxLayout(self)
+        wrapper.setContentsMargins(0, 0, 0, 0)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        wrapper.addWidget(scroll_area)
+        form_host = QWidget()
+        scroll_area.setWidget(form_host)
+        form = QFormLayout(form_host)
+        form.setContentsMargins(24, 24, 24, 24)
         form.setSpacing(12)
 
         self.name_edit = QLineEdit()

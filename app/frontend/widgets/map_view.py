@@ -157,18 +157,18 @@ class MapView(QFrame):
         available = {layer.get("id") for layer in layers if isinstance(layer, dict)}
         palettes: List[MapLayerPalette] = []
         if "earth" in available:
-            palettes.append(MapLayerPalette("earth", "fill", "#0f172a"))
+            palettes.append(MapLayerPalette("earth", "fill", "#050505"))
         if "landuse" in available or "landcover" in available:
             target = "landuse" if "landuse" in available else "landcover"
-            palettes.append(MapLayerPalette(target, "fill", "#1c3d1f"))
+            palettes.append(MapLayerPalette(target, "fill", "#121212"))
         if "water" in available:
-            palettes.append(MapLayerPalette("water", "fill", "#155e75"))
+            palettes.append(MapLayerPalette("water", "fill", "#0d0d0d"))
         if "roads" in available:
-            palettes.append(MapLayerPalette("roads", "line", "#f97316", 1.5))
+            palettes.append(MapLayerPalette("roads", "line", "#facc15", 1.5))
         if "railways" in available:
-            palettes.append(MapLayerPalette("railways", "line", "#f87171", 1.0))
+            palettes.append(MapLayerPalette("railways", "line", "#9ca3af", 1.0))
         if "boundaries" in available:
-            palettes.append(MapLayerPalette("boundaries", "line", "#f1f5f9", 1.2))
+            palettes.append(MapLayerPalette("boundaries", "line", "#f5f5f5", 1.2))
         style_layers = []
         for layer in palettes:
             entry = {
@@ -197,7 +197,7 @@ class MapView(QFrame):
                 {
                     "id": "background",
                     "type": "background",
-                    "paint": {"background-color": "#0f172a"},
+                    "paint": {"background-color": "#050505"},
                 }
             ],
         }

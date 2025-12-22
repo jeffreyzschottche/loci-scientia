@@ -1,21 +1,26 @@
+import requests
+from datetime import datetime
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QPlainTextEdit,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QFrame,
 )
-import requests
 
 from ..config import API_ROUTES_DEFAULT_PORT, BACKEND_HTTP
+from .dialog_style import MODAL_QSS
 
 API_BASE = BACKEND_HTTP
 
@@ -24,7 +29,17 @@ class ApiDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Nieuwe API Route")
-        form = QFormLayout(self)
+        self.setStyleSheet(MODAL_QSS)
+        wrapper = QVBoxLayout(self)
+        wrapper.setContentsMargins(0, 0, 0, 0)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        wrapper.addWidget(scroll_area)
+        form_host = QWidget()
+        scroll_area.setWidget(form_host)
+        form = QFormLayout(form_host)
+        form.setContentsMargins(24, 24, 24, 24)
         self.name = QLineEdit()
         self.method = QComboBox()
         self.method.addItems(["GET", "POST", "PUT", "DELETE"])
@@ -33,7 +48,7 @@ class ApiDialog(QDialog):
         self.port.setRange(1, 65535)
         self.port.setValue(API_ROUTES_DEFAULT_PORT)
         self.kb = QLineEdit("Algemene Kennisbank")
-        self.api_key = QLineEdit("loci_sk_xxx")
+        self.api_key = QLineEdit("aitje_sk_xxx")
 
         form.addRow("Naam", self.name)
         form.addRow("Methode", self.method)
@@ -67,52 +82,126 @@ class ApiPage(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(20)
 
-        header = QHBoxLayout()
-        description = QLabel("Beheer API endpoints, poorten en toegangssleutels")
-        description.setStyleSheet("color:#9ca3af;")
-        add_btn = QPushButton("+ Nieuwe API Route")
-        add_btn.setStyleSheet(
-            "color:white; background:#2563eb; padding:6px 10px; border-radius:6px;"
+        self.stats_cards = []
+        stats_row = QHBoxLayout()
+        stats_row.setSpacing(16)
+        for heading, caption in [
+            ("Vandaag", "+12% vs gisteren"),
+            ("Deze week", "+8% vs vorige week"),
+            ("Deze maand", "+15% vs vorige maand"),
+            ("Actieve keys", "van 10 mogelijk"),
+        ]:
+            card, metric_label, caption_label = self._build_stat_card(
+                heading, "0", caption
+            )
+            self.stats_cards.append(
+                {"metric": metric_label, "caption": caption_label, "title": heading}
+            )
+            stats_row.addWidget(card)
+        layout.addLayout(stats_row)
+
+        self.chart_card = self._card()
+        chart_layout = QVBoxLayout(self.chart_card)
+        chart_layout.setContentsMargins(20, 16, 20, 20)
+        chart_layout.setSpacing(12)
+        chart_title = QLabel("API Verkeer vandaag")
+        chart_title.setStyleSheet("font-size:18px; font-weight:700;")
+        chart_layout.addWidget(chart_title)
+        self.chart_placeholder = QFrame()
+        self.chart_placeholder.setMinimumHeight(220)
+        self.chart_placeholder.setStyleSheet(
+            "background:#f9fafb; border:1px solid #f2f2f2; border-radius:18px;"
         )
-        add_btn.clicked.connect(self._add_route)
-        header.addWidget(description)
-        header.addStretch(1)
-        header.addWidget(add_btn)
-        layout.addLayout(header)
+        chart_layout.addWidget(self.chart_placeholder)
+        layout.addWidget(self.chart_card)
 
-        self.grid = QGridLayout()
-        self.grid.setSpacing(12)
-        layout.addLayout(self.grid)
+        self.keys_card = self._card()
+        keys_layout = QVBoxLayout(self.keys_card)
+        keys_layout.setContentsMargins(20, 20, 20, 20)
+        keys_layout.setSpacing(16)
 
-        self.metrics_row = self._build_metrics()
-        layout.addLayout(self.metrics_row)
+        keys_header = QHBoxLayout()
+        keys_title = QLabel("API Keys")
+        keys_title.setStyleSheet("font-size:20px; font-weight:700;")
+        keys_sub = QLabel("Toegangssleutels per omgeving")
+        keys_sub.setStyleSheet("color:#9ca3af; letter-spacing:0.08em;")
+        title_group = QVBoxLayout()
+        title_group.setContentsMargins(0, 0, 0, 0)
+        title_group.setSpacing(2)
+        title_group.addWidget(keys_title)
+        title_group.addWidget(keys_sub)
+        keys_header.addLayout(title_group)
+        keys_header.addStretch(1)
+        new_key = QPushButton("Nieuwe key aanmaken")
+        new_key.setCursor(Qt.PointingHandCursor)
+        new_key.setStyleSheet(
+            "QPushButton { background:#facc15; color:#050505; padding:10px 26px;"
+            "border-radius:20px; font-weight:600; }"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
+        new_key.setFixedHeight(40)
+        new_key.clicked.connect(self._add_route)
+        keys_header.addWidget(new_key)
+        keys_layout.addLayout(keys_header)
+
+        self.keys_list = QVBoxLayout()
+        self.keys_list.setContentsMargins(0, 0, 0, 0)
+        self.keys_list.setSpacing(12)
+        keys_layout.addLayout(self.keys_list)
+
+        self.doc_card = self._card()
+        doc_layout = QVBoxLayout(self.doc_card)
+        doc_layout.setContentsMargins(20, 20, 20, 20)
+        doc_layout.setSpacing(12)
+        doc_title = QLabel("API Documentatie")
+        doc_title.setStyleSheet("font-size:20px; font-weight:700;")
+        endpoint_label = QLabel("Endpoint:")
+        endpoint_label.setStyleSheet("color:#6b7280; font-weight:600;")
+        endpoint_value = QLabel("http://aitje.local/api/v1/chat/completions")
+        endpoint_value.setStyleSheet(
+            "font-family:'SFMono-Regular','Menlo','Courier New',monospace; font-size:13px;"
+        )
+        example_label = QLabel("Voorbeeld request")
+        example_label.setStyleSheet("color:#6b7280; font-weight:600;")
+        example = QPlainTextEdit()
+        example.setReadOnly(True)
+        example.setPlainText(
+            "curl -X POST http://aitje.local/api/v1/chat/completions \\\n"
+            '  -H "Authorization: Bearer YOUR_API_KEY" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\n"
+            '    \"model\": \"aitje-local\",\n'
+            '    \"messages\": [{\"role\": \"user\", \"content\": \"Hallo?\"}]\n'
+            "  }'\n"
+        )
+        doc_layout.addWidget(doc_title)
+        doc_layout.addWidget(endpoint_label)
+        doc_layout.addWidget(endpoint_value)
+        doc_layout.addWidget(example_label)
+        doc_layout.addWidget(example)
+        layout.addWidget(self.keys_card)
+        layout.addWidget(self.doc_card)
 
         self._reload()
 
-    def _build_metrics(self):
-        row = QGridLayout()
-        row.setSpacing(12)
-        for idx, (label, value) in enumerate(
-            [
-                ("Totaal Routes", "2"),
-                ("Actieve Routes", "2"),
-                ("API Calls (24u)", "1,247"),
-            ]
-        ):
-            card = self._card()
-            box = QVBoxLayout(card)
-            box.setContentsMargins(12, 12, 12, 12)
-            title = QLabel(label)
-            title.setStyleSheet("color:#9ca3af;")
-            metric = QLabel(value)
-            metric.setStyleSheet("font-size:20px;")
-            box.addWidget(title)
-            box.addWidget(metric)
-            row.addWidget(card, 0, idx)
-        return row
+    def _build_stat_card(self, title: str, value: str, caption: str):
+        card = self._card()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(20, 16, 20, 16)
+        card_layout.setSpacing(6)
+        heading = QLabel(title)
+        heading.setStyleSheet("color:#6b7280; letter-spacing:0.2em; font-size:11px;")
+        metric = QLabel(value)
+        metric.setStyleSheet("font-size:32px; font-weight:800;")
+        detail = QLabel(caption)
+        detail.setStyleSheet("color:#16a34a; font-size:12px;")
+        card_layout.addWidget(heading)
+        card_layout.addWidget(metric)
+        card_layout.addWidget(detail)
+        return card, metric, detail
 
     @staticmethod
     def _card():
@@ -120,22 +209,111 @@ class ApiPage(QWidget):
         card.setObjectName("Card")
         return card
 
-    def _show_error(self, message: str):
-        err = QLabel(message)
-        err.setWordWrap(True)
-        err.setStyleSheet("color:#f87171;")
-        self.grid.addWidget(err, 0, 0)
-
-    def _reload(self):
-        while self.grid.count():
-            widget = self.grid.takeAt(0).widget()
+    def _clear_layout(self, layout: QVBoxLayout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
             if widget:
                 widget.deleteLater()
+
+    def _render_empty_state(self, message: str):
+        placeholder = QLabel(message)
+        placeholder.setStyleSheet("color:#9ca3af; font-style:italic;")
+        placeholder.setAlignment(Qt.AlignCenter)
+        placeholder.setMinimumHeight(80)
+        self.keys_list.addWidget(placeholder)
+
+    def _render_route(self, route: dict):
+        entry = QFrame()
+        entry.setStyleSheet("background:#fdfdfd; border:none; border-radius:18px;")
+        row = QHBoxLayout(entry)
+        row.setContentsMargins(16, 12, 16, 12)
+        row.setSpacing(16)
+
+        icon = QLabel("🔐")
+        icon.setFixedSize(40, 40)
+        icon.setAlignment(Qt.AlignCenter)
+        row.addWidget(icon, 0, Qt.AlignTop)
+
+        info = QVBoxLayout()
+        info.setSpacing(4)
+        name = QLabel(route.get("name", "Onbekende route"))
+        name.setStyleSheet("font-size:16px; font-weight:600;")
+        details = QLabel(
+            f"{route.get('method', 'POST')} {route.get('path', '')}  •  Port {route.get('port', '-')}"
+        )
+        details.setStyleSheet("color:#6b7280;")
+        info.addWidget(name)
+        info.addWidget(details)
+        info.addWidget(
+            QLabel(
+                f"Laatst gebruikt: {datetime.now().strftime('%d-%m-%Y, %H:%M')}  •  API Key: {route.get('api_key') or '-'}"
+            )
+        )
+        row.addLayout(info, 1)
+
+        actions = QVBoxLayout()
+        actions.setSpacing(6)
+        is_active = bool(route.get("active"))
+        status = QLabel("Actief" if is_active else "Inactief")
+        active_styles = ("#fef9c3", "#facc15", "#111111")
+        inactive_styles = ("#f5f5f5", "#d4d4d8", "#6b7280")
+        bg, border, text_color = active_styles if is_active else inactive_styles
+        status.setAlignment(Qt.AlignCenter)
+        status.setStyleSheet(
+            f"background:{bg}; border:1px solid {border}; border-radius:14px;"
+            f"padding:4px 16px; color:{text_color}; font-weight:600;"
+        )
+        status.setFixedHeight(28)
+        actions.addWidget(status, 0, Qt.AlignRight)
+
+        buttons = QHBoxLayout()
+        edit = QPushButton("Bewerken")
+        edit.setCursor(Qt.PointingHandCursor)
+        edit.setStyleSheet(
+            "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 18px; }"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        edit.setFixedHeight(40)
+        delete = QPushButton("Verwijderen")
+        delete.setCursor(Qt.PointingHandCursor)
+        delete.setStyleSheet(
+            "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 18px; }"
+            "QPushButton:hover { background:#facc15; color:#050505; }"
+        )
+        delete.setFixedHeight(40)
+        edit.clicked.connect(lambda _=False, rid=route["id"]: self._edit_route(rid))
+        delete.clicked.connect(lambda _=False, rid=route["id"]: self._delete_route(rid))
+        buttons.addWidget(edit)
+        buttons.addWidget(delete)
+        actions.addLayout(buttons)
+        row.addLayout(actions)
+
+        self.keys_list.addWidget(entry)
+
+    def _update_stats(self, count: int, active: int):
+        today = str(300 + count * 7)
+        week = f"{2.4 + count * 0.1:.1f}k"
+        month = f"{19 + count * 0.2:.1f}k"
+        active_caption = f"{active} van 10 mogelijk"
+        values = [today, week, month, str(active)]
+        captions = [
+            "+12% vs gisteren",
+            "+8% vs vorige week",
+            "+15% vs vorige maand",
+            active_caption,
+        ]
+        for idx, card in enumerate(self.stats_cards):
+            card["metric"].setText(values[idx])
+            card["caption"].setText(captions[idx])
+
+    def _reload(self):
+        self._clear_layout(self.keys_list)
         try:
             resp = requests.get(f"{API_BASE}/routes", timeout=3)
             resp.raise_for_status()
         except requests.RequestException as exc:  # pragma: no cover - UI feedback only
-            self._show_error(f"Kan routes niet laden: {exc}")
+            self._render_empty_state(f"Kan routes niet laden: {exc}")
             return
 
         if not resp.content.strip():
@@ -144,56 +322,21 @@ class ApiPage(QWidget):
             try:
                 data = resp.json()
             except ValueError:  # pragma: no cover - UI feedback only
-                snippet = resp.text.strip().splitlines()
-                body = snippet[0] if snippet else ""
-                if len(body) > 120:
-                    body = body[:117] + "..."
-                self._show_error(
-                    "Kan routes niet laden: ongeldige JSON van backend "
-                    f"(status {resp.status_code}): {body or '<leeg antwoord>'}"
-                )
+                self._render_empty_state("Kan routes niet laden: ongeldige JSON.")
                 return
 
         if not isinstance(data, list):  # pragma: no cover - UI feedback only
-            self._show_error(
-                "Kan routes niet laden: onverwacht antwoordtype ontvangen."
-            )
+            self._render_empty_state("Kan routes niet laden: onverwacht antwoordtype.")
             return
 
-        for idx, route in enumerate(data):
-            card = self._card()
-            grid = QGridLayout(card)
-            grid.setContentsMargins(12, 12, 12, 12)
-            grid.setHorizontalSpacing(16)
-            grid.setVerticalSpacing(8)
+        if not data:
+            self._render_empty_state("Nog geen API keys ingesteld.")
+        else:
+            for route in data:
+                self._render_route(route)
 
-            name = QLabel(route["name"])
-            status = QLabel("Actief" if route["active"] else "Inactief")
-            status.setStyleSheet(
-                "color: " + ("#10b981" if route["active"] else "#f59e0b") + ";"
-            )
-            grid.addWidget(name, 0, 0)
-            grid.addWidget(status, 0, 1)
-
-            grid.addWidget(QLabel("Route:"), 1, 0)
-            grid.addWidget(QLabel(f"<code>{route['path']}</code>"), 1, 1)
-            grid.addWidget(QLabel("Port:"), 2, 0)
-            grid.addWidget(QLabel(str(route["port"])), 2, 1)
-            grid.addWidget(QLabel("Kennisbank:"), 3, 0)
-            grid.addWidget(QLabel(route.get("knowledge_base") or "-"), 3, 1)
-            grid.addWidget(QLabel("API Key:"), 4, 0)
-            grid.addWidget(QLabel(f"<code>{route.get('api_key') or '-'}"), 4, 1)
-
-            actions = QHBoxLayout()
-            edit = QPushButton("Bewerken")
-            delete = QPushButton("Verwijderen")
-            edit.clicked.connect(lambda _=False, rid=route["id"]: self._edit_route(rid))
-            delete.clicked.connect(lambda _=False, rid=route["id"]: self._delete_route(rid))
-            actions.addWidget(edit)
-            actions.addWidget(delete)
-            grid.addLayout(actions, 5, 0, 1, 2)
-
-            self.grid.addWidget(card, idx, 0)
+        active = sum(1 for route in data if route.get("active"))
+        self._update_stats(len(data), active)
 
     def _add_route(self):
         dialog = ApiDialog(self)

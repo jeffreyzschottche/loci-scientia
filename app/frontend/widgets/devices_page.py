@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QStyle,
     QToolButton,
     QVBoxLayout,
@@ -21,52 +22,51 @@ from PySide6.QtWidgets import (
 import requests
 
 from ..config import BACKEND_HTTP
+from .dialog_style import MODAL_QSS
 
 
 class DevicesPage(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(16)
+        layout.setContentsMargins(16, 0, 16, 8)
+        layout.setSpacing(6)
 
-        header = QVBoxLayout()
-        header.setSpacing(4)
-        title = QLabel("Connected Devices & Gebruikersbeheer")
-        title.setStyleSheet("font-size:20px; font-weight:600;")
-        subtitle = QLabel(
-            "Beheer verbonden apparaten en gebruikersaccounts voor het systeem"
-        )
-        subtitle.setStyleSheet("color:#9ca3af; font-size:13px;")
-        header.addWidget(title)
-        header.addWidget(subtitle)
-        layout.addLayout(header)
-
-        top_actions = QHBoxLayout()
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        header.setContentsMargins(0, 0, 0, 0)
+        title_block = QVBoxLayout()
+        title_block.setSpacing(2)
+        title_block.setContentsMargins(0, 0, 0, 0)
         self.summary_label = QLabel("0 devices")
-        top_actions.addWidget(self.summary_label)
-        top_actions.addStretch(1)
+        self.summary_label.setStyleSheet(
+            "color:#6b7280; letter-spacing:0.2em; font-size:11px;"
+        )
+        title_block.addWidget(self.summary_label)
+        header.addLayout(title_block)
+        header.addStretch(1)
         add_btn = QPushButton("Apparaat toevoegen")
         add_btn.setStyleSheet(
-            "background:#2563eb; color:white; border-radius:8px; padding:6px 12px;"
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:20px;"
+            "  padding:10px 28px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
         )
+        add_btn.setFixedHeight(40)
         add_btn.clicked.connect(self._open_add_dialog)
-        top_actions.addWidget(add_btn)
-        layout.addLayout(top_actions)
+        header.addWidget(add_btn)
+        layout.addLayout(header)
 
-        grid_wrapper = QFrame()
-        grid_wrapper.setStyleSheet(
-            """
-            QFrame {
-                background-color: #0f172a;
-                border-radius: 16px;
-            }
-            """
-        )
+        grid_wrapper = QWidget()
         grid_wrapper_layout = QVBoxLayout(grid_wrapper)
-        grid_wrapper_layout.setContentsMargins(16, 16, 16, 16)
+        grid_wrapper_layout.setContentsMargins(0, 0, 0, 0)
 
         self.grid = QGridLayout()
+        self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(16)
         grid_wrapper_layout.addLayout(self.grid)
         layout.addWidget(grid_wrapper)
@@ -80,12 +80,13 @@ class DevicesPage(QWidget):
         card.setStyleSheet(
             """
             QFrame#DeviceCard {
-                background-color: #1f2937;
-                border-radius: 12px;
-                border: 1px solid rgba(255,255,255,0.05);
+                background-color: #ffffff;
+                border-radius: 28px;
+                border: 1px solid #e5e7eb;
+                box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
             }
             QLabel {
-                color: #e5e7eb;
+                color: #111111;
             }
             """
         )
@@ -95,22 +96,30 @@ class DevicesPage(QWidget):
 
         header = QHBoxLayout()
         name = QLabel(device.get("device_name", "Onbekend apparaat"))
-        name.setStyleSheet("font-weight:600;")
+        name.setStyleSheet("font-weight:700; letter-spacing:0.02em; color:#111111;")
         header.addWidget(name)
         header.addStretch(1)
 
         edit_btn = QToolButton()
         edit_btn.setToolTip("Bewerken")
-        edit_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        edit_btn.setText("✏️")
+        edit_btn.setIconSize(edit_btn.size())
         edit_btn.clicked.connect(partial(self._open_edit_dialog, device))
-        edit_btn.setStyleSheet("color:#cbd5f5;")
+        edit_btn.setStyleSheet(
+            "QToolButton { border:none; font-size:16px; }"
+            "QToolButton:hover { opacity:0.8; }"
+        )
         header.addWidget(edit_btn)
 
         delete_btn = QToolButton()
         delete_btn.setToolTip("Verwijderen")
-        delete_btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+        delete_btn.setText("🗑️")
+        delete_btn.setIconSize(delete_btn.size())
         delete_btn.clicked.connect(partial(self._confirm_delete, device))
-        delete_btn.setStyleSheet("color:#f87171;")
+        delete_btn.setStyleSheet(
+            "QToolButton { border:none; font-size:16px; }"
+            "QToolButton:hover { opacity:0.8; }"
+        )
         header.addWidget(delete_btn)
 
         layout.addLayout(header)
@@ -122,7 +131,9 @@ class DevicesPage(QWidget):
             ("Telefoon", device.get("phone", "")),
         ):
             row = QLabel(f"{label}: {value or '-'}")
-            row.setStyleSheet("color:#94a3b8;")
+            row.setStyleSheet(
+                "color:#111111; background:#f9fafb; border-radius:20px; padding:10px 16px;"
+            )
             meta.addWidget(row)
         layout.addLayout(meta)
 
@@ -160,8 +171,18 @@ class DevicesPage(QWidget):
         dialog.setWindowTitle(
             "Apparaat bewerken" if is_edit else "Nieuw apparaat & gebruiker"
         )
+        dialog.setStyleSheet(MODAL_QSS)
 
-        form = QFormLayout(dialog)
+        dialog_layout = QVBoxLayout(dialog)
+        dialog_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        dialog_layout.addWidget(scroll_area)
+        form_host = QWidget()
+        scroll_area.setWidget(form_host)
+        form = QFormLayout(form_host)
+        form.setContentsMargins(24, 24, 24, 24)
         user_name_edit = QLineEdit()
         email_edit = QLineEdit()
         password_edit = QLineEdit()

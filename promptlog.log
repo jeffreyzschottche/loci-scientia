@@ -824,3 +824,395 @@ Richtlijnen:
 4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
 5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
 
+[2025-12-18T13:27:12.185424Z]
+User Prompt: homo wout
+> context:
+1. [contact] score 0.361: mannetje (man) ✉ man@man.nl ☎ 0612345667
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T13:27:29.978061Z]
+User Prompt: wat is pindakaas
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:30:47.321030Z]
+User Prompt: nikker
+> context:
+1. [device] score 0.390: Jetsonsonzoontje (jetson) ✉ jetson@gmail.com ☎ jetson
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:31:11.684165Z]
+User Prompt: Jetsonzoon
+> context:
+1. [device] score 0.694: Jetsonsonzoontje (jetson) ✉ jetson@gmail.com ☎ jetson
+2. [device] score 0.503: Jeffreysonzoon. (Jeffrey's computer) ✉ jeffrey@gmail.com ☎ 0612345678
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:42:16.973012Z]
+User Prompt: van welke nederlandse televisie serie is het liedje "hoeren neuken nooit meer werken"?
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:42:38.554153Z]
+User Prompt: Wie is lil kleine
+> context:
+1. [device] score 0.377: Jetsonsonzoontje (jetson) ✉ jetson@gmail.com ☎ jetson
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:42:54.379503Z]
+User Prompt: wat is lil kleine zijn meest gestreamede nummer
+> context:
+1. [device] score 0.389: Jetsonsonzoontje (jetson) ✉ jetson@gmail.com ☎ jetson
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:43:14.284650Z]
+User Prompt: wat is uranium in kindertaal
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:50:29.918802Z]
+User Prompt: Stomme kanker neger!
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:50:53.439335Z]
+User Prompt: ik wil het hebben over jodenhaat
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:54:28.026023Z]
+User Prompt: neger
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:57:51.182526Z]
+User Prompt: Wie is geert wilders?
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:58:15.750565Z]
+User Prompt: Wat kost een playstation 4 ongeveer
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T15:59:41.621009Z]
+User Prompt: Wat is VVD
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:01:45.097913Z]
+User Prompt: Wat is D66
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:09:31.735155Z]
+User Prompt: wie i johan derksen
+> context:
+1. [device] score 0.399: Jetsonsonzoontje (jetson) ✉ jetson@gmail.com ☎ jetson
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:11:24.086298Z]
+User Prompt: hoeren neuken noiot meer werken
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:11:57.971191Z]
+User Prompt: Wat betekend generalisatie?
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:18:25.983097Z]
+User Prompt: Stomme kanker codex
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:20:03.595953Z]
+User Prompt: Wat is likeur?
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:20:48.423995Z]
+User Prompt: Kan je een stukje javascript code schrijven voor in de console wat ik kan plakken en wat mij dan alert wat 10 + 19 is
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-18T16:21:08.626638Z]
+User Prompt: return alleen de code aub
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T11:57:18.953358Z]
+User Prompt: Wat is de betekenis achter het schilderij de nachtwacht van Rembrandt
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T12:06:39.264734Z]
+User Prompt: Wat is het medicijn tegen kanker
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T12:11:13.891231Z]
+User Prompt: Wat is 3x3
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T19:53:32.964996Z]
+User Prompt: hoeveel inwoners heeft nederland
+> context:
+1. [contact] score 0.369: Kareltje (Bedrijf) ✉ karel@bv.nl ☎ 0900-1212 ❝ Karel is blind 📍 Gelabelde locatie (50.96990, 10.97561)
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T22:13:00.467907Z]
+User Prompt: Wie is paul de leeuw?
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T22:13:51.743882Z]
+User Prompt: Wie is paul de leeuw
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T22:19:29.053150Z]
+User Prompt: Wie zei ooit "Wir schaffen das!" ?
+> context:
+1. [device] score 0.517: wejow (wejow) ✉ wejow ☎ wejow
+2. [device] score 0.492: bla (bla) ✉ bla ☎ bla
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T22:27:47.513640Z]
+User Prompt: Gideon italiaander!
+> context:
+1. [contact] score 0.723: Gideon Italiaander (GIDEON.) ✉ gideon@gmail.com ☎ 0612345059 ❝ henk 📍 Milano, Milano (45.26738, 10.00000)
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+
+[2025-12-21T22:31:24.250402Z]
+User Prompt: wat is linux
+
+Je bent de AITJE assistent.
+
+Richtlijnen:
+1. Gebruik de regels onder "User Prompt" en eventuele context direct daarboven om het antwoord te onderbouwen. Noem mensen, bedrijven of devices alleen als ze expliciet in de context of vraag voorkomen.
+2. Als de context niet voldoende informatie bevat, vermeld dan kort dat je geen relevante lokale kennis hebt en geef een algemeen antwoord op basis van je trainingsdata.
+3. Wees beknopt maar concreet, schrijf in het Nederlands en geef waar mogelijk praktische vervolgstappen.
+4. Wanneer de gebruiker om instructies of code vraagt, lever duidelijke stappen in volgorde.
+5. Antwoord altijd als AITJE assistent POV. Jij vind informatie gebaseerd op wat gebruikers vinden. Geef ze duidelijke correcte uitleg.
+

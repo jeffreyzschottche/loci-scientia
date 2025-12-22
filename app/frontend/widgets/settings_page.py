@@ -21,19 +21,14 @@ class SettingsPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
 
-        title = QLabel("Instellingen")
-        title.setStyleSheet("font-size:20px; font-weight:600;")
-        subtitle = QLabel("Beheer de systeeminstellingen en voorkeuren voor AITJE OS")
-        subtitle.setStyleSheet("color:#6b7280;")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-
         tabs = QTabWidget()
+        tabs.setObjectName("SettingsTabs")
         tabs.addTab(self._appearance_tab(), "Uiterlijk")
         tabs.addTab(self._system_tab(), "Systeem")
         tabs.addTab(self._network_tab(), "Netwerk")
         tabs.addTab(self._security_tab(), "Beveiliging")
         tabs.addTab(self._advanced_tab(), "Geavanceerd")
+        tabs.tabBar().setObjectName("SettingsTabsBar")
         layout.addWidget(tabs, 1)
 
     def _appearance_tab(self) -> QWidget:
@@ -90,8 +85,8 @@ class SettingsPage(QWidget):
         grid.addWidget(QLabel("WiFi SSID"), 0, 0)
         grid.addWidget(QLineEditPlaceholder("AITJE-Net"), 0, 1)
         grid.addWidget(QLabel("VPN Status"), 1, 0)
-        vpn = QLabel("Uitgeschakeld")
-        vpn.setStyleSheet("color:#9ca3af;")
+        vpn = QLabel("UITGESCHAKELD")
+        vpn.setStyleSheet("color:#6b7280; letter-spacing:0.3em; font-size:11px;")
         grid.addWidget(vpn, 1, 1)
         layout.addWidget(card)
         return tab
@@ -112,7 +107,16 @@ class SettingsPage(QWidget):
         card = self._settings_card("Geavanceerde opties")
         vbox = QVBoxLayout(card)
         flush = QPushButton("Cache legen")
-        flush.setStyleSheet("border:1px solid #374151; border-radius:8px; padding:6px 12px;")
+        flush.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:999px;"
+            "  padding:8px 24px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         vbox.addWidget(flush)
         layout.addWidget(card)
         return tab
@@ -123,7 +127,9 @@ class SettingsPage(QWidget):
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.addWidget(QLabel(title))
+        label = QLabel(title)
+        label.setStyleSheet("font-weight:700; letter-spacing:0.02em;")
+        layout.addWidget(label)
         return card
 
 
@@ -133,5 +139,6 @@ class QLineEditPlaceholder(QLabel):
     def __init__(self, text: str):
         super().__init__(text)
         self.setStyleSheet(
-            "border:1px solid #d4d4d8; border-radius:10px; padding:8px 10px; color:#52525b;"
+            "border:1px solid #d6d3ce; border-radius:20px; padding:12px 16px;"
+            "color:#1f1f1f; background:#fcfbf9;"
         )

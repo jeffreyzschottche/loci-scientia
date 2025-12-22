@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QProgressBar,
+    QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -63,41 +65,34 @@ class BootScreen(QWidget):
         self.setStyleSheet(
             """
             QWidget#BootScreenRoot {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #fff7d6,
-                    stop:1 #f4f1ff
-                );
-                color: #0a0a0a;
+                background: #ffffff;
+                color: #111111;
             }
             QLabel#BootTitle {
-                font-size: 42pt;
-                font-weight: 700;
-                color: #0a0a0a;
+                font-size: 48pt;
+                font-weight: 800;
+                letter-spacing: 0.04em;
+                color: #111111;
             }
             QLabel#BootSubtitle {
                 font-size: 14pt;
-                color: #262626;
+                color: #4b5563;
             }
             QLabel#BootPercent {
                 font-size: 16pt;
-                font-weight: 600;
-                color: #0a0a0a;
+                font-weight: 700;
+                color: #111111;
             }
             QProgressBar {
-                background: #f4f4f5;
-                border: 0;
-                border-radius: 16px;
-                height: 24px;
-                color: #0a0a0a;
+                background: #f5f5f5;
+                border: 1px solid #e4e4e7;
+                border-radius: 999px;
+                height: 28px;
+                color: #111111;
             }
             QProgressBar::chunk {
-                border-radius: 16px;
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #facc15,
-                    stop:1 #f97316
-                );
+                border-radius: 999px;
+                background: #facc15;
             }
             """
         )
@@ -111,16 +106,18 @@ class BootScreen(QWidget):
         center.setSpacing(24)
         center.setAlignment(Qt.AlignCenter)
 
+        hero_pixmap = None
         if logo_path and os.path.exists(logo_path):
-            brand = QLabel()
-            brand.setAlignment(Qt.AlignCenter)
-            brand.setPixmap(QPixmap(logo_path).scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            center.addWidget(brand, 0, Qt.AlignCenter)
-
-        self.egg_label = QLabel()
-        self.egg_label.setAlignment(Qt.AlignCenter)
-        self.egg_label.setPixmap(self._build_egg_pixmap(260, 320))
-        center.addWidget(self.egg_label, 0, Qt.AlignCenter)
+            hero_pixmap = QPixmap(logo_path)
+        hero_label = QLabel()
+        hero_label.setAlignment(Qt.AlignCenter)
+        if hero_pixmap and not hero_pixmap.isNull():
+            hero_label.setPixmap(
+                hero_pixmap.scaled(260, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+        else:
+            hero_label.setPixmap(self._build_egg_pixmap(260, 320))
+        center.addWidget(hero_label, 0, Qt.AlignCenter)
 
         title = QLabel("AITJE ontwaakt...")
         title.setObjectName("BootTitle")
@@ -139,6 +136,7 @@ class BootScreen(QWidget):
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
+        self.progress_bar.setTextVisible(False)
         progress_layout.addWidget(self.progress_bar)
 
         info_row = QHBoxLayout()
@@ -171,13 +169,13 @@ class BootScreen(QWidget):
 
         gradient = QLinearGradient(0, 0, 0, height)
         gradient.setColorAt(0, QColor("#ffffff"))
-        gradient.setColorAt(1, QColor("#fef3c7"))
+        gradient.setColorAt(1, QColor("#f7f7f7"))
         painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(QColor("#f5e8b5"), 4))
+        painter.setPen(QPen(QColor("#0a0a0a"), 4))
         painter.drawEllipse(10, 10, width - 20, height - 20)
 
         # Simple crack lines to mimic the Figma egg
-        painter.setPen(QPen(QColor("#0f172a"), 2))
+        painter.setPen(QPen(QColor("#0a0a0a"), 2))
         painter.drawLine(width * 0.45, height * 0.35, width * 0.5, height * 0.55)
         painter.drawLine(width * 0.55, height * 0.38, width * 0.5, height * 0.6)
         painter.end()
@@ -226,7 +224,7 @@ class MainWindow(QMainWindow):
         self.center = QWidget()
         self.center.setObjectName("CenterContainer")
         center_layout = QVBoxLayout(self.center)
-        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setContentsMargins(0, 16, 0, 0)
         center_layout.setSpacing(0)
 
         self.header = HeaderBar("AITJE Dashboard")
@@ -265,6 +263,10 @@ class MainWindow(QMainWindow):
                     select_id=contact_id or None
                 )
             )
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
         self.content = QWidget()
         self.content.setObjectName("ContentArea")
 
@@ -274,8 +276,11 @@ class MainWindow(QMainWindow):
         for page in self.pages.values():
             content_layout.addWidget(page)
             page.setObjectName("Card")
+            page.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        center_layout.addWidget(self.content, 1)
+        self.content_scroll.setWidget(self.content)
+
+        center_layout.addWidget(self.content_scroll, 1)
         root_layout.addWidget(self.center, 1)
 
         self.sidebar.navigate.connect(self.show_page)
@@ -308,11 +313,23 @@ class MainWindow(QMainWindow):
             "maps": "Maps",
             "contacts": "Contacten",
             "net": "Netwerk Status",
-            "devices": "Connected Devices",
+            "devices": "Connected Devices & Gebruikersbeheer",
             "settings": "Instellingen",
             "faq": "FAQ",
         }
+        subtitles = {
+            "chat": "Start een gesprek met je lokale AI-assistent",
+            "api": "Beheer je API keys en bekijk gebruik statistieken",
+            "kb": "Beheer kennisbankdocumenten en SD-kaartopslag",
+            "maps": "Bekijk contactlocaties op de kaart",
+            "contacts": "Beheer je contacten en bekijk ze op de kaart",
+            "net": "Realtime overzicht van netwerk- en systeemstatus",
+            "devices": "Beheer verbonden apparaten en gebruikersaccounts voor het systeem",
+            "settings": "Beheer de systeeminstellingen en voorkeuren voor AITJE OS",
+            "faq": "Veelgestelde vragen en antwoorden",
+        }
         self.header.set_title(titles.get(key, "AITJE"))
+        self.header.set_subtitle(subtitles.get(key, "Lokale AI-console"))
 
     def _go_home(self):
         self.sidebar.set_current("chat")

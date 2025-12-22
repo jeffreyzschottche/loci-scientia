@@ -8,8 +8,7 @@ class FAQPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        layout.addWidget(QLabel("FAQ"))
         empty = QLabel("Deze sectie is nog leeg. Voeg later veelgestelde vragen toe.")
-        empty.setStyleSheet("color:#9ca3af;")
+        empty.setStyleSheet("color:#6b7280; letter-spacing:0.02em;")
         layout.addWidget(empty)
         layout.addStretch(1)

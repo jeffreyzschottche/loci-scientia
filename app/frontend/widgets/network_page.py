@@ -32,20 +32,34 @@ class NetworkStatusPage(QWidget):
         layout.setSpacing(16)
 
         header = QHBoxLayout()
-        title = QLabel("Netwerk Status")
-        title.setStyleSheet("font-size:20px; font-weight:600;")
-        header.addWidget(title)
+        header.setContentsMargins(0, 0, 0, 0)
         header.addStretch(1)
         refresh = QPushButton("Vernieuwen")
         refresh.clicked.connect(self.refresh_stats)
         refresh.setStyleSheet(
-            "border:1px solid #374151; border-radius:8px; padding:6px 12px;"
+            "QPushButton {"
+            "  color:#111111;"
+            "  border:1px solid rgba(33,33,33,0.2);"
+            "  border-radius:20px;"
+            "  padding:8px 24px;"
+            "  background:transparent;"
+            "}"
+            "QPushButton:hover { border-color: rgba(33,33,33,0.45); }"
         )
+        refresh.setFixedHeight(40)
         header.addWidget(refresh)
         login = QPushButton("Beheerder Login")
         login.setStyleSheet(
-            "background:#2563eb; color:white; border-radius:8px; padding:6px 12px;"
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:20px;"
+            "  padding:8px 28px;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
         )
+        login.setFixedHeight(40)
         header.addWidget(login)
         layout.addLayout(header)
 
@@ -83,8 +97,8 @@ class NetworkStatusPage(QWidget):
         labels = ["IP Adres", "MAC Adres", "Gateway", "DNS Servers"]
         self.status_values = [QLabel("-") for _ in labels]
         for idx, label in enumerate(labels):
-            lbl = QLabel(label)
-            lbl.setStyleSheet("color:#9ca3af;")
+            lbl = QLabel(label.upper())
+            lbl.setStyleSheet("color:#6b7280; letter-spacing:0.3em; font-size:11px;")
             layout.addWidget(lbl, 0, idx)
             layout.addWidget(self.status_values[idx], 1, idx)
         return card
@@ -94,12 +108,17 @@ class NetworkStatusPage(QWidget):
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
-        label = QLabel(title)
-        label.setStyleSheet("color:#9ca3af;")
+        label = QLabel(title.upper())
+        label.setStyleSheet("color:#6b7280; letter-spacing:0.3em; font-size:11px;")
         value = QLabel("-")
-        value.setStyleSheet("font-size:24px; font-weight:600;")
+        value.setStyleSheet("font-size:26px; font-weight:700; color:#111111;")
         bar = QProgressBar()
         bar.setRange(0, 100)
+        bar.setFixedHeight(20)
+        bar.setStyleSheet(
+            "QProgressBar { border-radius:10px; border:1px solid #facc15; background:#fefce8; }"
+            "QProgressBar::chunk { border-radius:10px; background:#facc15; }"
+        )
         layout.addWidget(label)
         layout.addWidget(value)
         layout.addWidget(bar)
@@ -121,8 +140,8 @@ class NetworkStatusPage(QWidget):
             ("Uptime", self._format_uptime()),
         ]
         for idx, (label, value) in enumerate(entries):
-            lbl = QLabel(label)
-            lbl.setStyleSheet("color:#9ca3af;")
+            lbl = QLabel(label.upper())
+            lbl.setStyleSheet("color:#6b7280; letter-spacing:0.3em; font-size:11px;")
             val = QLabel(value)
             layout.addWidget(lbl, idx // 2, (idx % 2) * 2)
             layout.addWidget(val, idx // 2, (idx % 2) * 2 + 1)
@@ -134,13 +153,15 @@ class NetworkStatusPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         title = QLabel("Netwerk Interfaces")
-        title.setStyleSheet("font-weight:600;")
+        title.setStyleSheet("font-size:18px; font-weight:700; letter-spacing:0.08em;")
         layout.addWidget(title)
         self.interface_labels = []
         for iface in ("eth0", "wlan0"):
             row = QHBoxLayout()
-            name = QLabel(iface)
-            name.setStyleSheet("font-family:monospace;")
+            name = QLabel(iface.upper())
+            name.setStyleSheet(
+                "font-family:'SFMono-Regular','Menlo','Courier New',monospace; letter-spacing:0.35em; color:#111111;"
+            )
             status = QLabel("Onbekend")
             row.addWidget(name)
             row.addStretch(1)
@@ -176,7 +197,11 @@ class NetworkStatusPage(QWidget):
                 txt = "Verbonden" if status.speed else "Actief"
             else:
                 txt = "Niet actief"
-            self.interface_labels[idx].setText(txt)
+            color = "#facc15" if status and status.isup else "#9ca3af"
+            self.interface_labels[idx].setText(txt.upper())
+            self.interface_labels[idx].setStyleSheet(
+                f"color:{color}; font-weight:600; letter-spacing:0.08em;"
+            )
 
     def _network_info(self):
         ip = "-"

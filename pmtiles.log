@@ -1,7 +1,1 @@
-2025/12/11 22:13:53 main.go:159: Serving  /mnt/hgfs/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
-2025/12/11 22:16:04 server.go:156: fetching europe 0-16384
-2025/12/11 22:16:04 server.go:164: failed to fetch europe 0-0, open /mnt/hgfs/loci-maps/europe.pmtiles: no such file or directory
-2025/12/11 22:16:04 main.go:156: served 404 %2Feurope%2F3%2F4%2F2.mvt in 7.367375ms
-2025/12/11 22:16:04 main.go:156: served 404 %2Feurope%2F3%2F4%2F3.mvt in 5.07925ms
-2025/12/11 22:16:04 main.go:156: served 404 %2Feurope%2F3%2F3%2F3.mvt in 1.062375ms
-2025/12/11 22:16:04 main.go:156: served 404 %2Feurope%2F3%2F3%2F2.mvt in 7.352ms
+2025/12/21 23:31:00 main.go:159: Serving  /Volumes/Expansion/loci-maps on port 8080 and interface 0.0.0.0 with Access-Control-Allow-Origin: *
