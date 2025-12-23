@@ -166,7 +166,7 @@ async def api_ask(req: ChatRequest):
 
 
 async def sse_stream_generator(req: ChatRequest):
-    """Generate SSE events for queue countdown and token streaming from Ollama."""
+    """Generate SSE events for queue countdown and token streaming from TensorRT-LLM."""
 
     final_prompt = build_augmented_prompt(req.prompt)
     _log_prompt(final_prompt)
@@ -177,71 +177,104 @@ async def sse_stream_generator(req: ChatRequest):
         yield f"data: {event_data}\n\n"
         await asyncio.sleep(1)
 
-    # Call Ollama API with streaming
-    ollama_url = f"{settings.ollama_base_url}/api/generate"
-    ollama_payload = {
-        "model": settings.ollama_model,
-        "prompt": final_prompt,
+    # Call TensorRT-LLM OpenAI-compatible API with streaming
+    llm_url = f"{settings.llm_base_url}/v1/chat/completions"
+    llm_payload = {
+        "model": settings.llm_model,
+        "messages": [
+            {"role": "user", "content": final_prompt}
+        ],
         "stream": True,
+        "max_tokens": 1024,
     }
 
     try:
-        async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
-            async with client.stream("POST", ollama_url, json=ollama_payload) as response:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
+            async with client.stream("POST", llm_url, json=llm_payload) as response:
                 if response.status_code >= 400:
-                    # Lees fouttekst voor logging zodat we weten waarom de fallback triggert.
                     error_body = await response.aread()
-                    logger.warning(
-                        "Ollama gaf status %s voor model '%s' via %s: %s",
+                    error_msg = error_body.decode("utf-8", errors="replace").strip()
+                    logger.error(
+                        "TensorRT-LLM returned status %s for model '%s' via %s: %s",
                         response.status_code,
-                        settings.ollama_model,
-                        ollama_url,
-                        error_body.decode("utf-8", errors="replace").strip(),
+                        settings.llm_model,
+                        llm_url,
+                        error_msg,
                     )
-                    response.raise_for_status()
+                    raise httpx.HTTPStatusError(
+                        f"TensorRT-LLM error: {error_msg}",
+                        request=response.request,
+                        response=response,
+                    )
 
                 async for line in response.aiter_lines():
                     if not line:
                         continue
 
-                    try:
-                        data = json.loads(line)
+                    # OpenAI SSE format: "data: {json}" or "data: [DONE]"
+                    if line.startswith("data: "):
+                        data_str = line[6:]  # Remove "data: " prefix
 
-                        # Ollama sends token in "response" field
-                        if "response" in data:
-                            token = data["response"]
-                            if token:  # Only send non-empty tokens
-                                event_data = json.dumps({"token": token, "done": False})
-                                yield f"data: {event_data}\n\n"
-
-                        # Check if done
-                        if data.get("done", False):
+                        if data_str == "[DONE]":
                             break
 
-                    except json.JSONDecodeError:
-                        continue
+                        try:
+                            data = json.loads(data_str)
 
-    except Exception as exc:
-        # Fallback to mock response if Ollama is not available
-        logger.warning(
-            "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
-            ollama_url,
-            settings.ollama_model,
+                            # OpenAI format: choices[0].delta.content
+                            choices = data.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                token = delta.get("content", "")
+                                if token:
+                                    event_data = json.dumps({"token": token, "done": False})
+                                    yield f"data: {event_data}\n\n"
+
+                                # Check finish reason
+                                if choices[0].get("finish_reason"):
+                                    break
+
+                        except json.JSONDecodeError:
+                            continue
+
+    except httpx.ConnectError as exc:
+        logger.error(
+            "Cannot connect to TensorRT-LLM server (url=%s, model=%s): %s",
+            llm_url,
+            settings.llm_model,
             exc,
         )
-        mock_response = (
-            "[Ollama niet beschikbaar - Mock response] "
-            f"Kon geen antwoord krijgen van Ollama op {ollama_url} met model '{settings.ollama_model}'. "
-            f"Je vroeg: '{req.prompt}'. Controleer of de Ollama-service draait en bereikbaar is."
+        error_response = (
+            f"[FOUT] Kan geen verbinding maken met TensorRT-LLM server op {settings.llm_base_url}. "
+            "Controleer of de TensorRT-LLM Docker container draait met: "
+            "'docker ps | grep tensorrt-llm-server' of start deze met: "
+            "'./tensorrt-llm-setup.sh start'"
         )
+        event_data = json.dumps({"error": error_response, "done": True})
+        yield f"data: {event_data}\n\n"
+        return
 
-        # Stream the mock response word by word
-        words = mock_response.split()
-        for word in words:
-            token = word + " "
-            event_data = json.dumps({"token": token, "done": False})
-            yield f"data: {event_data}\n\n"
-            await asyncio.sleep(0.1)
+    except httpx.HTTPStatusError as exc:
+        logger.error("TensorRT-LLM HTTP error: %s", exc)
+        error_response = f"[FOUT] TensorRT-LLM server gaf een fout: {exc}"
+        event_data = json.dumps({"error": error_response, "done": True})
+        yield f"data: {event_data}\n\n"
+        return
+
+    except Exception as exc:
+        logger.error(
+            "Unexpected error with TensorRT-LLM (url=%s, model=%s): %s",
+            llm_url,
+            settings.llm_model,
+            exc,
+        )
+        error_response = (
+            f"[FOUT] Onverwachte fout bij communicatie met TensorRT-LLM: {exc}. "
+            f"URL: {llm_url}, Model: {settings.llm_model}"
+        )
+        event_data = json.dumps({"error": error_response, "done": True})
+        yield f"data: {event_data}\n\n"
+        return
 
     # Send final done event
     event_data = json.dumps({"done": True})
