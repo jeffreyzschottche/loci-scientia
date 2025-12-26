@@ -163,6 +163,7 @@ convert_model() {
 
             # Convert checkpoint with INT4 quantization
             python3 convert_checkpoint.py \
+                --ckpt-type hf \
                 --model-dir /models/gemma-3-1b-it \
                 --output-model-dir /engines/checkpoint \
                 --dtype float16 \
