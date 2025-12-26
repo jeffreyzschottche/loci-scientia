@@ -26,6 +26,9 @@ MAX_OUTPUT_LEN=1024
 CONTAINER_NAME="tensorrt-llm-server"
 JETSON_CONTAINER="dustynv/tensorrt_llm:0.12-r36.4.0"
 
+# HuggingFace token for gated models
+HF_TOKEN="${HF_TOKEN:-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}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -120,15 +123,6 @@ download_model() {
     if [ -d "$MODEL_DIR/gemma-3-1b-it" ] && [ "$(ls -A $MODEL_DIR/gemma-3-1b-it 2>/dev/null)" ]; then
         log_info "Model already downloaded. Skipping..."
         return
-    fi
-
-    # Check for HuggingFace token (required for gated models like Gemma)
-    if [ -z "$HF_TOKEN" ]; then
-        log_error "HF_TOKEN environment variable is required for gated models like Gemma.
-
-1. Accept the license at: https://huggingface.co/google/gemma-3-1b-it
-2. Get your token at: https://huggingface.co/settings/tokens
-3. Run: sudo HF_TOKEN=your_token_here ./tensorrt-llm-setup.sh"
     fi
 
     # Download using huggingface-cli inside container
