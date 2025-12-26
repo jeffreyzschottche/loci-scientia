@@ -24,7 +24,7 @@ MAX_OUTPUT_LEN=1024
 
 # Container settings
 CONTAINER_NAME="tensorrt-llm-server"
-JETSON_CONTAINER="dustynv/tensorrt_llm:0.14-r36.4.0"
+JETSON_CONTAINER="dustynv/tensorrt_llm:0.12-r36.4.0"
 
 # Colors for output
 RED='\033[0;31m'
