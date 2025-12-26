@@ -162,7 +162,7 @@ convert_model() {
             cd /opt/TensorRT-LLM/examples/gemma
 
             # Convert checkpoint with INT4 AWQ quantization
-            python convert_checkpoint.py \
+            python3 convert_checkpoint.py \
                 --model_dir /models/gemma-3-1b-it \
                 --output_dir /engines/checkpoint \
                 --dtype float16 \
@@ -179,7 +179,6 @@ convert_model() {
                 --max_input_len $MAX_INPUT_LEN \
                 --max_seq_len $((MAX_INPUT_LEN + MAX_OUTPUT_LEN)) \
                 --max_num_tokens $((MAX_BATCH_SIZE * MAX_INPUT_LEN)) \
-                --strongly_typed \
                 --workers 1
 
             # Cleanup checkpoint to save space
@@ -206,7 +205,7 @@ start_server() {
         -v "$MODEL_DIR:/models" \
         -v "$CACHE_DIR:/root/.cache" \
         "$JETSON_CONTAINER" \
-        python -m tensorrt_llm.serve \
+        python3 -m tensorrt_llm.serve \
             --model_dir /engines \
             --tokenizer_dir /models/gemma-3-1b-it \
             --host 0.0.0.0 \
