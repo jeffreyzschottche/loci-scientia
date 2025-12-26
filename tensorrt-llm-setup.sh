@@ -161,14 +161,12 @@ convert_model() {
         bash -c "
             cd /opt/TensorRT-LLM/examples/gemma
 
-            # Convert checkpoint with INT4 AWQ quantization
+            # Convert checkpoint with INT4 quantization
             python3 convert_checkpoint.py \
-                --model_dir /models/gemma-3-1b-it \
-                --output_dir /engines/checkpoint \
+                --model-dir /models/gemma-3-1b-it \
+                --output-model-dir /engines/checkpoint \
                 --dtype float16 \
-                --use_weight_only \
-                --weight_only_precision int4_awq \
-                --per_group
+                --use-weight-only-with-precision int4
 
             # Build TensorRT engine optimized for Orin Nano
             trtllm-build \
