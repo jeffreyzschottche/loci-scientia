@@ -122,16 +122,26 @@ download_model() {
         return
     fi
 
+    # Check for HuggingFace token (required for gated models like Gemma)
+    if [ -z "$HF_TOKEN" ]; then
+        log_error "HF_TOKEN environment variable is required for gated models like Gemma.
+
+1. Accept the license at: https://huggingface.co/google/gemma-3-1b-it
+2. Get your token at: https://huggingface.co/settings/tokens
+3. Run: sudo HF_TOKEN=your_token_here ./tensorrt-llm-setup.sh"
+    fi
+
     # Download using huggingface-cli inside container
     docker run --rm \
         --runtime=nvidia \
         -v "$MODEL_DIR:/models" \
         -v "$CACHE_DIR:/root/.cache" \
         -e HF_HOME=/root/.cache/huggingface \
+        -e HF_TOKEN="$HF_TOKEN" \
         "$JETSON_CONTAINER" \
         bash -c "
             pip install -q huggingface_hub[cli] &&
-            huggingface-cli download $MODEL_NAME --local-dir /models/gemma-3-1b-it --local-dir-use-symlinks False
+            huggingface-cli download $MODEL_NAME --local-dir /models/gemma-3-1b-it --local-dir-use-symlinks False --token \$HF_TOKEN
         "
 
     log_info "Model downloaded successfully to $MODEL_DIR/gemma-3-1b-it"
