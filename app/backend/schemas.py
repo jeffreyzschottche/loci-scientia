@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel
@@ -92,3 +93,13 @@ class ApiRouteCreate(BaseModel):
     knowledge_base: Optional[str] = None
     api_key: Optional[str] = None
     active: bool = True
+
+
+class SignOnRequest(BaseModel):
+    user_name: str
+    password: str
+
+
+class BearerTokenResponse(BaseModel):
+    token: str
+    expires_at: datetime

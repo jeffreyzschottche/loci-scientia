@@ -82,21 +82,28 @@ Clients op hetzelfde netwerk kunnen dan altijd `http://aitje-2.local:8000/...` b
 
 ## 📡 API testen
 
-Zodra backend + hostname draaien, kan elke client (bijv. telefoon/laptop) dit curl-commando doen:
+Elke client (bijv. telefoon/laptop) doet nu twee stappen:
 
 ```bash
+# 1) Token ophalen (90 dagen geldig)
+curl -X POST "http://aitje-2.local:8000/api/v1/signon" \
+  -H "Content-Type: application/json" \
+  -d '{"user_name":"<naam>","password":"<wachtwoord>"}'
+
+# 2) Vraag stellen met Authorization header
 curl -X POST "http://aitje-2.local:8000/api/v1/ask" \
+  -H "Authorization: Bearer <token-uit-stap-1>" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"biggest city of germany"}'
 ```
 
-**Verwacht antwoord:** het **zelfde** als in de desktop chat, omdat `/api/v1/ask` nu dezelfde augmented prompt en LLM gebruikt als de streaming-UI.  
-Authenticatie (`-u user:pass`) wordt later toegevoegd; nu zijn de endpoints open binnen je LAN.
+**Verwacht antwoord:** het **zelfde** als in de desktop chat, omdat `/api/v1/ask` nu dezelfde augmented prompt en LLM gebruikt als de streaming-UI.
 
 ### Streaming variant
 
 ```bash
 curl -N "http://aitje-2.local:8000/api/v1/ask/stream" \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"vertel een grap"}'
 ```

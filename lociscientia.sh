@@ -25,6 +25,29 @@ ORIGINAL_COMPUTER_NAME=""
 SUDO_KEEPALIVE_PID=""
 HAVE_SUDO=0
 
+ensure_sudo_session() {
+    if ! command -v sudo >/dev/null 2>&1; then
+        return 1
+    fi
+    if sudo -n true 2>/dev/null; then
+        :
+    else
+        echo "🔐 sudo-toegang vereist voor hostname/mDNS-aanpassingen."
+        sudo -v || return 1
+    fi
+    if [ -z "${SUDO_KEEPALIVE_PID:-}" ]; then
+        (
+            while true; do
+                sleep 60
+                sudo -n true >/dev/null 2>&1 || exit
+            done
+        ) &
+        SUDO_KEEPALIVE_PID=$!
+    fi
+    HAVE_SUDO=1
+    return 0
+}
+
 detect_platform() {
     local uname_s
     uname_s="$(uname -s 2>/dev/null || echo unknown)"
@@ -154,29 +177,6 @@ case "$DEVICE_PLATFORM" in
         fi
         ;;
 esac
-
-ensure_sudo_session() {
-    if ! command -v sudo >/dev/null 2>&1; then
-        return 1
-    fi
-    if sudo -n true 2>/dev/null; then
-        :
-    else
-        echo "🔐 sudo-toegang vereist voor hostname/mDNS-aanpassingen."
-        sudo -v || return 1
-    fi
-    if [ -z "${SUDO_KEEPALIVE_PID:-}" ]; then
-        (
-            while true; do
-                sleep 60
-                sudo -n true >/dev/null 2>&1 || exit
-            done
-        ) &
-        SUDO_KEEPALIVE_PID=$!
-    fi
-    HAVE_SUDO=1
-    return 0
-}
 
 install_ollama() {
     if ! command -v ollama >/dev/null 2>&1; then

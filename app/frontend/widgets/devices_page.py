@@ -184,14 +184,20 @@ class DevicesPage(QWidget):
 
     def _show_client_hint(self) -> None:
         curl_cmd = (
-            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
-            '  -u "user:pass" \\\n'
+            f"# Bearer token ophalen\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/signon \\\n"
             '  -H "Content-Type: application/json" \\\n'
-            "  -d '{\"message\":\"Hoi vanaf mijn device\"}'"
+            "  -d '{\"user_name\":\"<naam>\",\"password\":\"<wachtwoord>\"}'\n\n"
+            "# Vraag sturen met token\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -H "Authorization: Bearer <token>" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\"prompt\":\"Hoi vanaf mijn device\"}'"
         )
         lines = [
             f"Verbind clients met: {PUBLIC_BASE_URL}",
-            f"Endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
+            f"Sign-on endpoint: {PUBLIC_BASE_URL}/api/v1/signon",
+            f"Ask endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
             "",
             "Gebruik onderstaand voorbeeld:",
         ]

@@ -174,12 +174,15 @@ class ApiPage(QWidget):
         url_button.clicked.connect(self._show_url_hint)
         doc_header.addWidget(url_button)
         doc_layout.addLayout(doc_header)
-        endpoint_label = QLabel("Publiek endpoint (mDNS):")
+        endpoint_label = QLabel("Publieke endpoints (mDNS):")
         endpoint_label.setStyleSheet("color:#6b7280; font-weight:600;")
-        endpoint_value = QLabel(f"{PUBLIC_BASE_URL}/api/v1/ask")
+        endpoint_value = QLabel(
+            f"{PUBLIC_BASE_URL}/api/v1/signon\n{PUBLIC_BASE_URL}/api/v1/ask"
+        )
         endpoint_value.setStyleSheet(
             "font-family:'SFMono-Regular','Menlo','Courier New',monospace; font-size:13px;"
         )
+        endpoint_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
         mdns_hint = QLabel(f"Device hostname: {DEVICE_MDNS}")
         mdns_hint.setStyleSheet("color:#4b5563;")
         example_label = QLabel("Voorbeeld request")
@@ -187,11 +190,19 @@ class ApiPage(QWidget):
         example = QPlainTextEdit()
         example.setReadOnly(True)
         example.setPlainText(
-            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
-            '  -u "user:pass" \\\n'
+            f"# 1) Bearer token ophalen (3 maanden geldig)\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/signon \\\n"
             '  -H "Content-Type: application/json" \\\n'
             "  -d '{\n"
-            '    \"message\": \"Hoi vanaf mijn telefoon\"\n'
+            '    \"user_name\": \"<gebruikersnaam>\",\n'
+            '    \"password\": \"<wachtwoord>\"\n'
+            "  }'\n\n"
+            "# 2) Vraag stellen met Authorization header\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -H "Authorization: Bearer <token>" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\n"
+            '    \"prompt\": \"Hoi vanaf mijn telefoon\"\n'
             "  }'\n"
         )
         doc_layout.addWidget(endpoint_label)
@@ -380,14 +391,20 @@ class ApiPage(QWidget):
 
     def _show_url_hint(self):
         curl_cmd = (
-            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
-            '  -u "user:pass" \\\n'
+            f"# Haal token op\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/signon \\\n"
             '  -H "Content-Type: application/json" \\\n'
-            "  -d '{\"message\":\"Hoi vanaf mijn telefoon\"}'"
+            "  -d '{\"user_name\":\"<naam>\",\"password\":\"<wachtwoord>\"}'\n\n"
+            "# Stel vraag met Authorization header\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -H "Authorization: Bearer <token>" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\"prompt\":\"Hoi vanaf mijn telefoon\"}'"
         )
         body = [
             f"Basis-URL: {PUBLIC_BASE_URL}",
-            f"Endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
+            f"Sign-on endpoint: {PUBLIC_BASE_URL}/api/v1/signon",
+            f"Ask endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
             "",
             "Gebruik dit voorbeeld vanaf de client:",
         ]

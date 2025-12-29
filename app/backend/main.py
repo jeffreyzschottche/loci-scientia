@@ -2,16 +2,19 @@ import asyncio
 import json
 import logging
 import httpx
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import build_augmented_prompt, handle_ask, log_prompt
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .schemas import (
     ApiRouteCreate,
+    BearerTokenResponse,
     ChatRequest,
     Contact,
     ContactCreate,
@@ -19,6 +22,7 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    SignOnRequest,
 )
 from .settings import settings
 from .store import Store
@@ -44,6 +48,24 @@ if settings.offline_assets_dir and settings.offline_assets_dir.exists():
 store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
+token_store = BearerTokenStore()
+
+
+def _extract_bearer_token(auth_header: Optional[str]) -> str:
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Bearer token vereist")
+    scheme, _, value = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        raise HTTPException(status_code=401, detail="Ongeldig Authorization-headerformaat")
+    return value.strip()
+
+
+def require_token(authorization: Optional[str] = Header(default=None)) -> TokenRecord:
+    token_value = _extract_bearer_token(authorization)
+    record = token_store.validate(token_value)
+    if record is None:
+        raise HTTPException(status_code=401, detail="Bearer token ongeldig of verlopen")
+    return record
 
 
 @app.get("/health")
@@ -74,8 +96,19 @@ def delete_route(rid: str):
     return {"ok": True}
 
 
+@app.post("/api/v1/signon", response_model=BearerTokenResponse)
+def api_signon(req: SignOnRequest):
+    device = devices_repo.find_by_username(req.user_name)
+    if device is None or device.user_name != req.user_name:
+        raise HTTPException(status_code=401, detail="Account niet gevonden of geblokkeerd")
+    if device.password != req.password:
+        raise HTTPException(status_code=401, detail="Onjuiste gebruikersnaam of wachtwoord")
+    issued = token_store.issue_token(device.id, device.user_name)
+    return {"token": issued.token, "expires_at": issued.expires_at}
+
+
 @app.post("/api/v1/ask")
-async def api_ask(req: ChatRequest):
+async def api_ask(req: ChatRequest, _: TokenRecord = Depends(require_token)):
     return await handle_ask(req)
 
 
@@ -163,7 +196,7 @@ async def sse_stream_generator(req: ChatRequest):
 
 
 @app.post("/api/v1/ask/stream")
-async def api_ask_stream(req: ChatRequest):
+async def api_ask_stream(req: ChatRequest, _: TokenRecord = Depends(require_token)):
     """Stream SSE response with queue position and token-by-token LLM output."""
     return StreamingResponse(
         sse_stream_generator(req),
@@ -242,6 +275,7 @@ def patch_device(device_id: str, patch: DevicePatch):
 def delete_device(device_id: str):
     try:
         devices_repo.delete_device(device_id)
+        token_store.revoke_for_device(device_id)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"status": "ok"}
