@@ -7,3 +7,14 @@ app/maps/europe.pmtilesx
 app/maps/europe.pmtilesb
 app/maps/europe.pmtilesp
 fastembed_models/
+
+.env
+.env.*
+
+*.log
+backend.log
+ollama.log
+pmtiles.log
+promptlog.log
+
+*.pmtiles
