@@ -19,7 +19,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import API_ROUTES_DEFAULT_PORT, BACKEND_HTTP
+from ..config import (
+    API_ROUTES_DEFAULT_PORT,
+    BACKEND_HTTP,
+    DEVICE_MDNS,
+    PUBLIC_BASE_URL,
+)
 from .dialog_style import MODAL_QSS
 
 API_BASE = BACKEND_HTTP
@@ -158,28 +163,41 @@ class ApiPage(QWidget):
         doc_layout.setSpacing(12)
         doc_title = QLabel("API Documentatie")
         doc_title.setStyleSheet("font-size:20px; font-weight:700;")
-        endpoint_label = QLabel("Endpoint:")
+        doc_header = QHBoxLayout()
+        doc_header.addWidget(doc_title)
+        doc_header.addStretch(1)
+        url_button = QPushButton("Toon API URL")
+        url_button.setCursor(Qt.PointingHandCursor)
+        url_button.setStyleSheet(
+            "QPushButton { border:1px solid #d1d5db; border-radius:18px; padding:6px 16px; }"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        url_button.clicked.connect(self._show_url_hint)
+        doc_header.addWidget(url_button)
+        doc_layout.addLayout(doc_header)
+        endpoint_label = QLabel("Publiek endpoint (mDNS):")
         endpoint_label.setStyleSheet("color:#6b7280; font-weight:600;")
-        endpoint_value = QLabel("http://aitje.local/api/v1/chat/completions")
+        endpoint_value = QLabel(f"{PUBLIC_BASE_URL}/api/v1/ask")
         endpoint_value.setStyleSheet(
             "font-family:'SFMono-Regular','Menlo','Courier New',monospace; font-size:13px;"
         )
+        mdns_hint = QLabel(f"Device hostname: {DEVICE_MDNS}")
+        mdns_hint.setStyleSheet("color:#4b5563;")
         example_label = QLabel("Voorbeeld request")
         example_label.setStyleSheet("color:#6b7280; font-weight:600;")
         example = QPlainTextEdit()
         example.setReadOnly(True)
         example.setPlainText(
-            "curl -X POST http://aitje.local/api/v1/chat/completions \\\n"
-            '  -H "Authorization: Bearer YOUR_API_KEY" \\\n'
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -u "user:pass" \\\n'
             '  -H "Content-Type: application/json" \\\n'
             "  -d '{\n"
-            '    \"model\": \"aitje-local\",\n'
-            '    \"messages\": [{\"role\": \"user\", \"content\": \"Hallo?\"}]\n'
+            '    \"message\": \"Hoi vanaf mijn telefoon\"\n'
             "  }'\n"
         )
-        doc_layout.addWidget(doc_title)
         doc_layout.addWidget(endpoint_label)
         doc_layout.addWidget(endpoint_value)
+        doc_layout.addWidget(mdns_hint)
         doc_layout.addWidget(example_label)
         doc_layout.addWidget(example)
         layout.addWidget(self.keys_card)
@@ -360,3 +378,39 @@ class ApiPage(QWidget):
             self._reload()
         except Exception as exc:
             QMessageBox.critical(self, "Fout", str(exc))
+
+    def _show_url_hint(self):
+        curl_cmd = (
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -u "user:pass" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\"message\":\"Hoi vanaf mijn telefoon\"}'"
+        )
+        body = [
+            f"Basis-URL: {PUBLIC_BASE_URL}",
+            f"Endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
+            "",
+            "Gebruik dit voorbeeld vanaf de client:",
+        ]
+        self._show_styled_popup("API URL", body, curl_cmd)
+
+    def _show_styled_popup(self, title: str, lines: list[str], code_block: str):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setStyleSheet(MODAL_QSS)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        for line in lines:
+            label = QLabel(line)
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        code = QPlainTextEdit()
+        code.setReadOnly(True)
+        code.setPlainText(code_block)
+        code.setStyleSheet("font-family:'SFMono-Regular','Menlo','Courier New',monospace;")
+        layout.addWidget(code)
+        close_btn = QPushButton("Sluiten")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn, 0, Qt.AlignRight)
+        dialog.exec()

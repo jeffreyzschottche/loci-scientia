@@ -1,16 +1,20 @@
-from dataclasses import dataclass
-from typing import Literal, Optional, Union
+import logging
+from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
+import httpx
 
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .schemas import ChatRequest, Contact, Device
+from .settings import settings
 
+logger = logging.getLogger(__name__)
 
-@dataclass(frozen=True)
-class SearchCandidate:
-    kind: Literal["contact", "device"]
-    score: float
-    payload: Union[Contact, Device]
+MAX_CONTEXT_ITEMS = 3
+MIN_CONTEXT_SCORE = 0.35
+PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
+PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 
 
 contacts_repo = ContactsRepository()
@@ -52,43 +56,118 @@ def describe_device(device: Device) -> str:
     return "\n".join(line for line in lines if line)
 
 
-def _pick_best_candidate(
-    contact_hits: list[tuple[Contact, float]],
-    device_hits: list[tuple[Device, float]],
-) -> Optional[SearchCandidate]:
-    best: Optional[SearchCandidate] = None
-    for kind, hits in (
-        ("contact", contact_hits),
-        ("device", device_hits),
-    ):
-        for entity, score in hits:
-            candidate = SearchCandidate(kind=kind, score=score, payload=entity)
-            if best is None or candidate.score > best.score:
-                best = candidate
-    return best
+def _flatten_multiline(text: str) -> str:
+    return " ".join(line.strip() for line in text.splitlines() if line.strip())
 
 
-def handle_ask(req: ChatRequest) -> dict:
-    """Returneer de beste match op basis van contacten en devices."""
-
-    contact_hits = contacts_repo.search_contacts(req.prompt, limit=3)
+def _gather_context_lines(prompt_text: str) -> list[str]:
+    scored: list[tuple[str, str, float]] = []
+    contact_hits = contacts_repo.search_contacts(prompt_text, limit=5)
     if not contact_hits and hasattr(contacts_repo, "keyword_search_contacts"):
-        contact_hits = contacts_repo.keyword_search_contacts(req.prompt, limit=3)
-    device_hits = devices_repo.search_devices(req.prompt, limit=3)
-    best = _pick_best_candidate(contact_hits, device_hits)
-    if not best:
-        return {"message": "Geen relevante matches gevonden.", "matches": []}
+        contact_hits = contacts_repo.keyword_search_contacts(prompt_text, limit=5)
+    for contact, score in contact_hits:
+        scored.append(
+            (
+                "contact",
+                _flatten_multiline(describe_contact(contact)),
+                float(score or 0.0),
+            )
+        )
 
-    if best.kind == "contact":
-        description = describe_contact(best.payload)
-        kind_label = "contact"
-    else:
-        description = describe_device(best.payload)
-        kind_label = "apparaat"
+    device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    for device, score in device_hits:
+        scored.append(
+            (
+                "device",
+                _flatten_multiline(describe_device(device)),
+                float(score or 0.0),
+            )
+        )
 
-    return {
-        "message": f"Ik vond dit {kind_label}:\n{description}",
-        "kind": best.kind,
-        "score": best.score,
-        "matches": [best.payload.model_dump()],
+    if not scored:
+        return []
+
+    scored.sort(key=lambda item: item[2], reverse=True)
+    best_score = scored[0][2]
+    threshold = max(MIN_CONTEXT_SCORE, best_score * 0.7)
+    filtered = [item for item in scored if item[2] >= threshold]
+    limited = filtered[:MAX_CONTEXT_ITEMS]
+    lines: list[str] = []
+    for idx, (kind, desc, score) in enumerate(limited, 1):
+        lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
+    return lines
+
+
+@lru_cache(maxsize=1)
+def _prompt_template() -> str:
+    try:
+        return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return (
+            "Je bent de AITJE assistent. Gebruik context waar mogelijk, "
+            "maar verzin niets als er geen relevante context beschikbaar is. "
+            "Leg je antwoord duidelijk uit en antwoord in het Nederlands."
+        )
+
+
+def build_augmented_prompt(user_prompt: str) -> str:
+    base_lines = [f"User Prompt: {user_prompt.strip()}"]
+    context_lines = _gather_context_lines(user_prompt)
+    if context_lines:
+        base_lines.append("> context:")
+        base_lines.extend(context_lines)
+    template = _prompt_template()
+    if template:
+        base_lines.append("")
+        base_lines.append(template)
+    return "\n".join(base_lines).strip()
+
+
+def log_prompt(final_prompt: str) -> None:
+    try:
+        PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with PROMPT_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(f"[{datetime.utcnow().isoformat()}Z]\n{final_prompt}\n\n")
+    except OSError:
+        pass
+
+
+async def _call_ollama(prompt: str) -> str:
+    ollama_url = f"{settings.ollama_base_url}/api/generate"
+    payload = {
+        "model": settings.ollama_model,
+        "prompt": prompt,
+        "stream": False,
     }
+    async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
+        response = await client.post(ollama_url, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        return (data.get("response") or "").strip()
+
+
+def _fallback_response(original_prompt: str) -> str:
+    return (
+        "[Ollama niet beschikbaar - Mock response] "
+        f"Kon geen antwoord krijgen van Ollama op {settings.ollama_base_url} "
+        f"met model '{settings.ollama_model}'. Je vroeg: '{original_prompt}'. "
+        "Controleer of de Ollama-service draait en bereikbaar is."
+    )
+
+
+async def handle_ask(req: ChatRequest) -> dict:
+    final_prompt = build_augmented_prompt(req.prompt)
+    log_prompt(final_prompt)
+    try:
+        message = await _call_ollama(final_prompt)
+    except Exception as exc:  # pragma: no cover - netwerkfout
+        logger.warning(
+            "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
+            settings.ollama_base_url,
+            settings.ollama_model,
+            exc,
+        )
+        message = _fallback_response(req.prompt)
+    if not message:
+        message = "Ik kon geen antwoord genereren."
+    return {"message": message}

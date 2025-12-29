@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QPlainTextEdit,
     QScrollArea,
     QStyle,
     QToolButton,
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import (
 
 import requests
 
-from ..config import BACKEND_HTTP
+from ..config import BACKEND_HTTP, PUBLIC_BASE_URL
 from .dialog_style import MODAL_QSS
 
 
@@ -45,6 +46,18 @@ class DevicesPage(QWidget):
         title_block.addWidget(self.summary_label)
         header.addLayout(title_block)
         header.addStretch(1)
+        url_btn = QPushButton("Toon client URL")
+        url_btn.setStyleSheet(
+            "QPushButton {"
+            "  border:1px solid #d1d5db;"
+            "  border-radius:20px;"
+            "  padding:8px 20px;"
+            "}"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        url_btn.setFixedHeight(40)
+        url_btn.clicked.connect(self._show_client_hint)
+        header.addWidget(url_btn)
         add_btn = QPushButton("Apparaat toevoegen")
         add_btn.setStyleSheet(
             "QPushButton {"
@@ -164,6 +177,42 @@ class DevicesPage(QWidget):
 
     def _open_edit_dialog(self, device: dict) -> None:
         self._open_device_dialog(device)
+
+    def _show_client_hint(self) -> None:
+        curl_cmd = (
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -u "user:pass" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\"message\":\"Hoi vanaf mijn device\"}'"
+        )
+        lines = [
+            f"Verbind clients met: {PUBLIC_BASE_URL}",
+            f"Endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
+            "",
+            "Gebruik onderstaand voorbeeld:",
+        ]
+        self._show_styled_popup("Client URL", lines, curl_cmd)
+
+    def _show_styled_popup(self, title: str, lines: list[str], code_block: str) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setStyleSheet(MODAL_QSS)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        for line in lines:
+            label = QLabel(line)
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        code = QPlainTextEdit()
+        code.setReadOnly(True)
+        code.setPlainText(code_block)
+        code.setStyleSheet("font-family:'SFMono-Regular','Menlo','Courier New',monospace;")
+        layout.addWidget(code)
+        close_btn = QPushButton("Sluiten")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn, 0, Qt.AlignRight)
+        dialog.exec()
 
     def _open_device_dialog(self, device: Optional[dict] = None) -> None:
         is_edit = device is not None
