@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QPlainTextEdit,
     QScrollArea,
@@ -23,7 +22,12 @@ from PySide6.QtWidgets import (
 import requests
 
 from ..config import BACKEND_HTTP, PUBLIC_BASE_URL
-from .dialog_style import MODAL_QSS
+from .dialog_style import (
+    MODAL_QSS,
+    ask_yes_no_dialog,
+    show_error_dialog,
+    show_warning_dialog,
+)
 
 
 class DevicesPage(QWidget):
@@ -292,7 +296,7 @@ class DevicesPage(QWidget):
         password = password_edit.text()
         password2 = confirm_edit.text()
         if not user_name or not device_name:
-            QMessageBox.warning(
+            show_warning_dialog(
                 self,
                 "Ongeldig",
                 "Naam gebruiker en device naam zijn verplicht.",
@@ -300,7 +304,7 @@ class DevicesPage(QWidget):
             return
 
         if password != password2:
-            QMessageBox.warning(
+            show_warning_dialog(
                 self,
                 "Ongeldig",
                 "De wachtwoorden komen niet overeen.",
@@ -324,7 +328,7 @@ class DevicesPage(QWidget):
                 resp = requests.post(f"{BACKEND_HTTP}/devices", json=payload, timeout=5)
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Device kon niet worden opgeslagen:\n{exc}",
@@ -334,12 +338,12 @@ class DevicesPage(QWidget):
         self._reload_devices()
 
     def _confirm_delete(self, device: dict) -> None:
-        answer = QMessageBox.question(
+        answer = ask_yes_no_dialog(
             self,
             "Verwijderen",
             f"Weet je zeker dat je '{device.get('device_name')}' wilt verwijderen?",
         )
-        if answer != QMessageBox.Yes:
+        if not answer:
             return
 
         try:
@@ -348,7 +352,7 @@ class DevicesPage(QWidget):
             )
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Device kon niet worden verwijderd:\n{exc}",

@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -18,6 +17,11 @@ import requests
 
 from ..config import BACKEND_HTTP, BACKEND_TIMEOUT
 from .contact_form import ContactFormDialog
+from .dialog_style import (
+    ask_yes_no_dialog,
+    show_error_dialog,
+    show_info_dialog,
+)
 
 
 class ContactCard(QFrame):
@@ -241,7 +245,7 @@ class ContactsPage(QWidget):
         lat = contact.get("location_lat")
         lon = contact.get("location_lon")
         if lat is None or lon is None:
-            QMessageBox.information(
+            show_info_dialog(
                 self,
                 "Geen locatie",
                 "Dit contact heeft nog geen GPS-locatie.",
@@ -266,7 +270,7 @@ class ContactsPage(QWidget):
             resp.raise_for_status()
             contact = resp.json()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Contact kon niet worden opgeslagen:\n{exc}",
@@ -301,7 +305,7 @@ class ContactsPage(QWidget):
                 timeout=BACKEND_TIMEOUT,
             )
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Contact kon niet worden bijgewerkt:\n{exc}",
@@ -317,19 +321,19 @@ class ContactsPage(QWidget):
         contact_id = contact.get("id")
         if contact_id is None:
             return
-        confirm = QMessageBox.question(
+        confirm = ask_yes_no_dialog(
             self,
             "Bevestig",
             f"Weet je zeker dat je {contact.get('name')} wilt verwijderen?",
         )
-        if confirm != QMessageBox.Yes:
+        if not confirm:
             return
         try:
             requests.delete(
                 f"{BACKEND_HTTP}/contacts/{contact_id}", timeout=BACKEND_TIMEOUT
             )
         except Exception as exc:
-            QMessageBox.critical(self, "Fout", f"Kon contact niet verwijderen:\n{exc}")
+            show_error_dialog(self, "Fout", f"Kon contact niet verwijderen:\n{exc}")
             return
         self.reload_contacts()
         self.contacts_updated.emit(str(contact_id))
@@ -350,11 +354,11 @@ class ContactsPage(QWidget):
             return
         link_via_map = mode == "save_and_map"
         if not link_via_map:
-            choice = QMessageBox.question(
+            link_via_map = ask_yes_no_dialog(
                 self,
                 "Locatie toevoegen",
                 "Wil je via de kaart een locatie koppelen?",
+                default_to_no=False,
             )
-            link_via_map = choice == QMessageBox.Yes
         if link_via_map:
             self.add_location_requested.emit(contact, False)

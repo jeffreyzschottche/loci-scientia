@@ -7,14 +7,13 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QWidget,
     QVBoxLayout,
 )
 
-from .dialog_style import MODAL_QSS
+from .dialog_style import MODAL_QSS, show_warning_dialog
 
 class ContactFormDialog(QDialog):
     """Reusable contact form dialog that can prefill location data."""
@@ -155,7 +154,7 @@ class ContactFormDialog(QDialog):
 
     def accept(self) -> None:  # type: ignore[override]
         if not self.name_edit.text().strip():
-            QMessageBox.warning(self, "Ongeldig", "Naam is verplicht.")
+            show_warning_dialog(self, "Ongeldig", "Naam is verplicht.")
             return
         self._payload_cache = self.payload()
         super().accept()

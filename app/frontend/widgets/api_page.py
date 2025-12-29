@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QPlainTextEdit,
     QScrollArea,
@@ -25,7 +24,7 @@ from ..config import (
     DEVICE_MDNS,
     PUBLIC_BASE_URL,
 )
-from .dialog_style import MODAL_QSS
+from .dialog_style import MODAL_QSS, show_error_dialog
 
 API_BASE = BACKEND_HTTP
 
@@ -363,21 +362,21 @@ class ApiPage(QWidget):
                 requests.post(f"{API_BASE}/routes", json=dialog.payload(), timeout=3)
                 self._reload()
             except Exception as exc:
-                QMessageBox.critical(self, "Fout", str(exc))
+                show_error_dialog(self, "Fout", str(exc))
 
     def _edit_route(self, rid: str):
         try:
             requests.patch(f"{API_BASE}/routes/{rid}", json={"active": True}, timeout=3)
             self._reload()
         except Exception as exc:
-            QMessageBox.critical(self, "Fout", str(exc))
+            show_error_dialog(self, "Fout", str(exc))
 
     def _delete_route(self, rid: str):
         try:
             requests.delete(f"{API_BASE}/routes/{rid}", timeout=3)
             self._reload()
         except Exception as exc:
-            QMessageBox.critical(self, "Fout", str(exc))
+            show_error_dialog(self, "Fout", str(exc))
 
     def _show_url_hint(self):
         curl_cmd = (
