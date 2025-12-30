@@ -244,8 +244,31 @@ echo "===================="
 echo
 
 BACKEND_HOST="${BACKEND_HOST:-}"
+auto_backend_host=0
 if [ -z "$BACKEND_HOST" ] || [ "$BACKEND_HOST" = "127.0.0.1" ] || [ "$BACKEND_HOST" = "localhost" ]; then
     BACKEND_HOST="$DEVICE_MDNS"
+    auto_backend_host=1
+fi
+if [ "$auto_backend_host" -eq 1 ]; then
+    host_check_failed=0
+    if command -v python3 >/dev/null 2>&1; then
+        if ! CHECK_HOST="$BACKEND_HOST" python3 - <<'PY' >/dev/null 2>&1; then
+import os, socket, sys
+host = os.environ.get("CHECK_HOST", "")
+try:
+    socket.getaddrinfo(host, None)
+except OSError:
+    sys.exit(1)
+PY
+            host_check_failed=1
+        fi
+    elif ! getent hosts "$BACKEND_HOST" >/dev/null 2>&1; then
+        host_check_failed=1
+    fi
+    if [ "$host_check_failed" -eq 1 ]; then
+        echo "⚠️  Hostname ${BACKEND_HOST} niet bereikbaar, val terug op 127.0.0.1"
+        BACKEND_HOST="127.0.0.1"
+    fi
 fi
 BACKEND_BIND_HOST="${BACKEND_BIND_HOST:-0.0.0.0}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
