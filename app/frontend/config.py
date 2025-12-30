@@ -30,6 +30,12 @@ BACKEND_HTTP = os.environ.get("BACKEND_HTTP", _default_backend_http(BACKEND_HOST
 BACKEND_WS = os.environ.get("BACKEND_WS") or _http_to_ws(BACKEND_HTTP)
 BACKEND_TIMEOUT = int(os.environ.get("BACKEND_TIMEOUT", "6"))
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", _default_backend_http(DEVICE_MDNS, BACKEND_PORT)).rstrip("/")
+_ENV_BEARER_TOKEN = (
+    os.environ.get("AITJE_BEARER_TOKEN")
+    or os.environ.get("BACKEND_BEARER_TOKEN")
+    or ""
+)
+BACKEND_BEARER_TOKEN = _ENV_BEARER_TOKEN.strip()
 
 API_ROUTES_DEFAULT_PORT = int(os.environ.get("API_ROUTES_DEFAULT_PORT", str(BACKEND_PORT)))
 
