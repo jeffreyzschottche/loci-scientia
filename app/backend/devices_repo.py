@@ -4,7 +4,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    CollectionInfo,
+    Distance,
+    HnswConfigDiff,
+    PointStruct,
+    ScalarQuantization,
+    ScalarQuantizationConfig,
+    ScalarType,
+    VectorParams,
+)
 
 from .contacts_repo import _get_qdrant_client, QDRANT_LOCAL_DIR
 from .rag.embedder import embed_text
@@ -67,6 +76,21 @@ class DevicesRepository:
         client.recreate_collection(
             collection_name=self.collection,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            # HNSW index voor snellere similarity search
+            hnsw_config=HnswConfigDiff(
+                m=16,                # Aantal edges per node
+                ef_construct=100,    # Nauwkeurigheid bij index opbouw
+            ),
+            # Scalar quantization: float32 → int8 (75% minder geheugen)
+            quantization_config=ScalarQuantization(
+                scalar=ScalarQuantizationConfig(
+                    type=ScalarType.INT8,
+                    quantile=0.99,
+                    always_ram=True,
+                ),
+            ),
+            # Payloads op disk opslaan i.p.v. RAM
+            on_disk_payload=True,
         )
 
     def _rebuild_collection(self, client: QdrantClient, vector_size: int) -> None:
