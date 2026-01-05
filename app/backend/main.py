@@ -1,21 +1,20 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
-from functools import lru_cache
-from pathlib import Path
-
 import httpx
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .apiAsk import describe_contact, describe_device, handle_ask
+from .auth_tokens import BearerTokenStore, TokenRecord
+from .apiAsk import build_augmented_prompt, handle_ask, log_prompt
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .schemas import (
     ApiRouteCreate,
+    BearerTokenResponse,
     ChatRequest,
     Contact,
     ContactCreate,
@@ -23,6 +22,7 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    SignOnRequest,
 )
 from .settings import settings
 from .store import Store
@@ -48,88 +48,24 @@ if settings.offline_assets_dir and settings.offline_assets_dir.exists():
 store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
-
-MAX_CONTEXT_ITEMS = 3
-MIN_CONTEXT_SCORE = 0.35
-PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
-PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
+token_store = BearerTokenStore()
 
 
-def _flatten_multiline(text: str) -> str:
-    return " ".join(line.strip() for line in text.splitlines() if line.strip())
+def _extract_bearer_token(auth_header: Optional[str]) -> str:
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Bearer token vereist")
+    scheme, _, value = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        raise HTTPException(status_code=401, detail="Ongeldig Authorization-headerformaat")
+    return value.strip()
 
 
-def _gather_context_lines(prompt_text: str) -> list[str]:
-    scored: list[tuple[str, str, float]] = []
-    contact_hits = contacts_repo.search_contacts(prompt_text, limit=5)
-    if not contact_hits and hasattr(contacts_repo, "keyword_search_contacts"):
-        contact_hits = contacts_repo.keyword_search_contacts(prompt_text, limit=5)
-    for contact, score in contact_hits:
-        scored.append(
-            (
-                "contact",
-                _flatten_multiline(describe_contact(contact)),
-                float(score or 0.0),
-            )
-        )
-
-    device_hits = devices_repo.search_devices(prompt_text, limit=5)
-    for device, score in device_hits:
-        scored.append(
-            (
-                "device",
-                _flatten_multiline(describe_device(device)),
-                float(score or 0.0),
-            )
-        )
-
-    if not scored:
-        return []
-
-    scored.sort(key=lambda item: item[2], reverse=True)
-    best_score = scored[0][2]
-    threshold = max(MIN_CONTEXT_SCORE, best_score * 0.7)
-    filtered = [item for item in scored if item[2] >= threshold]
-    limited = filtered[:MAX_CONTEXT_ITEMS]
-    lines: list[str] = []
-    for idx, (kind, desc, score) in enumerate(limited, 1):
-        lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
-    return lines
-
-
-@lru_cache(maxsize=1)
-def _prompt_template() -> str:
-    try:
-        return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        return (
-            "Je bent de AITJE assistent. Gebruik context waar mogelijk, "
-            "maar verzin niets als er geen relevante context beschikbaar is. "
-            "Leg je antwoord duidelijk uit en antwoord in het Nederlands."
-        )
-
-
-def build_augmented_prompt(user_prompt: str) -> str:
-    base_lines = [f"User Prompt: {user_prompt.strip()}"]
-    context_lines = _gather_context_lines(user_prompt)
-    if context_lines:
-        base_lines.append("> context:")
-        base_lines.extend(context_lines)
-    template = _prompt_template()
-    if template:
-        base_lines.append("")
-        base_lines.append(template)
-    return "\n".join(base_lines).strip()
-
-
-def _log_prompt(final_prompt: str) -> None:
-    try:
-        PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with PROMPT_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(f"[{datetime.utcnow().isoformat()}Z]\n{final_prompt}\n\n")
-    except OSError:
-        # Logging failures should not break the request flow.
-        pass
+def require_token(authorization: Optional[str] = Header(default=None)) -> TokenRecord:
+    token_value = _extract_bearer_token(authorization)
+    record = token_store.validate(token_value)
+    if record is None:
+        raise HTTPException(status_code=401, detail="Bearer token ongeldig of verlopen")
+    return record
 
 
 @app.get("/health")
@@ -160,16 +96,27 @@ def delete_route(rid: str):
     return {"ok": True}
 
 
+@app.post("/api/v1/signon", response_model=BearerTokenResponse)
+def api_signon(req: SignOnRequest):
+    device = devices_repo.find_by_username(req.user_name)
+    if device is None or device.user_name != req.user_name:
+        raise HTTPException(status_code=401, detail="Account niet gevonden of geblokkeerd")
+    if device.password != req.password:
+        raise HTTPException(status_code=401, detail="Onjuiste gebruikersnaam of wachtwoord")
+    issued = token_store.issue_token(device.id, device.user_name)
+    return {"token": issued.token, "expires_at": issued.expires_at}
+
+
 @app.post("/api/v1/ask")
-async def api_ask(req: ChatRequest):
-    return handle_ask(req)
+async def api_ask(req: ChatRequest, _: TokenRecord = Depends(require_token)):
+    return await handle_ask(req)
 
 
 async def sse_stream_generator(req: ChatRequest):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
     final_prompt = build_augmented_prompt(req.prompt)
-    _log_prompt(final_prompt)
+    log_prompt(final_prompt)
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -249,7 +196,7 @@ async def sse_stream_generator(req: ChatRequest):
 
 
 @app.post("/api/v1/ask/stream")
-async def api_ask_stream(req: ChatRequest):
+async def api_ask_stream(req: ChatRequest, _: TokenRecord = Depends(require_token)):
     """Stream SSE response with queue position and token-by-token LLM output."""
     return StreamingResponse(
         sse_stream_generator(req),
@@ -328,6 +275,7 @@ def patch_device(device_id: str, patch: DevicePatch):
 def delete_device(device_id: str):
     try:
         devices_repo.delete_device(device_id)
+        token_store.revoke_for_device(device_id)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"status": "ok"}

@@ -11,6 +11,173 @@ if [ -f ".env" ]; then
     set +a
 fi
 
+DEVICE_NAME_PREFIX="${DEVICE_NAME_PREFIX:-aitje}"
+DEVICE_NUMBER="${DEVICE_NUMBER:-1}"
+if [ -n "${DEVICE_HOSTNAME:-}" ]; then
+    DEVICE_HOSTNAME="${DEVICE_HOSTNAME}"
+else
+    DEVICE_HOSTNAME="${DEVICE_NAME_PREFIX}-${DEVICE_NUMBER}"
+fi
+DEVICE_MDNS="${DEVICE_MDNS:-${DEVICE_HOSTNAME}.local}"
+ORIGINAL_HOSTNAME=""
+ORIGINAL_LOCAL_HOSTNAME=""
+ORIGINAL_COMPUTER_NAME=""
+SUDO_KEEPALIVE_PID=""
+HAVE_SUDO=0
+
+ensure_sudo_session() {
+    if ! command -v sudo >/dev/null 2>&1; then
+        return 1
+    fi
+    if sudo -n true 2>/dev/null; then
+        :
+    else
+        echo "🔐 sudo-toegang vereist voor hostname/mDNS-aanpassingen."
+        sudo -v || return 1
+    fi
+    if [ -z "${SUDO_KEEPALIVE_PID:-}" ]; then
+        (
+            while true; do
+                sleep 60
+                sudo -n true >/dev/null 2>&1 || exit
+            done
+        ) &
+        SUDO_KEEPALIVE_PID=$!
+    fi
+    HAVE_SUDO=1
+    return 0
+}
+
+detect_platform() {
+    local uname_s
+    uname_s="$(uname -s 2>/dev/null || echo unknown)"
+    case "$uname_s" in
+        Linux*)
+            if [ -f /etc/nv_tegra_release ]; then
+                DEVICE_PLATFORM="jetson"
+            else
+                DEVICE_PLATFORM="linux"
+            fi
+            ;;
+        Darwin*)
+            DEVICE_PLATFORM="macos"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            DEVICE_PLATFORM="windows"
+            ;;
+        *)
+            DEVICE_PLATFORM="unknown"
+            ;;
+    esac
+}
+
+ensure_mdns_support() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            if [ "$HAVE_SUDO" -ne 1 ]; then
+                echo "⚠️  Geen sudo, avahi-daemon wordt niet automatisch geïnstalleerd."
+                return
+            fi
+            if ! command -v apt-get >/dev/null 2>&1; then
+                echo "⚠️  apt-get niet beschikbaar, sla avahi-daemon installatie over."
+                return
+            fi
+            if dpkg -s avahi-daemon >/dev/null 2>&1; then
+                echo "✅ avahi-daemon is al geïnstalleerd"
+            else
+                echo "📦 avahi-daemon installeren..."
+                sudo apt-get update -y
+                sudo apt-get install -y avahi-daemon
+            fi
+            if command -v systemctl >/dev/null 2>&1; then
+                sudo systemctl enable avahi-daemon >/dev/null 2>&1 || true
+                sudo systemctl restart avahi-daemon >/dev/null 2>&1 || true
+            fi
+            ;;
+        macos)
+            echo "✅ macOS Bonjour is standaard beschikbaar voor mDNS."
+            ;;
+        windows)
+            echo "⚠️  Windows detectie: installeer Bonjour/MDNS responder handmatig (Apple Bonjour of dnssd)."
+            ;;
+        *)
+            echo "⚠️  Onbekend platform, sla mDNS setup over."
+            ;;
+    esac
+}
+
+configure_hostname() {
+    desired="${DEVICE_HOSTNAME}"
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            if [ "$HAVE_SUDO" -ne 1 ]; then
+                echo "⚠️  Geen sudo, hostname blijft ongewijzigd."
+                return
+            fi
+            if ! command -v hostnamectl >/dev/null 2>&1; then
+                echo "⚠️  hostnamectl niet beschikbaar, huidige hostname blijft ongewijzigd."
+                return
+            fi
+            current="$(hostnamectl --static 2>/dev/null || hostname)"
+            if [ "$current" != "$desired" ]; then
+                ORIGINAL_HOSTNAME="${ORIGINAL_HOSTNAME:-$current}"
+                echo "🔧 Hostname instellen op ${desired}"
+                sudo hostnamectl set-hostname "$desired"
+            else
+                echo "✅ Hostname staat al op ${desired}"
+            fi
+            ;;
+        macos)
+            if [ "$HAVE_SUDO" -ne 1 ]; then
+                echo "⚠️  Geen sudo, hostname blijft ongewijzigd."
+                return
+            fi
+            if ! command -v scutil >/dev/null 2>&1; then
+                echo "⚠️  scutil niet beschikbaar, hostname kan niet automatisch worden ingesteld."
+                return
+            fi
+            current="$(scutil --get HostName 2>/dev/null || hostname)"
+            if [ "$current" != "$desired" ]; then
+                ORIGINAL_HOSTNAME="${ORIGINAL_HOSTNAME:-$current}"
+                echo "🔧 macOS hostname instellen op ${desired}"
+                sudo scutil --set HostName "$desired"
+            else
+                echo "✅ Hostname staat al op ${desired}"
+            fi
+            local_current="$(scutil --get LocalHostName 2>/dev/null || echo "")"
+            if [ "$local_current" != "$desired" ]; then
+                ORIGINAL_LOCAL_HOSTNAME="${ORIGINAL_LOCAL_HOSTNAME:-$local_current}"
+                sudo scutil --set LocalHostName "$desired"
+            fi
+            computer_current="$(scutil --get ComputerName 2>/dev/null || echo "")"
+            if [ "$computer_current" != "$desired" ]; then
+                ORIGINAL_COMPUTER_NAME="${ORIGINAL_COMPUTER_NAME:-$computer_current}"
+                sudo scutil --set ComputerName "$desired"
+            else
+                echo "✅ Computernaam staat al op ${desired}"
+            fi
+            ;;
+        windows)
+            echo "⚠️  Windows: stel de computernaam handmatig in op '${desired}' (bijv. via PowerShell: Rename-Computer -NewName ${desired})."
+            ;;
+        *)
+            echo "⚠️  Onbekend platform, hostname blijft ongewijzigd."
+            ;;
+    esac
+}
+
+detect_platform
+echo "🖥  Gedetecteerd platform: ${DEVICE_PLATFORM}"
+export DEVICE_NAME_PREFIX DEVICE_NUMBER DEVICE_HOSTNAME DEVICE_MDNS DEVICE_PLATFORM
+
+case "$DEVICE_PLATFORM" in
+    linux|jetson|macos)
+        if ! ensure_sudo_session; then
+            echo "⚠️  Geen sudo-toegang beschikbaar; hostname/mDNS-aanpassingen worden overgeslagen."
+        fi
+        ;;
+esac
+
 install_ollama() {
     if ! command -v ollama >/dev/null 2>&1; then
         echo "📦 Ollama niet gevonden, proberen te installeren..."
@@ -60,6 +227,13 @@ start_ollama() {
     return 0
 }
 
+echo "=== Netwerk & mDNS setup ==="
+ensure_mdns_support
+configure_hostname
+echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
+echo "============================="
+echo
+
 echo "=== Ollama Setup ==="
 if install_ollama; then
     start_ollama || echo "⚠️  Kon Ollama niet starten, app draait zonder LLM support"
@@ -69,9 +243,38 @@ fi
 echo "===================="
 echo
 
-BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
+BACKEND_HOST="${BACKEND_HOST:-}"
+auto_backend_host=0
+if [ -z "$BACKEND_HOST" ] || [ "$BACKEND_HOST" = "127.0.0.1" ] || [ "$BACKEND_HOST" = "localhost" ]; then
+    BACKEND_HOST="$DEVICE_MDNS"
+    auto_backend_host=1
+fi
+if [ "$auto_backend_host" -eq 1 ]; then
+    host_check_failed=0
+    if command -v python3 >/dev/null 2>&1; then
+        if ! CHECK_HOST="$BACKEND_HOST" python3 - <<'PY' >/dev/null 2>&1; then
+import os, socket, sys
+host = os.environ.get("CHECK_HOST", "")
+try:
+    socket.getaddrinfo(host, None)
+except OSError:
+    sys.exit(1)
+PY
+            host_check_failed=1
+        fi
+    elif ! getent hosts "$BACKEND_HOST" >/dev/null 2>&1; then
+        host_check_failed=1
+    fi
+    if [ "$host_check_failed" -eq 1 ]; then
+        echo "⚠️  Hostname ${BACKEND_HOST} niet bereikbaar, val terug op 127.0.0.1"
+        BACKEND_HOST="127.0.0.1"
+    fi
+fi
+BACKEND_BIND_HOST="${BACKEND_BIND_HOST:-0.0.0.0}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
-BACKEND_HTTP="${BACKEND_HTTP:-http://$BACKEND_HOST:$BACKEND_PORT}"
+if [ -z "${BACKEND_HTTP:-}" ] || [[ "$BACKEND_HTTP" == http://127.0.0.1* ]] || [[ "$BACKEND_HTTP" == http://localhost* ]]; then
+    BACKEND_HTTP="http://$BACKEND_HOST:$BACKEND_PORT"
+fi
 if [ -z "${BACKEND_WS:-}" ]; then
     if [[ "$BACKEND_HTTP" == https://* ]]; then
         BACKEND_WS="wss://${BACKEND_HTTP#https://}"
@@ -81,7 +284,10 @@ if [ -z "${BACKEND_WS:-}" ]; then
         BACKEND_WS="ws://$BACKEND_HOST:$BACKEND_PORT/ws"
     fi
 fi
-export BACKEND_HOST BACKEND_PORT BACKEND_HTTP BACKEND_WS
+if [ -z "${PUBLIC_BASE_URL:-}" ] || [[ "$PUBLIC_BASE_URL" == http://127.0.0.1* ]] || [[ "$PUBLIC_BASE_URL" == http://localhost* ]]; then
+    PUBLIC_BASE_URL="http://$DEVICE_MDNS:$BACKEND_PORT"
+fi
+export BACKEND_HOST BACKEND_BIND_HOST BACKEND_PORT BACKEND_HTTP BACKEND_WS PUBLIC_BASE_URL
 
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
@@ -96,7 +302,7 @@ if [ ! -f ".venv/.requirements_installed" ]; then
     touch .venv/.requirements_installed
 fi
 
-BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_HOST" --port "$BACKEND_PORT")
+BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_BIND_HOST" --port "$BACKEND_PORT")
 backend_log="$PROJECT_ROOT/backend.log"
 
 if lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
@@ -178,6 +384,35 @@ cleanup() {
     if [ -n "${ollama_pid:-}" ]; then
         echo "🛑 Ollama stoppen..."
         kill "$ollama_pid" >/dev/null 2>&1 || true
+    fi
+
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            if [ -n "${ORIGINAL_HOSTNAME:-}" ]; then
+                echo "♻️  Hostname terugzetten naar ${ORIGINAL_HOSTNAME}"
+                sudo hostnamectl set-hostname "$ORIGINAL_HOSTNAME" >/dev/null 2>&1 || true
+            fi
+            ;;
+        macos)
+            if [ -n "${ORIGINAL_HOSTNAME:-}" ]; then
+                echo "♻️  macOS HostName terugzetten naar ${ORIGINAL_HOSTNAME}"
+                sudo scutil --set HostName "$ORIGINAL_HOSTNAME" >/dev/null 2>&1 || true
+            fi
+            if [ -n "${ORIGINAL_LOCAL_HOSTNAME:-}" ]; then
+                sudo scutil --set LocalHostName "$ORIGINAL_LOCAL_HOSTNAME" >/dev/null 2>&1 || true
+            fi
+            if [ -n "${ORIGINAL_COMPUTER_NAME:-}" ]; then
+                sudo scutil --set ComputerName "$ORIGINAL_COMPUTER_NAME" >/dev/null 2>&1 || true
+            fi
+            ;;
+    esac
+
+    if [ -n "${SUDO_KEEPALIVE_PID:-}" ]; then
+        kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
+        SUDO_KEEPALIVE_PID=""
+    fi
+    if [ "$HAVE_SUDO" -eq 1 ]; then
+        sudo -k >/dev/null 2>&1 || true
     fi
 }
 

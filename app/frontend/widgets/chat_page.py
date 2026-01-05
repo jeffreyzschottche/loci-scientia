@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import html
 import json
@@ -20,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_HTTP
+from ..config import BACKEND_HTTP, BACKEND_BEARER_TOKEN
 
 API_BASE = BACKEND_HTTP
 MAX_BUBBLE_WIDTH = 680
@@ -45,6 +47,8 @@ class ChatPage(QWidget):
         self.current_reply_label: QLabel | None = None
         self.queue_label: QLabel | None = None
         self.message_rows: list[QWidget] = []
+        self._bearer_token = BACKEND_BEARER_TOKEN or ""
+        self._auto_token_error: str | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -157,6 +161,19 @@ class ChatPage(QWidget):
             return
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
+            if status == 401:
+                # Probeer automatisch een token op te halen voor de lokale admin.
+                if self._refresh_auto_token():
+                    await asyncio.to_thread(self._stream_sse, prompt)
+                    return
+                message = (
+                    self._auto_token_error
+                    or "[fout] 401 Unauthorized: backend verwacht een Bearer token. "
+                    "Vraag een token op via /api/v1/signon en zet AITJE_BEARER_TOKEN in de omgeving."
+                )
+                self.signals.token.emit(message)
+                self.signals.done.emit()
+                return
             if status != 404:
                 self.signals.token.emit(f"[fout] {exc}")
                 self.signals.done.emit()
@@ -184,6 +201,7 @@ class ChatPage(QWidget):
             json={"prompt": prompt, "max_new_tokens": 128},
             stream=True,
             timeout=60,
+            headers=self._auth_headers(),
         ) as resp:
             resp.raise_for_status()
 
@@ -222,6 +240,7 @@ class ChatPage(QWidget):
         """Fallback naar het niet-streamende endpoint."""
 
         endpoints = ["/api/v1/ask"]
+        headers = self._auth_headers()
         last_error: Exception | None = None
         for suffix in endpoints:
             url = f"{API_BASE}{suffix}"
@@ -230,6 +249,7 @@ class ChatPage(QWidget):
                     url,
                     json={"prompt": prompt},
                     timeout=5,
+                    headers=headers,
                 )
             except Exception as exc:  # pragma: no cover - UI feedback only
                 last_error = exc
@@ -273,6 +293,78 @@ class ChatPage(QWidget):
         else:
             self.current_message += token
             self._set_label_text(self.current_reply_label, self.current_message)
+
+    def _auth_headers(self) -> dict[str, str] | None:
+        token = self._ensure_token()
+        if not token:
+            return None
+        return {"Authorization": f"Bearer {token}"}
+
+    def _ensure_token(self) -> str | None:
+        if self._bearer_token:
+            return self._bearer_token
+        if self._auto_token_error:
+            return None
+        self._bearer_token = self._fetch_auto_token() or ""
+        return self._bearer_token or None
+
+    def _refresh_auto_token(self) -> bool:
+        """Forceer opnieuw ophalen als we geen manueel token hebben."""
+        if BACKEND_BEARER_TOKEN:
+            return False  # Manueel token moet gebruiker fixen
+        self._bearer_token = ""
+        self._auto_token_error = None
+        token = self._fetch_auto_token()
+        if token:
+            self._bearer_token = token
+            return True
+        return False
+
+    def _fetch_auto_token(self) -> str | None:
+        """Vraag automatisch een token op via het eerste apparaat in /devices."""
+        if BACKEND_BEARER_TOKEN:
+            return BACKEND_BEARER_TOKEN
+        self._auto_token_error = None
+        try:
+            resp = requests.get(f"{API_BASE}/devices", timeout=5)
+            resp.raise_for_status()
+            devices = resp.json() or []
+        except Exception as exc:
+            self._auto_token_error = (
+                f"[fout] Kon geen apparaatlijst ophalen voor automatische login: {exc}"
+            )
+            return None
+        if not devices:
+            self._auto_token_error = "[fout] Geen apparaten gevonden voor auto-login."
+            return None
+        primary = devices[0]
+        payload = {
+            "user_name": primary.get("user_name", ""),
+            "password": primary.get("password", ""),
+        }
+        if not payload["user_name"] or not payload["password"]:
+            self._auto_token_error = (
+                "[fout] Onvolledige apparaatgegevens voor auto-login."
+            )
+            return None
+        try:
+            resp = requests.post(
+                f"{API_BASE}/api/v1/signon",
+                json=payload,
+                timeout=5,
+            )
+            resp.raise_for_status()
+            data = resp.json() or {}
+            token = data.get("token")
+            if not token:
+                self._auto_token_error = "[fout] Sign-on gaf geen token terug."
+                return None
+            return token
+        except Exception as exc:
+            self._auto_token_error = (
+                f"[fout] Automatisch token ophalen mislukt: {exc}"
+            )
+            return None
 
     @Slot()
     def _on_done(self):

@@ -13,11 +13,29 @@ def _http_to_ws(url: str) -> str:
     return url
 
 
-BACKEND_HOST = os.environ.get("BACKEND_HOST", "127.0.0.1")
+DEVICE_NAME_PREFIX = os.environ.get("DEVICE_NAME_PREFIX", "aitje").strip() or "aitje"
+DEVICE_NUMBER = os.environ.get("DEVICE_NUMBER", "1").strip() or "1"
+DEVICE_HOSTNAME = os.environ.get("DEVICE_HOSTNAME")
+if not DEVICE_HOSTNAME:
+    DEVICE_HOSTNAME = f"{DEVICE_NAME_PREFIX}-{DEVICE_NUMBER}".strip("-")
+DEVICE_MDNS = os.environ.get("DEVICE_MDNS") or f"{DEVICE_HOSTNAME}.local"
+
+_ENV_BACKEND_HOST = os.environ.get("BACKEND_HOST")
+if _ENV_BACKEND_HOST and _ENV_BACKEND_HOST not in {"0.0.0.0", "127.0.0.1"}:
+    BACKEND_HOST = _ENV_BACKEND_HOST
+else:
+    BACKEND_HOST = DEVICE_MDNS
 BACKEND_PORT = int(os.environ.get("BACKEND_PORT", "8000"))
 BACKEND_HTTP = os.environ.get("BACKEND_HTTP", _default_backend_http(BACKEND_HOST, BACKEND_PORT)).rstrip("/")
 BACKEND_WS = os.environ.get("BACKEND_WS") or _http_to_ws(BACKEND_HTTP)
 BACKEND_TIMEOUT = int(os.environ.get("BACKEND_TIMEOUT", "6"))
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", _default_backend_http(DEVICE_MDNS, BACKEND_PORT)).rstrip("/")
+_ENV_BEARER_TOKEN = (
+    os.environ.get("AITJE_BEARER_TOKEN")
+    or os.environ.get("BACKEND_BEARER_TOKEN")
+    or ""
+)
+BACKEND_BEARER_TOKEN = _ENV_BEARER_TOKEN.strip()
 
 API_ROUTES_DEFAULT_PORT = int(os.environ.get("API_ROUTES_DEFAULT_PORT", str(BACKEND_PORT)))
 

@@ -127,6 +127,35 @@ class DevicesRepository:
                 continue
         return devices
 
+    def find_by_username(self, user_name: str) -> Optional[Device]:
+        user_name = user_name or ""
+        if not user_name:
+            return None
+        for device in self.list_devices():
+            if device.user_name == user_name:
+                return device
+        return None
+
+    def get_device(self, device_id: str) -> Optional[Device]:
+        with self._client_context() as client:
+            try:
+                existing = client.retrieve(
+                    collection_name=self.collection,
+                    ids=[device_id],
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except Exception:
+                return None
+        if not existing:
+            return None
+        payload = dict(existing[0].payload or {})
+        payload.setdefault("id", device_id)
+        try:
+            return self._device_from_payload(payload)
+        except KeyError:
+            return None
+
     def create_device(self, data: DeviceCreate) -> Device:
         did = uuid.uuid4().hex
         payload = {

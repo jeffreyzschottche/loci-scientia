@@ -10,8 +10,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
+    QPlainTextEdit,
     QScrollArea,
     QStyle,
     QToolButton,
@@ -21,8 +21,13 @@ from PySide6.QtWidgets import (
 
 import requests
 
-from ..config import BACKEND_HTTP
-from .dialog_style import MODAL_QSS
+from ..config import BACKEND_HTTP, PUBLIC_BASE_URL
+from .dialog_style import (
+    MODAL_QSS,
+    ask_yes_no_dialog,
+    show_error_dialog,
+    show_warning_dialog,
+)
 
 
 class DevicesPage(QWidget):
@@ -45,6 +50,18 @@ class DevicesPage(QWidget):
         title_block.addWidget(self.summary_label)
         header.addLayout(title_block)
         header.addStretch(1)
+        url_btn = QPushButton("Toon client URL")
+        url_btn.setStyleSheet(
+            "QPushButton {"
+            "  border:1px solid #d1d5db;"
+            "  border-radius:20px;"
+            "  padding:8px 20px;"
+            "}"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        url_btn.setFixedHeight(40)
+        url_btn.clicked.connect(self._show_client_hint)
+        header.addWidget(url_btn)
         add_btn = QPushButton("Apparaat toevoegen")
         add_btn.setStyleSheet(
             "QPushButton {"
@@ -165,6 +182,48 @@ class DevicesPage(QWidget):
     def _open_edit_dialog(self, device: dict) -> None:
         self._open_device_dialog(device)
 
+    def _show_client_hint(self) -> None:
+        curl_cmd = (
+            f"# Bearer token ophalen\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/signon \\\n"
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\"user_name\":\"<naam>\",\"password\":\"<wachtwoord>\"}'\n\n"
+            "# Vraag sturen met token\n"
+            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
+            '  -H "Authorization: Bearer <token>" \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            "  -d '{\"prompt\":\"Hoi vanaf mijn device\"}'"
+        )
+        lines = [
+            f"Verbind clients met: {PUBLIC_BASE_URL}",
+            f"Sign-on endpoint: {PUBLIC_BASE_URL}/api/v1/signon",
+            f"Ask endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
+            "",
+            "Gebruik onderstaand voorbeeld:",
+        ]
+        self._show_styled_popup("Client URL", lines, curl_cmd)
+
+    def _show_styled_popup(self, title: str, lines: list[str], code_block: str) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setStyleSheet(MODAL_QSS)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        for line in lines:
+            label = QLabel(line)
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        code = QPlainTextEdit()
+        code.setReadOnly(True)
+        code.setPlainText(code_block)
+        code.setStyleSheet("font-family:'SFMono-Regular','Menlo','Courier New',monospace;")
+        layout.addWidget(code)
+        close_btn = QPushButton("Sluiten")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn, 0, Qt.AlignRight)
+        dialog.exec()
+
     def _open_device_dialog(self, device: Optional[dict] = None) -> None:
         is_edit = device is not None
         dialog = QDialog(self)
@@ -243,7 +302,7 @@ class DevicesPage(QWidget):
         password = password_edit.text()
         password2 = confirm_edit.text()
         if not user_name or not device_name:
-            QMessageBox.warning(
+            show_warning_dialog(
                 self,
                 "Ongeldig",
                 "Naam gebruiker en device naam zijn verplicht.",
@@ -251,7 +310,7 @@ class DevicesPage(QWidget):
             return
 
         if password != password2:
-            QMessageBox.warning(
+            show_warning_dialog(
                 self,
                 "Ongeldig",
                 "De wachtwoorden komen niet overeen.",
@@ -275,7 +334,7 @@ class DevicesPage(QWidget):
                 resp = requests.post(f"{BACKEND_HTTP}/devices", json=payload, timeout=5)
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Device kon niet worden opgeslagen:\n{exc}",
@@ -285,12 +344,12 @@ class DevicesPage(QWidget):
         self._reload_devices()
 
     def _confirm_delete(self, device: dict) -> None:
-        answer = QMessageBox.question(
+        answer = ask_yes_no_dialog(
             self,
             "Verwijderen",
             f"Weet je zeker dat je '{device.get('device_name')}' wilt verwijderen?",
         )
-        if answer != QMessageBox.Yes:
+        if not answer:
             return
 
         try:
@@ -299,7 +358,7 @@ class DevicesPage(QWidget):
             )
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Device kon niet worden verwijderd:\n{exc}",
