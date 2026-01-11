@@ -22,6 +22,8 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    OllamaModelState,
+    OllamaModelSwitch,
     SignOnRequest,
 )
 from .settings import settings
@@ -60,6 +62,32 @@ def _extract_bearer_token(auth_header: Optional[str]) -> str:
     return value.strip()
 
 
+def _ollama_model_payload() -> dict:
+    return {
+        "current_model": settings.ollama_model,
+        "available_models": settings.ollama_models,
+    }
+
+
+async def _pull_ollama_model(model: str) -> None:
+    ollama_url = f"{settings.ollama_base_url}/api/pull"
+    payload = {"name": model}
+    async with httpx.AsyncClient(timeout=None) as client:
+        async with client.stream("POST", ollama_url, json=payload) as response:
+            if response.status_code >= 400:
+                error_body = await response.aread()
+                logger.warning(
+                    "Ollama gaf status %s voor pull van model '%s' via %s: %s",
+                    response.status_code,
+                    model,
+                    ollama_url,
+                    error_body.decode("utf-8", errors="replace").strip(),
+                )
+                response.raise_for_status()
+            async for _ in response.aiter_lines():
+                pass
+
+
 def require_token(authorization: Optional[str] = Header(default=None)) -> TokenRecord:
     token_value = _extract_bearer_token(authorization)
     record = token_store.validate(token_value)
@@ -71,6 +99,26 @@ def require_token(authorization: Optional[str] = Header(default=None)) -> TokenR
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/ollama/models", response_model=OllamaModelState)
+def list_ollama_models():
+    return _ollama_model_payload()
+
+
+@app.post("/api/v1/ollama/model", response_model=OllamaModelState)
+async def switch_ollama_model(payload: OllamaModelSwitch):
+    model = payload.model.strip()
+    if model not in settings.ollama_models:
+        raise HTTPException(status_code=400, detail="Onbekend Ollama model")
+    if model != settings.ollama_model:
+        try:
+            await _pull_ollama_model(model)
+        except httpx.HTTPError as exc:
+            logger.warning("Kon Ollama model '%s' niet ophalen: %s", model, exc)
+            raise HTTPException(status_code=502, detail="Kon Ollama model niet ophalen") from exc
+        settings.ollama_model = model
+    return _ollama_model_payload()
 
 
 @app.get("/routes")
