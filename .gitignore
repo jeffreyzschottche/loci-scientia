@@ -7,6 +7,7 @@ app/maps/europe.pmtilesx
 app/maps/europe.pmtilesb
 app/maps/europe.pmtilesp
 fastembed_models/
+fileslociscientiamaps/
 
 .env
 .env.*
