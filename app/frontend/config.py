@@ -13,6 +13,14 @@ def _http_to_ws(url: str) -> str:
     return url
 
 
+def _parse_ollama_models(value: str | None) -> list[str]:
+    default_models = ["gemma2:2b", "gemma3:1b", "gemma3:4b"]
+    if not value:
+        return default_models
+    models = [item.strip() for item in value.split(",") if item.strip()]
+    return models or default_models
+
+
 DEVICE_NAME_PREFIX = os.environ.get("DEVICE_NAME_PREFIX", "aitje").strip() or "aitje"
 DEVICE_NUMBER = os.environ.get("DEVICE_NUMBER", "1").strip() or "1"
 DEVICE_HOSTNAME = os.environ.get("DEVICE_HOSTNAME")
@@ -51,3 +59,5 @@ PMTILES_STATUS_HINT = os.environ.get(
     "PMTILES_STATUS_HINT",
     f"Kaartdata kon niet geladen worden. Controleer of de pmtiles-server draait op {PMTILES_HOST}:{PMTILES_PORT} en dat {PMTILES_TILESET}.pmtiles beschikbaar is.",
 )
+
+OLLAMA_MODELS = _parse_ollama_models(os.environ.get("OLLAMA_MODELS"))

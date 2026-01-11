@@ -22,6 +22,8 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    OllamaModelInfo,
+    OllamaModelUpdate,
     SignOnRequest,
 )
 from .settings import settings
@@ -68,6 +70,27 @@ def require_token(authorization: Optional[str] = Header(default=None)) -> TokenR
     return record
 
 
+def _pull_ollama_model(model: str) -> None:
+    ollama_url = f"{settings.ollama_base_url}/api/pull"
+    payload = {"name": model, "stream": False}
+    try:
+        with httpx.Client(timeout=settings.ollama_timeout) as client:
+            response = client.post(ollama_url, json=payload)
+            if response.status_code >= 400:
+                logger.warning(
+                    "Ollama pull faalde voor model '%s' via %s: %s",
+                    model,
+                    ollama_url,
+                    response.text.strip(),
+                )
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Ollama model kon niet worden opgehaald: {exc}",
+        ) from exc
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -110,6 +133,30 @@ def api_signon(req: SignOnRequest):
 @app.post("/api/v1/ask")
 async def api_ask(req: ChatRequest, _: TokenRecord = Depends(require_token)):
     return await handle_ask(req)
+
+
+@app.get("/api/v1/ollama/models", response_model=OllamaModelInfo)
+def list_ollama_models() -> dict:
+    return {
+        "current_model": settings.ollama_model,
+        "models": settings.ollama_models,
+    }
+
+
+@app.post("/api/v1/ollama/model", response_model=OllamaModelInfo)
+def set_ollama_model(payload: OllamaModelUpdate) -> dict:
+    model = payload.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="Modelnaam ontbreekt")
+    if model not in settings.ollama_models:
+        raise HTTPException(status_code=400, detail="Model niet toegestaan")
+    if model != settings.ollama_model:
+        _pull_ollama_model(model)
+        settings.ollama_model = model
+    return {
+        "current_model": settings.ollama_model,
+        "models": settings.ollama_models,
+    }
 
 
 async def sse_stream_generator(req: ChatRequest):

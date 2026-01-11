@@ -6,12 +6,16 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QProgressDialog,
     QPushButton,
     QSlider,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
+import requests
+
+from ..config import BACKEND_HTTP, BACKEND_TIMEOUT, OLLAMA_MODELS
 
 
 class SettingsPage(QWidget):
@@ -21,15 +25,29 @@ class SettingsPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
 
-        tabs = QTabWidget()
-        tabs.setObjectName("SettingsTabs")
-        tabs.addTab(self._appearance_tab(), "Uiterlijk")
-        tabs.addTab(self._system_tab(), "Systeem")
-        tabs.addTab(self._network_tab(), "Netwerk")
-        tabs.addTab(self._security_tab(), "Beveiliging")
-        tabs.addTab(self._advanced_tab(), "Geavanceerd")
-        tabs.tabBar().setObjectName("SettingsTabsBar")
-        layout.addWidget(tabs, 1)
+        self._tabs = QTabWidget()
+        self._tabs.setObjectName("SettingsTabs")
+        self._tabs.addTab(self._appearance_tab(), "Uiterlijk")
+        self._tabs.addTab(self._system_tab(), "Systeem")
+        self._tabs.addTab(self._network_tab(), "Netwerk")
+        self._tabs.addTab(self._security_tab(), "Beveiliging")
+        self._tabs.addTab(self._advanced_tab(), "Geavanceerd")
+        self._tabs.tabBar().setObjectName("SettingsTabsBar")
+        layout.addWidget(self._tabs, 1)
+
+        self._ollama_progress = QProgressDialog(
+            "Ollama model wordt geladen...",
+            None,
+            0,
+            0,
+            self,
+        )
+        self._ollama_progress.setWindowModality(Qt.WindowModal)
+        self._ollama_progress.setCancelButton(None)
+        self._ollama_progress.setAutoClose(False)
+        self._ollama_progress.setAutoReset(False)
+        self._ollama_progress.close()
+        self._load_ollama_models()
 
     def _appearance_tab(self) -> QWidget:
         tab = QWidget()
@@ -104,6 +122,27 @@ class SettingsPage(QWidget):
     def _advanced_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        model_card = self._settings_card("Ollama model")
+        model_layout = QVBoxLayout(model_card)
+        model_layout.setSpacing(12)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Model"))
+        self._ollama_combo = QComboBox()
+        self._ollama_combo.addItems(OLLAMA_MODELS)
+        row.addWidget(self._ollama_combo, 1)
+        self._ollama_apply_button = QPushButton("Switch")
+        self._ollama_apply_button.clicked.connect(self._apply_ollama_model)
+        row.addWidget(self._ollama_apply_button)
+        model_layout.addLayout(row)
+
+        status_row = QHBoxLayout()
+        self._ollama_status = QLabel("Huidig model: onbekend")
+        status_row.addWidget(self._ollama_status, 1)
+        status_row.addStretch()
+        model_layout.addLayout(status_row)
+
+        layout.addWidget(model_card)
         card = self._settings_card("Geavanceerde opties")
         vbox = QVBoxLayout(card)
         flush = QPushButton("Cache legen")
@@ -120,6 +159,67 @@ class SettingsPage(QWidget):
         vbox.addWidget(flush)
         layout.addWidget(card)
         return tab
+
+    def _set_ollama_busy(self, busy: bool, message: str | None = None) -> None:
+        if message:
+            self._ollama_progress.setLabelText(message)
+        if busy:
+            self._ollama_progress.show()
+        else:
+            self._ollama_progress.hide()
+        self._ollama_apply_button.setEnabled(not busy)
+        self._ollama_combo.setEnabled(not busy)
+        self._tabs.tabBar().setEnabled(not busy)
+
+    def _populate_ollama_models(self, models: list[str], current_model: str | None) -> None:
+        self._ollama_combo.blockSignals(True)
+        self._ollama_combo.clear()
+        self._ollama_combo.addItems(models)
+        if current_model and current_model in models:
+            self._ollama_combo.setCurrentText(current_model)
+        self._ollama_combo.blockSignals(False)
+
+    def _load_ollama_models(self) -> None:
+        self._set_ollama_busy(True, "Ollama modellen ophalen...")
+        try:
+            resp = requests.get(
+                f"{BACKEND_HTTP}/api/v1/ollama/models",
+                timeout=BACKEND_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            models = data.get("models") or OLLAMA_MODELS
+            current = data.get("current_model") or (models[0] if models else "")
+            self._populate_ollama_models(models, current)
+            self._ollama_status.setText(f"Huidig model: {current or 'onbekend'}")
+        except requests.RequestException as exc:  # pragma: no cover - UI feedback only
+            self._populate_ollama_models(OLLAMA_MODELS, None)
+            self._ollama_status.setText(f"Kon Ollama-modellen niet laden: {exc}")
+        finally:
+            self._set_ollama_busy(False)
+
+    def _apply_ollama_model(self) -> None:
+        model = self._ollama_combo.currentText().strip()
+        if not model:
+            return
+        self._set_ollama_busy(True, f"Ollama model '{model}' wordt opgehaald...")
+        timeout = max(BACKEND_TIMEOUT, 90)
+        try:
+            resp = requests.post(
+                f"{BACKEND_HTTP}/api/v1/ollama/model",
+                json={"model": model},
+                timeout=timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            models = data.get("models") or OLLAMA_MODELS
+            current = data.get("current_model") or model
+            self._populate_ollama_models(models, current)
+            self._ollama_status.setText(f"Huidig model: {current}")
+        except requests.RequestException as exc:  # pragma: no cover - UI feedback only
+            self._ollama_status.setText(f"Kon model niet wisselen: {exc}")
+        finally:
+            self._set_ollama_busy(False)
 
     @staticmethod
     def _settings_card(title: str) -> QFrame:
