@@ -1,6 +1,9 @@
 import asyncio
 import json
 import logging
+import os
+from pathlib import Path
+
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from typing import Optional
@@ -29,6 +32,12 @@ from .settings import settings
 from .store import Store
 
 logger = logging.getLogger(__name__)
+ENV_FILE_PATH = Path(
+    os.environ.get(
+        "AITJE_ENV_PATH",
+        Path(__file__).resolve().parents[2] / ".env",
+    )
+).expanduser().resolve()
 
 app = FastAPI(title="AITJE Backend")
 app.add_middleware(
@@ -114,6 +123,32 @@ async def _stream_ollama_pull(model: str):
         raise HTTPException(status_code=502, detail=f"Ollama pull faalde: {exc}") from exc
 
 
+def _persist_ollama_model(model: str) -> None:
+    if not ENV_FILE_PATH.exists():
+        raise HTTPException(status_code=500, detail=f".env niet gevonden: {ENV_FILE_PATH}")
+    try:
+        content = ENV_FILE_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f".env lezen faalde: {exc}") from exc
+
+    lines = content.splitlines(keepends=True)
+    updated = False
+    for idx, line in enumerate(lines):
+        if line.startswith("OLLAMA_MODEL="):
+            lines[idx] = f"OLLAMA_MODEL={model}\n"
+            updated = True
+            break
+    if not updated:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] = lines[-1] + "\n"
+        lines.append(f"OLLAMA_MODEL={model}\n")
+
+    try:
+        ENV_FILE_PATH.write_text("".join(lines), encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f".env schrijven faalde: {exc}") from exc
+
+
 @app.get("/routes")
 def list_routes():
     return [route.model_dump() for route in store.list()]
@@ -135,6 +170,7 @@ async def set_ollama_model(req: OllamaModelRequest):
     async with ollama_switch_lock:
         if model != settings.ollama_model:
             await _pull_ollama_model(model)
+            _persist_ollama_model(model)
             settings.ollama_model = model
 
     return {"current": settings.ollama_model}
@@ -178,6 +214,12 @@ async def set_ollama_model_stream(req: OllamaModelRequest):
                 yield f"data: {payload}\n\n"
                 return
 
+            try:
+                _persist_ollama_model(model)
+            except HTTPException as exc:
+                payload = json.dumps({"error": exc.detail, "done": True})
+                yield f"data: {payload}\n\n"
+                return
             settings.ollama_model = model
             payload = json.dumps(
                 {"progress": 100, "status": "Model actief", "done": True, "current": model}
