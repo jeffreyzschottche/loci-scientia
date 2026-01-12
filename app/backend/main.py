@@ -22,6 +22,7 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    OllamaModelRequest,
     SignOnRequest,
 )
 from .settings import settings
@@ -49,6 +50,7 @@ store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
+ollama_switch_lock = asyncio.Lock()
 
 
 def _extract_bearer_token(auth_header: Optional[str]) -> str:
@@ -73,9 +75,62 @@ def health():
     return {"status": "ok"}
 
 
+async def _pull_ollama_model(model: str) -> None:
+    ollama_url = f"{settings.ollama_base_url}/api/pull"
+    payload = {"name": model}
+
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream("POST", ollama_url, json=payload) as response:
+                if response.status_code >= 400:
+                    error_body = await response.aread()
+                    raise HTTPException(
+                        status_code=502,
+                        detail=(
+                            f"Ollama pull faalde ({response.status_code}): "
+                            f"{error_body.decode('utf-8', errors='replace').strip()}"
+                        ),
+                    )
+
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if data.get("status") == "success":
+                        return
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Ollama pull faalde: {exc}") from exc
+
+    raise HTTPException(status_code=502, detail="Ollama pull beeindigd zonder succes-status")
+
+
 @app.get("/routes")
 def list_routes():
     return [route.model_dump() for route in store.list()]
+
+
+@app.get("/api/v1/ollama/models")
+def list_ollama_models():
+    return {"current": settings.ollama_model, "available": settings.ollama_models}
+
+
+@app.post("/api/v1/ollama/model")
+async def set_ollama_model(req: OllamaModelRequest):
+    model = req.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model ontbreekt")
+    if model not in settings.ollama_models:
+        raise HTTPException(status_code=400, detail="model niet toegestaan")
+
+    async with ollama_switch_lock:
+        if model != settings.ollama_model:
+            await _pull_ollama_model(model)
+            settings.ollama_model = model
+
+    return {"current": settings.ollama_model}
 
 
 @app.post("/routes")
