@@ -76,6 +76,16 @@ def health():
 
 
 async def _pull_ollama_model(model: str) -> None:
+    success = False
+    async for data in _stream_ollama_pull(model):
+        if data.get("status") == "success":
+            success = True
+            break
+    if not success:
+        raise HTTPException(status_code=502, detail="Ollama pull beeindigd zonder succes-status")
+
+
+async def _stream_ollama_pull(model: str):
     ollama_url = f"{settings.ollama_base_url}/api/pull"
     payload = {"name": model}
 
@@ -99,12 +109,9 @@ async def _pull_ollama_model(model: str) -> None:
                         data = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    if data.get("status") == "success":
-                        return
+                    yield data
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Ollama pull faalde: {exc}") from exc
-
-    raise HTTPException(status_code=502, detail="Ollama pull beeindigd zonder succes-status")
 
 
 @app.get("/routes")
@@ -131,6 +138,60 @@ async def set_ollama_model(req: OllamaModelRequest):
             settings.ollama_model = model
 
     return {"current": settings.ollama_model}
+
+
+@app.post("/api/v1/ollama/model/stream")
+async def set_ollama_model_stream(req: OllamaModelRequest):
+    model = req.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model ontbreekt")
+    if model not in settings.ollama_models:
+        raise HTTPException(status_code=400, detail="model niet toegestaan")
+
+    async def event_stream():
+        async with ollama_switch_lock:
+            if model == settings.ollama_model:
+                payload = json.dumps(
+                    {"progress": 100, "status": "Model is al actief", "done": True, "current": model}
+                )
+                yield f"data: {payload}\n\n"
+                return
+
+            progress = 0
+            status = "Pull starten..."
+            payload = json.dumps({"progress": progress, "status": status})
+            yield f"data: {payload}\n\n"
+
+            try:
+                async for data in _stream_ollama_pull(model):
+                    status = data.get("status") or status
+                    completed = data.get("completed")
+                    total = data.get("total")
+                    if isinstance(completed, (int, float)) and isinstance(total, (int, float)) and total:
+                        progress = min(100, int(completed * 100 / total))
+                    payload = json.dumps({"progress": progress, "status": status})
+                    yield f"data: {payload}\n\n"
+                    if data.get("status") == "success":
+                        break
+            except HTTPException as exc:
+                payload = json.dumps({"error": exc.detail, "done": True})
+                yield f"data: {payload}\n\n"
+                return
+
+            settings.ollama_model = model
+            payload = json.dumps(
+                {"progress": 100, "status": "Model actief", "done": True, "current": model}
+            )
+            yield f"data: {payload}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.post("/routes")

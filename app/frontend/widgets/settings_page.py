@@ -1,7 +1,8 @@
 import asyncio
+import json
 
 import requests
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,6 +28,9 @@ class SettingsPage(QWidget):
         self._ollama_status: QLabel | None = None
         self._current_model: str | None = None
         self._busy_dialog: QProgressDialog | None = None
+        self._model_signals = ModelSwitchSignals()
+        self._model_signals.progress.connect(self._on_model_progress)
+        self._model_signals.done.connect(self._on_model_done)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
@@ -234,42 +238,87 @@ class SettingsPage(QWidget):
 
     async def _apply_model_async(self, model: str) -> None:
         try:
-            response = await asyncio.to_thread(
-                requests.post,
-                f"{BACKEND_HTTP}/api/v1/ollama/model",
-                json={"model": model},
-                timeout=600,
-                headers=self._auth_headers(),
-            )
-            response.raise_for_status()
-            payload = response.json()
+            await asyncio.to_thread(self._stream_model_switch, model)
         except Exception as exc:
             self._hide_busy()
             self._ollama_status.setText(f"Switchen mislukt: {exc}")
             return
 
-        self._hide_busy()
-        self._current_model = payload.get("current", model)
-        if self._current_model:
-            self._ollama_status.setText(f"Huidig model: {self._current_model}")
-            self._ollama_combo.setCurrentText(self._current_model)
+    def _stream_model_switch(self, model: str) -> None:
+        url = f"{BACKEND_HTTP}/api/v1/ollama/model/stream"
+        with requests.post(
+            url,
+            json={"model": model},
+            stream=True,
+            timeout=600,
+            headers=self._auth_headers(),
+        ) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                decoded = line.decode("utf-8")
+                if not decoded.startswith("data: "):
+                    continue
+                payload = decoded[6:]
+                try:
+                    event_data = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+
+                status = event_data.get("status")
+                progress = event_data.get("progress")
+                if isinstance(progress, int):
+                    self._model_signals.progress.emit(progress, status or "")
+                elif status:
+                    self._model_signals.progress.emit(-1, status)
+
+                if event_data.get("done"):
+                    current = event_data.get("current") or ""
+                    error = event_data.get("error") or ""
+                    self._model_signals.done.emit(current, error)
+                    return
 
     def _show_busy(self, message: str) -> None:
         if self._busy_dialog is None:
             self._busy_dialog = QProgressDialog(self)
             self._busy_dialog.setWindowModality(Qt.ApplicationModal)
             self._busy_dialog.setCancelButton(None)
-            self._busy_dialog.setRange(0, 0)
+            self._busy_dialog.setRange(0, 100)
             self._busy_dialog.setMinimumDuration(0)
             self._busy_dialog.setWindowTitle("Ollama bezig")
             self._busy_dialog.setAutoClose(False)
             self._busy_dialog.setAutoReset(False)
+            self._busy_dialog.setValue(0)
         self._busy_dialog.setLabelText(message)
         self._busy_dialog.show()
 
     def _hide_busy(self) -> None:
         if self._busy_dialog is not None:
             self._busy_dialog.hide()
+
+    def _on_model_progress(self, progress: int, status: str) -> None:
+        if self._busy_dialog is None:
+            return
+        if progress >= 0:
+            self._busy_dialog.setValue(progress)
+        if status:
+            self._busy_dialog.setLabelText(status)
+
+    def _on_model_done(self, current: str, error: str) -> None:
+        self._hide_busy()
+        if error:
+            self._ollama_status.setText(f"Switchen mislukt: {error}")
+            return
+        if current:
+            self._current_model = current
+            self._ollama_status.setText(f"Huidig model: {current}")
+            self._ollama_combo.setCurrentText(current)
+
+
+class ModelSwitchSignals(QObject):
+    progress = Signal(int, str)
+    done = Signal(str, str)
 
 
 class QLineEditPlaceholder(QLabel):
