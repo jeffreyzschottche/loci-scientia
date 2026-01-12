@@ -39,6 +39,12 @@ BACKEND_BEARER_TOKEN = _ENV_BEARER_TOKEN.strip()
 
 API_ROUTES_DEFAULT_PORT = int(os.environ.get("API_ROUTES_DEFAULT_PORT", str(BACKEND_PORT)))
 
+OLLAMA_MODELS = [
+    model.strip()
+    for model in os.environ.get("OLLAMA_MODELS", "").split(",")
+    if model.strip()
+]
+
 PMTILES_HOST = os.environ.get("PMTILES_HOST", "127.0.0.1")
 PMTILES_PORT = int(os.environ.get("PMTILES_PORT", "8080"))
 PMTILES_BASE_URL = os.environ.get("PMTILES_BASE_URL", f"http://{PMTILES_HOST}:{PMTILES_PORT}").rstrip("/")

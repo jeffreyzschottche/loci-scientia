@@ -103,3 +103,7 @@ class SignOnRequest(BaseModel):
 class BearerTokenResponse(BaseModel):
     token: str
     expires_at: datetime
+
+
+class OllamaModelRequest(BaseModel):
+    model: str

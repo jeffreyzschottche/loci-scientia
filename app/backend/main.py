@@ -1,6 +1,9 @@
 import asyncio
 import json
 import logging
+import os
+from pathlib import Path
+
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from typing import Optional
@@ -22,12 +25,19 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    OllamaModelRequest,
     SignOnRequest,
 )
 from .settings import settings
 from .store import Store
 
 logger = logging.getLogger(__name__)
+ENV_FILE_PATH = Path(
+    os.environ.get(
+        "AITJE_ENV_PATH",
+        Path(__file__).resolve().parents[2] / ".env",
+    )
+).expanduser().resolve()
 
 app = FastAPI(title="AITJE Backend")
 app.add_middleware(
@@ -49,6 +59,7 @@ store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
+ollama_switch_lock = asyncio.Lock()
 
 
 def _extract_bearer_token(auth_header: Optional[str]) -> str:
@@ -73,9 +84,156 @@ def health():
     return {"status": "ok"}
 
 
+async def _pull_ollama_model(model: str) -> None:
+    success = False
+    async for data in _stream_ollama_pull(model):
+        if data.get("status") == "success":
+            success = True
+            break
+    if not success:
+        raise HTTPException(status_code=502, detail="Ollama pull beeindigd zonder succes-status")
+
+
+async def _stream_ollama_pull(model: str):
+    ollama_url = f"{settings.ollama_base_url}/api/pull"
+    payload = {"name": model}
+
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream("POST", ollama_url, json=payload) as response:
+                if response.status_code >= 400:
+                    error_body = await response.aread()
+                    raise HTTPException(
+                        status_code=502,
+                        detail=(
+                            f"Ollama pull faalde ({response.status_code}): "
+                            f"{error_body.decode('utf-8', errors='replace').strip()}"
+                        ),
+                    )
+
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    yield data
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Ollama pull faalde: {exc}") from exc
+
+
+def _persist_ollama_model(model: str) -> None:
+    if not ENV_FILE_PATH.exists():
+        raise HTTPException(status_code=500, detail=f".env niet gevonden: {ENV_FILE_PATH}")
+    try:
+        content = ENV_FILE_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f".env lezen faalde: {exc}") from exc
+
+    lines = content.splitlines(keepends=True)
+    updated = False
+    for idx, line in enumerate(lines):
+        if line.startswith("OLLAMA_MODEL="):
+            lines[idx] = f"OLLAMA_MODEL={model}\n"
+            updated = True
+            break
+    if not updated:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] = lines[-1] + "\n"
+        lines.append(f"OLLAMA_MODEL={model}\n")
+
+    try:
+        ENV_FILE_PATH.write_text("".join(lines), encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f".env schrijven faalde: {exc}") from exc
+
+
 @app.get("/routes")
 def list_routes():
     return [route.model_dump() for route in store.list()]
+
+
+@app.get("/api/v1/ollama/models")
+def list_ollama_models():
+    return {"current": settings.ollama_model, "available": settings.ollama_models}
+
+
+@app.post("/api/v1/ollama/model")
+async def set_ollama_model(req: OllamaModelRequest):
+    model = req.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model ontbreekt")
+    if model not in settings.ollama_models:
+        raise HTTPException(status_code=400, detail="model niet toegestaan")
+
+    async with ollama_switch_lock:
+        if model != settings.ollama_model:
+            await _pull_ollama_model(model)
+            _persist_ollama_model(model)
+            settings.ollama_model = model
+
+    return {"current": settings.ollama_model}
+
+
+@app.post("/api/v1/ollama/model/stream")
+async def set_ollama_model_stream(req: OllamaModelRequest):
+    model = req.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model ontbreekt")
+    if model not in settings.ollama_models:
+        raise HTTPException(status_code=400, detail="model niet toegestaan")
+
+    async def event_stream():
+        async with ollama_switch_lock:
+            if model == settings.ollama_model:
+                payload = json.dumps(
+                    {"progress": 100, "status": "Model is al actief", "done": True, "current": model}
+                )
+                yield f"data: {payload}\n\n"
+                return
+
+            progress = 0
+            status = "Pull starten..."
+            payload = json.dumps({"progress": progress, "status": status})
+            yield f"data: {payload}\n\n"
+
+            try:
+                async for data in _stream_ollama_pull(model):
+                    status = data.get("status") or status
+                    completed = data.get("completed")
+                    total = data.get("total")
+                    if isinstance(completed, (int, float)) and isinstance(total, (int, float)) and total:
+                        progress = min(100, int(completed * 100 / total))
+                    payload = json.dumps({"progress": progress, "status": status})
+                    yield f"data: {payload}\n\n"
+                    if data.get("status") == "success":
+                        break
+            except HTTPException as exc:
+                payload = json.dumps({"error": exc.detail, "done": True})
+                yield f"data: {payload}\n\n"
+                return
+
+            try:
+                _persist_ollama_model(model)
+            except HTTPException as exc:
+                payload = json.dumps({"error": exc.detail, "done": True})
+                yield f"data: {payload}\n\n"
+                return
+            settings.ollama_model = model
+            payload = json.dumps(
+                {"progress": 100, "status": "Model actief", "done": True, "current": model}
+            )
+            yield f"data: {payload}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.post("/routes")
