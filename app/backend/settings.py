@@ -14,6 +14,7 @@ class Settings(BaseModel):
     ollama_model: str = "gemma3:4b"
     ollama_models: list[str] = ["gemma3:4b"]
     ollama_timeout: float = 60.0
+    admin_usernames: list[str] = ["ADMIN"]
 
 
 def get_settings() -> "Settings":
@@ -37,12 +38,15 @@ def get_settings() -> "Settings":
         ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "60"))
     except ValueError:
         ollama_timeout = 60.0
+    raw_admins = os.environ.get("ADMIN_USERS", "ADMIN")
+    admin_usernames = [name.strip() for name in raw_admins.split(",") if name.strip()]
     return Settings(
         offline_assets_dir=offline_assets_dir,
         ollama_base_url=ollama_base_url,
         ollama_model=ollama_model,
         ollama_models=ollama_models,
         ollama_timeout=ollama_timeout,
+        admin_usernames=admin_usernames or ["ADMIN"],
     )
 
 

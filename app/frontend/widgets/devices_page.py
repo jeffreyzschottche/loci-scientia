@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 import requests
 
-from ..config import BACKEND_HTTP, PUBLIC_BASE_URL
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL
 from .dialog_style import (
     MODAL_QSS,
     ask_yes_no_dialog,
@@ -158,7 +158,11 @@ class DevicesPage(QWidget):
 
     def _reload_devices(self) -> None:
         try:
-            resp = requests.get(f"{BACKEND_HTTP}/devices", timeout=5)
+            resp = requests.get(
+                f"{BACKEND_HTTP}/devices",
+                timeout=5,
+                headers=self._auth_headers(),
+            )
             resp.raise_for_status()
             self.devices = resp.json()
         except Exception:
@@ -328,10 +332,18 @@ class DevicesPage(QWidget):
         try:
             if is_edit:
                 resp = requests.patch(
-                    f"{BACKEND_HTTP}/devices/{device['id']}", json=payload, timeout=5
+                    f"{BACKEND_HTTP}/devices/{device['id']}",
+                    json=payload,
+                    timeout=5,
+                    headers=self._auth_headers(),
                 )
             else:
-                resp = requests.post(f"{BACKEND_HTTP}/devices", json=payload, timeout=5)
+                resp = requests.post(
+                    f"{BACKEND_HTTP}/devices",
+                    json=payload,
+                    timeout=5,
+                    headers=self._auth_headers(),
+                )
             resp.raise_for_status()
         except Exception as exc:
             show_error_dialog(
@@ -354,7 +366,9 @@ class DevicesPage(QWidget):
 
         try:
             resp = requests.delete(
-                f"{BACKEND_HTTP}/devices/{device['id']}", timeout=5
+                f"{BACKEND_HTTP}/devices/{device['id']}",
+                timeout=5,
+                headers=self._auth_headers(),
             )
             resp.raise_for_status()
         except Exception as exc:
@@ -366,3 +380,9 @@ class DevicesPage(QWidget):
             return
 
         self._reload_devices()
+
+    @staticmethod
+    def _auth_headers() -> dict:
+        if BACKEND_BEARER_TOKEN:
+            return {"Authorization": f"Bearer {BACKEND_BEARER_TOKEN}"}
+        return {}

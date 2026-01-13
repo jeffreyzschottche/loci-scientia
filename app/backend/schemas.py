@@ -107,3 +107,18 @@ class BearerTokenResponse(BaseModel):
 
 class OllamaModelRequest(BaseModel):
     model: str
+
+
+class SupportAccessRequest(BaseModel):
+    duration_minutes: int = 60
+    public_key: Optional[str] = None
+    ticket: Optional[str] = None
+
+
+class SupportAccessStatus(BaseModel):
+    active: bool
+    enabled_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    session_id: Optional[str] = None
+    requested_by: Optional[str] = None
+    last_error: Optional[str] = None

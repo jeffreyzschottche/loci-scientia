@@ -142,3 +142,20 @@ class BearerTokenStore:
         if removed:
             self._persist_tokens(remaining)
         return removed
+
+    def get_valid_for_device(
+        self,
+        device_id: str,
+        *,
+        user_name: Optional[str] = None,
+    ) -> Optional[TokenRecord]:
+        if not device_id:
+            return None
+        valid = self._purge_expired()
+        for record in valid:
+            if record.device_id != device_id:
+                continue
+            if user_name and record.user_name != user_name:
+                continue
+            return record
+        return None

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import build_augmented_prompt, handle_ask, log_prompt
+from .admin_access import AdminTokenManager
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .schemas import (
@@ -27,9 +28,12 @@ from .schemas import (
     DevicePatch,
     OllamaModelRequest,
     SignOnRequest,
+    SupportAccessRequest,
+    SupportAccessStatus,
 )
 from .settings import settings
 from .store import Store
+from .support_access import SupportAccessError, SupportAccessManager
 
 logger = logging.getLogger(__name__)
 ENV_FILE_PATH = Path(
@@ -60,6 +64,12 @@ contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
 ollama_switch_lock = asyncio.Lock()
+support_access = SupportAccessManager()
+admin_tokens = AdminTokenManager(
+    token_store=token_store,
+    admin_usernames=settings.admin_usernames,
+)
+admin_tokens.ensure()
 
 
 def _extract_bearer_token(auth_header: Optional[str]) -> str:
@@ -76,6 +86,15 @@ def require_token(authorization: Optional[str] = Header(default=None)) -> TokenR
     record = token_store.validate(token_value)
     if record is None:
         raise HTTPException(status_code=401, detail="Bearer token ongeldig of verlopen")
+    return record
+
+
+def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRecord:
+    if (
+        record.user_name not in settings.admin_usernames
+        or record.device_id != admin_tokens.admin_device_id
+    ):
+        raise HTTPException(status_code=403, detail="Admin token vereist")
     return record
 
 
@@ -150,17 +169,17 @@ def _persist_ollama_model(model: str) -> None:
 
 
 @app.get("/routes")
-def list_routes():
+def list_routes(_: TokenRecord = Depends(require_admin_token)):
     return [route.model_dump() for route in store.list()]
 
 
 @app.get("/api/v1/ollama/models")
-def list_ollama_models():
+def list_ollama_models(_: TokenRecord = Depends(require_admin_token)):
     return {"current": settings.ollama_model, "available": settings.ollama_models}
 
 
 @app.post("/api/v1/ollama/model")
-async def set_ollama_model(req: OllamaModelRequest):
+async def set_ollama_model(req: OllamaModelRequest, _: TokenRecord = Depends(require_admin_token)):
     model = req.model.strip()
     if not model:
         raise HTTPException(status_code=400, detail="model ontbreekt")
@@ -177,7 +196,10 @@ async def set_ollama_model(req: OllamaModelRequest):
 
 
 @app.post("/api/v1/ollama/model/stream")
-async def set_ollama_model_stream(req: OllamaModelRequest):
+async def set_ollama_model_stream(
+    req: OllamaModelRequest,
+    _: TokenRecord = Depends(require_admin_token),
+):
     model = req.model.strip()
     if not model:
         raise HTTPException(status_code=400, detail="model ontbreekt")
@@ -236,20 +258,64 @@ async def set_ollama_model_stream(req: OllamaModelRequest):
     )
 
 
+@app.get("/api/v1/support/ssh", response_model=SupportAccessStatus)
+def support_access_status(_: TokenRecord = Depends(require_admin_token)):
+    return support_access.status().to_response()
+
+
+@app.post("/api/v1/support/ssh/enable", response_model=SupportAccessStatus)
+def support_access_enable(
+    req: SupportAccessRequest,
+    record: TokenRecord = Depends(require_admin_token),
+):
+    try:
+        state = support_access.enable(
+            duration_minutes=req.duration_minutes,
+            public_key=req.public_key,
+            ticket=req.ticket,
+            requested_by=record.user_name,
+        )
+    except SupportAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return state.to_response()
+
+
+@app.post("/api/v1/support/ssh/disable", response_model=SupportAccessStatus)
+def support_access_disable(
+    record: TokenRecord = Depends(require_admin_token),
+):
+    try:
+        state = support_access.disable(
+            requested_by=record.user_name,
+            reason="manual",
+            force=False,
+        )
+    except SupportAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return state.to_response()
+
+
 @app.post("/routes")
-def create_route(data: ApiRouteCreate):
+def create_route(
+    data: ApiRouteCreate,
+    _: TokenRecord = Depends(require_admin_token),
+):
     return store.create(data).model_dump()
 
 
 @app.patch("/routes/{rid}")
-def update_route(rid: str, patch: dict):
+def update_route(
+    rid: str,
+    patch: dict,
+    _: TokenRecord = Depends(require_admin_token),
+):
     if rid not in store.routes:
         raise HTTPException(status_code=404, detail="not found")
     return store.update(rid, patch).model_dump()
 
 
 @app.delete("/routes/{rid}")
-def delete_route(rid: str):
+def delete_route(rid: str, _: TokenRecord = Depends(require_admin_token)):
     store.delete(rid)
     return {"ok": True}
 
@@ -407,12 +473,15 @@ def delete_contact(contact_id: str):
 
 
 @app.get("/devices", response_model=list[Device])
-def list_devices():
+def list_devices(_: TokenRecord = Depends(require_admin_token)):
     return devices_repo.list_devices()
 
 
 @app.post("/devices", response_model=Device)
-def create_device(data: DeviceCreate):
+def create_device(
+    data: DeviceCreate,
+    _: TokenRecord = Depends(require_admin_token),
+):
     try:
         return devices_repo.create_device(data)
     except Exception as exc:  # pragma: no cover
@@ -420,7 +489,11 @@ def create_device(data: DeviceCreate):
 
 
 @app.patch("/devices/{device_id}", response_model=Device)
-def patch_device(device_id: str, patch: DevicePatch):
+def patch_device(
+    device_id: str,
+    patch: DevicePatch,
+    _: TokenRecord = Depends(require_admin_token),
+):
     try:
         return devices_repo.update_device(device_id, patch)
     except ValueError:
@@ -430,7 +503,10 @@ def patch_device(device_id: str, patch: DevicePatch):
 
 
 @app.delete("/devices/{device_id}")
-def delete_device(device_id: str):
+def delete_device(
+    device_id: str,
+    _: TokenRecord = Depends(require_admin_token),
+):
     try:
         devices_repo.delete_device(device_id)
         token_store.revoke_for_device(device_id)

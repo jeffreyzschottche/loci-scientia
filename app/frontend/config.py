@@ -1,4 +1,6 @@
+import json
 import os
+from pathlib import Path
 
 
 def _default_backend_http(host: str, port: int) -> str:
@@ -11,6 +13,22 @@ def _http_to_ws(url: str) -> str:
     if url.startswith("http://"):
         return "ws://" + url[len("http://") :]
     return url
+
+
+def _load_local_admin_token() -> str:
+    token_path = Path(__file__).resolve().parents[2] / "devices_db" / "admin_token.json"
+    try:
+        raw = token_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return ""
+    token = payload.get("token", "")
+    if not isinstance(token, str):
+        return ""
+    return token.strip()
 
 
 DEVICE_NAME_PREFIX = os.environ.get("DEVICE_NAME_PREFIX", "aitje").strip() or "aitje"
@@ -33,6 +51,7 @@ PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", _default_backend_http(DEVICE
 _ENV_BEARER_TOKEN = (
     os.environ.get("AITJE_BEARER_TOKEN")
     or os.environ.get("BACKEND_BEARER_TOKEN")
+    or _load_local_admin_token()
     or ""
 )
 BACKEND_BEARER_TOKEN = _ENV_BEARER_TOKEN.strip()

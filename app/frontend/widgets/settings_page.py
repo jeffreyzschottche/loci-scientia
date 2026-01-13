@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timezone
 
 import requests
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS
+from .dialog_style import ask_yes_no_dialog, show_error_dialog
 
 class SettingsPage(QWidget):
     def __init__(self):
@@ -28,6 +30,16 @@ class SettingsPage(QWidget):
         self._ollama_status: QLabel | None = None
         self._current_model: str | None = None
         self._busy_dialog: QProgressDialog | None = None
+        self._support_status: QLabel | None = None
+        self._support_enable: QPushButton | None = None
+        self._support_disable: QPushButton | None = None
+        self._support_duration: QComboBox | None = None
+        self._support_active = False
+        self._support_durations = {
+            "30 min": 30,
+            "1 uur": 60,
+            "4 uur": 240,
+        }
         self._model_signals = ModelSwitchSignals()
         self._model_signals.progress.connect(self._on_model_progress)
         self._model_signals.done.connect(self._on_model_done)
@@ -46,6 +58,7 @@ class SettingsPage(QWidget):
         layout.addWidget(tabs, 1)
 
         QTimer.singleShot(0, self._load_models)
+        QTimer.singleShot(0, self._load_support_status)
 
     def _appearance_tab(self) -> QWidget:
         tab = QWidget()
@@ -161,6 +174,43 @@ class SettingsPage(QWidget):
         vbox.addWidget(flush)
         card.layout().addWidget(body)
         layout.addWidget(card)
+
+        support_card = self._settings_card("Remote support (Tailscale)")
+        support_body = QWidget()
+        support_layout = QVBoxLayout(support_body)
+        support_layout.setSpacing(10)
+        support_hint = QLabel(
+            "Schakel alleen in met expliciete toestemming van de klant. "
+            "We starten tijdelijk een Tailscale-verbinding voor support en sluiten automatisch."
+        )
+        support_hint.setWordWrap(True)
+        support_hint.setStyleSheet("color:#6b7280; font-size:12px;")
+        support_layout.addWidget(support_hint)
+
+        support_form = QGridLayout()
+        support_form.setHorizontalSpacing(12)
+        support_form.addWidget(QLabel("Duur"), 0, 0)
+        self._support_duration = QComboBox()
+        self._support_duration.addItems(list(self._support_durations.keys()))
+        support_form.addWidget(self._support_duration, 0, 1)
+        support_layout.addLayout(support_form)
+
+        self._support_status = QLabel("Support status laden...")
+        self._support_status.setStyleSheet("color:#6b7280; font-size:12px;")
+        support_layout.addWidget(self._support_status)
+
+        support_actions = QHBoxLayout()
+        self._support_enable = QPushButton("Activeer ondersteuning")
+        self._support_disable = QPushButton("Stop ondersteuning")
+        self._support_disable.setEnabled(False)
+        support_actions.addWidget(self._support_enable)
+        support_actions.addWidget(self._support_disable)
+        support_layout.addLayout(support_actions)
+        self._support_enable.clicked.connect(self._on_support_enable)
+        self._support_disable.clicked.connect(self._on_support_disable)
+
+        support_card.layout().addWidget(support_body)
+        layout.addWidget(support_card)
         return tab
 
     @staticmethod
@@ -314,6 +364,176 @@ class SettingsPage(QWidget):
             self._current_model = current
             self._ollama_status.setText(f"Huidig model: {current}")
             self._ollama_combo.setCurrentText(current)
+
+    def _load_support_status(self) -> None:
+        if not self._support_status:
+            return
+        asyncio.create_task(self._load_support_status_async())
+
+    async def _load_support_status_async(self) -> None:
+        try:
+            payload = await asyncio.to_thread(self._fetch_support_status)
+        except requests.HTTPError as exc:
+            self._set_support_busy(False)
+            message = self._support_error_message(exc)
+            self._support_status.setText(message)
+            return
+        except Exception as exc:
+            self._set_support_busy(False)
+            self._support_status.setText(f"Kon support status niet laden: {exc}")
+            return
+        self._apply_support_state(payload)
+
+    def _fetch_support_status(self) -> dict:
+        resp = requests.get(
+            f"{BACKEND_HTTP}/api/v1/support/ssh",
+            timeout=6,
+            headers=self._auth_headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _on_support_enable(self) -> None:
+        if not (self._support_enable and self._support_duration):
+            return
+        if not ask_yes_no_dialog(
+            self,
+            "Remote support inschakelen",
+            "Dit opent tijdelijke SSH-toegang voor support. "
+            "Schakel alleen in met expliciete toestemming. Doorgaan?",
+        ):
+            return
+        duration = self._selected_support_duration()
+        self._set_support_busy(True, "Ondersteuning activeren...")
+        asyncio.create_task(self._enable_support_async(duration))
+
+    async def _enable_support_async(self, duration: int) -> None:
+        try:
+            payload = await asyncio.to_thread(
+                self._post_support_enable,
+                duration,
+            )
+        except requests.HTTPError as exc:
+            self._set_support_busy(False)
+            show_error_dialog(self, "Fout", self._support_error_message(exc))
+            return
+        except Exception as exc:
+            self._set_support_busy(False)
+            show_error_dialog(self, "Fout", str(exc))
+            return
+        self._set_support_busy(False)
+        self._apply_support_state(payload)
+
+    def _post_support_enable(self, duration: int) -> dict:
+        payload = {"duration_minutes": duration}
+        resp = requests.post(
+            f"{BACKEND_HTTP}/api/v1/support/ssh/enable",
+            json=payload,
+            timeout=10,
+            headers=self._auth_headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _on_support_disable(self) -> None:
+        if not self._support_disable:
+            return
+        if not ask_yes_no_dialog(
+            self,
+            "Remote support uitschakelen",
+            "Weet je zeker dat je de supporttoegang wilt afsluiten?",
+        ):
+            return
+        self._set_support_busy(True, "Ondersteuning afsluiten...")
+        asyncio.create_task(self._disable_support_async())
+
+    async def _disable_support_async(self) -> None:
+        try:
+            payload = await asyncio.to_thread(self._post_support_disable)
+        except requests.HTTPError as exc:
+            self._set_support_busy(False)
+            show_error_dialog(self, "Fout", self._support_error_message(exc))
+            return
+        except Exception as exc:
+            self._set_support_busy(False)
+            show_error_dialog(self, "Fout", str(exc))
+            return
+        self._set_support_busy(False)
+        self._apply_support_state(payload)
+
+    def _post_support_disable(self) -> dict:
+        resp = requests.post(
+            f"{BACKEND_HTTP}/api/v1/support/ssh/disable",
+            timeout=10,
+            headers=self._auth_headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _support_error_message(self, exc: requests.HTTPError) -> str:
+        status = getattr(exc.response, "status_code", None)
+        detail = None
+        try:
+            detail = exc.response.json().get("detail")
+        except Exception:
+            detail = None
+        if status == 401:
+            return (
+                "Backend verwacht een Bearer token. "
+                "Stel BACKEND_BEARER_TOKEN in op het apparaat."
+            )
+        if detail:
+            return detail
+        return str(exc)
+
+    def _apply_support_state(self, payload: dict) -> None:
+        active = bool(payload.get("active"))
+        session_id = payload.get("session_id")
+        expires_at = self._format_support_timestamp(payload.get("expires_at"))
+        last_error = payload.get("last_error")
+        self._support_active = active
+        if self._support_status:
+            if active:
+                parts = ["Actief"]
+                if expires_at:
+                    parts.append(f"tot {expires_at}")
+                if session_id:
+                    parts.append(f"(sessie {session_id})")
+                self._support_status.setText(" ".join(parts))
+            else:
+                message = "Uitgeschakeld"
+                if last_error:
+                    message = f"{message} (laatste fout: {last_error})"
+                self._support_status.setText(message)
+        if self._support_enable:
+            self._support_enable.setEnabled(not active)
+        if self._support_disable:
+            self._support_disable.setEnabled(active)
+
+    def _set_support_busy(self, busy: bool, message: str | None = None) -> None:
+        if self._support_enable:
+            self._support_enable.setEnabled(not busy and not self._support_active)
+        if self._support_disable:
+            self._support_disable.setEnabled(not busy and self._support_active)
+        if message and self._support_status:
+            self._support_status.setText(message)
+
+    def _selected_support_duration(self) -> int:
+        if not self._support_duration:
+            return 60
+        return self._support_durations.get(self._support_duration.currentText(), 60)
+
+    @staticmethod
+    def _format_support_timestamp(value: str | None) -> str:
+        if not value:
+            return ""
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone().strftime("%d-%m %H:%M")
 
 
 class ModelSwitchSignals(QObject):

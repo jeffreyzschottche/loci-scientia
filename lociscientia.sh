@@ -106,6 +106,82 @@ ensure_mdns_support() {
     esac
 }
 
+should_setup_tailscale() {
+    if [ -z "${SUPPORT_SSH_HOOK:-}" ]; then
+        return 1
+    fi
+    case "$SUPPORT_SSH_HOOK" in
+        *support_tailscale_hook.sh)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+install_tailscale() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            ;;
+        *)
+            echo "⚠️  Tailscale setup alleen ondersteund op Linux."
+            return 1
+            ;;
+    esac
+    if command -v tailscale >/dev/null 2>&1; then
+        echo "✅ Tailscale is al geïnstalleerd"
+        return 0
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "⚠️  curl ontbreekt; Tailscale installatie overslaan."
+        return 1
+    fi
+    if [ "${HAVE_SUDO:-0}" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; Tailscale installatie overslaan."
+        return 1
+    fi
+    echo "📦 Tailscale installeren..."
+    if [ "$(id -u)" -eq 0 ]; then
+        curl -fsSL https://tailscale.com/install.sh | sh
+    else
+        sudo sh -c "curl -fsSL https://tailscale.com/install.sh | sh"
+    fi
+    echo "✅ Tailscale geïnstalleerd"
+    return 0
+}
+
+start_tailscaled() {
+    if ! command -v tailscaled >/dev/null 2>&1; then
+        return 1
+    fi
+    if pgrep -x tailscaled >/dev/null 2>&1; then
+        echo "✅ tailscaled draait al"
+        return 0
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+        if [ "${HAVE_SUDO:-0}" -eq 1 ]; then
+            sudo systemctl enable tailscaled >/dev/null 2>&1 || true
+            sudo systemctl restart tailscaled >/dev/null 2>&1 || true
+        elif [ "$(id -u)" -eq 0 ]; then
+            systemctl enable tailscaled >/dev/null 2>&1 || true
+            systemctl restart tailscaled >/dev/null 2>&1 || true
+        else
+            echo "⚠️  Geen sudo/root; tailscaled niet gestart."
+            return 1
+        fi
+        sleep 1
+        return 0
+    fi
+    echo "⏳ tailscaled starten..."
+    if [ "$(id -u)" -eq 0 ]; then
+        tailscaled >/dev/null 2>&1 &
+    else
+        echo "⚠️  Geen sudo/root; tailscaled niet gestart."
+        return 1
+    fi
+    sleep 1
+    return 0
+}
+
 configure_hostname() {
     desired="${DEVICE_HOSTNAME}"
     case "$DEVICE_PLATFORM" in
@@ -233,6 +309,17 @@ configure_hostname
 echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="
 echo
+
+if should_setup_tailscale; then
+    echo "=== Tailscale Setup ==="
+    if install_tailscale; then
+        start_tailscaled || echo "⚠️  Kon tailscaled niet starten."
+    else
+        echo "⚠️  Tailscale niet beschikbaar; support werkt niet."
+    fi
+    echo "======================="
+    echo
+fi
 
 echo "=== Ollama Setup ==="
 if install_ollama; then

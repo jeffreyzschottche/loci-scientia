@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from ..config import (
     API_ROUTES_DEFAULT_PORT,
+    BACKEND_BEARER_TOKEN,
     BACKEND_HTTP,
     DEVICE_MDNS,
     PUBLIC_BASE_URL,
@@ -338,7 +339,11 @@ class ApiPage(QWidget):
     def _reload(self):
         self._clear_layout(self.keys_list)
         try:
-            resp = requests.get(f"{API_BASE}/routes", timeout=3)
+            resp = requests.get(
+                f"{API_BASE}/routes",
+                timeout=3,
+                headers=self._auth_headers(),
+            )
             resp.raise_for_status()
         except requests.RequestException as exc:  # pragma: no cover - UI feedback only
             self._render_empty_state(f"Kan routes niet laden: {exc}")
@@ -370,24 +375,44 @@ class ApiPage(QWidget):
         dialog = ApiDialog(self)
         if dialog.exec():
             try:
-                requests.post(f"{API_BASE}/routes", json=dialog.payload(), timeout=3)
+                requests.post(
+                    f"{API_BASE}/routes",
+                    json=dialog.payload(),
+                    timeout=3,
+                    headers=self._auth_headers(),
+                )
                 self._reload()
             except Exception as exc:
                 show_error_dialog(self, "Fout", str(exc))
 
     def _edit_route(self, rid: str):
         try:
-            requests.patch(f"{API_BASE}/routes/{rid}", json={"active": True}, timeout=3)
+            requests.patch(
+                f"{API_BASE}/routes/{rid}",
+                json={"active": True},
+                timeout=3,
+                headers=self._auth_headers(),
+            )
             self._reload()
         except Exception as exc:
             show_error_dialog(self, "Fout", str(exc))
 
     def _delete_route(self, rid: str):
         try:
-            requests.delete(f"{API_BASE}/routes/{rid}", timeout=3)
+            requests.delete(
+                f"{API_BASE}/routes/{rid}",
+                timeout=3,
+                headers=self._auth_headers(),
+            )
             self._reload()
         except Exception as exc:
             show_error_dialog(self, "Fout", str(exc))
+
+    @staticmethod
+    def _auth_headers() -> dict:
+        if BACKEND_BEARER_TOKEN:
+            return {"Authorization": f"Bearer {BACKEND_BEARER_TOKEN}"}
+        return {}
 
     def _show_url_hint(self):
         curl_cmd = (
