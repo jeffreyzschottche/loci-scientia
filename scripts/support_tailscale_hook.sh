@@ -3,12 +3,13 @@ set -euo pipefail
 
 payload="$(cat)"
 action="$(
-  python3 - <<'PY'
+  python3 - "$payload" <<'PY'
 import json
 import sys
 
+raw = sys.argv[1] if len(sys.argv) > 1 else ""
 try:
-    data = json.loads(sys.stdin.read() or "{}")
+    data = json.loads(raw or "{}")
 except json.JSONDecodeError:
     data = {}
 print(data.get("action", "") or "")
