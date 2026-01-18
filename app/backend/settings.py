@@ -2,7 +2,44 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+KV_CACHE_TYPES = {"f16", "q8_0", "q4_0"}
+
+
+def _split_env_list(raw: str) -> list[str]:
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",")]
+
+
+def _normalize_kv_quant(value: str) -> Optional[str]:
+    if not value:
+        return None
+    normalized = value.strip().lower()
+    if normalized in KV_CACHE_TYPES:
+        return normalized
+    return None
+
+
+def _parse_max_context(value: str) -> Optional[int]:
+    if not value:
+        return None
+    try:
+        parsed = int(value.strip())
+    except ValueError:
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def _map_max_context(models: list[str], values: list[str]) -> dict[str, Optional[int]]:
+    mapping: dict[str, Optional[int]] = {}
+    for idx, model in enumerate(models):
+        raw = values[idx] if idx < len(values) else ""
+        mapping[model] = _parse_max_context(raw)
+    return mapping
 
 
 class Settings(BaseModel):
@@ -13,6 +50,8 @@ class Settings(BaseModel):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "gemma3:4b"
     ollama_models: list[str] = ["gemma3:4b"]
+    ollama_kv_cache_type: Optional[str] = None
+    ollama_max_context: dict[str, Optional[int]] = Field(default_factory=dict)
     ollama_timeout: float = 60.0
 
 
@@ -30,9 +69,17 @@ def get_settings() -> "Settings":
     ollama_base_url = ollama_base_url.rstrip("/")
     ollama_model = os.environ.get("OLLAMA_MODEL") or "gemma3:4b"
     raw_models = os.environ.get("OLLAMA_MODELS", "")
+    raw_kv = os.environ.get("OLLAMA_KV_CACHE_TYPE")
+    if raw_kv is None:
+        raw_kv = os.environ.get("OLLAMA_KV_QUANT", "")
+    raw_kv = (raw_kv or "").split(",")[0]
+    ollama_kv_cache_type = _normalize_kv_quant(raw_kv)
+    raw_context = _split_env_list(os.environ.get("OLLAMA_MAX_CONTEXT", ""))
     ollama_models = [model.strip() for model in raw_models.split(",") if model.strip()]
     if ollama_model not in ollama_models:
         ollama_models.insert(0, ollama_model)
+        raw_context.insert(0, "")
+    ollama_max_context = _map_max_context(ollama_models, raw_context)
     try:
         ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "60"))
     except ValueError:
@@ -42,6 +89,8 @@ def get_settings() -> "Settings":
         ollama_base_url=ollama_base_url,
         ollama_model=ollama_model,
         ollama_models=ollama_models,
+        ollama_kv_cache_type=ollama_kv_cache_type,
+        ollama_max_context=ollama_max_context,
         ollama_timeout=ollama_timeout,
     )
 

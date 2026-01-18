@@ -289,6 +289,9 @@ async def sse_stream_generator(req: ChatRequest):
         "prompt": final_prompt,
         "stream": True,
     }
+    max_context = settings.ollama_max_context.get(settings.ollama_model)
+    if isinstance(max_context, int) and max_context > 0:
+        ollama_payload["options"] = {"num_ctx": max_context}
 
     try:
         async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:

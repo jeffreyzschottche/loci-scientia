@@ -139,6 +139,9 @@ async def _call_ollama(prompt: str) -> str:
         "prompt": prompt,
         "stream": False,
     }
+    max_context = settings.ollama_max_context.get(settings.ollama_model)
+    if isinstance(max_context, int) and max_context > 0:
+        payload["options"] = {"num_ctx": max_context}
     async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
         response = await client.post(ollama_url, json=payload)
         response.raise_for_status()

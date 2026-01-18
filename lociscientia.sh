@@ -48,6 +48,58 @@ ensure_sudo_session() {
     return 0
 }
 
+_trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf "%s" "$value"
+}
+
+_run_ollama() {
+    env -u OLLAMA_MODELS ollama "$@"
+}
+
+_stop_ollama() {
+    local pids=""
+    if command -v pgrep >/dev/null 2>&1; then
+        pids="$(pgrep -x ollama || true)"
+    fi
+    if [ -z "$pids" ]; then
+        return 0
+    fi
+    if command -v pkill >/dev/null 2>&1; then
+        if [ "$HAVE_SUDO" -eq 1 ]; then
+            sudo pkill -x ollama >/dev/null 2>&1 || true
+        else
+            pkill -x ollama >/dev/null 2>&1 || true
+        fi
+    else
+        for pid in $pids; do
+            if [ "$HAVE_SUDO" -eq 1 ]; then
+                sudo kill "$pid" >/dev/null 2>&1 || true
+            else
+                kill "$pid" >/dev/null 2>&1 || true
+            fi
+        done
+    fi
+    sleep 2
+    if command -v pgrep >/dev/null 2>&1 && pgrep -x ollama >/dev/null 2>&1; then
+        return 1
+    fi
+    return 0
+}
+
+_wait_for_ollama() {
+    local attempt
+    for attempt in {1..30}; do
+        if _run_ollama list >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 detect_platform() {
     local uname_s
     uname_s="$(uname -s 2>/dev/null || echo unknown)"
@@ -202,20 +254,46 @@ start_ollama() {
         return 1
     fi
 
+    MODEL_NAME="${OLLAMA_MODEL:-gemma3:4b}"
+    kv_cache_type_raw="${OLLAMA_KV_CACHE_TYPE:-${OLLAMA_KV_QUANT:-}}"
+    kv_cache_type="$(_trim "${kv_cache_type_raw%%,*}")"
+    kv_cache_type="$(printf '%s' "$kv_cache_type" | tr '[:upper:]' '[:lower:]')"
+    case "$kv_cache_type" in
+        f16|q8_0|q4_0) ;;
+        *) kv_cache_type="";;
+    esac
+
     if pgrep -x "ollama" >/dev/null 2>&1; then
-        echo "✅ Ollama draait al"
-    else
-        echo "⏳ Ollama server starten..."
-        ollama serve > "$PROJECT_ROOT/ollama.log" 2>&1 &
-        ollama_pid=$!
-        echo "✅ Ollama server gestart (PID: $ollama_pid)"
-        sleep 3
+        if [ -n "$kv_cache_type" ]; then
+            echo "♻️  Ollama herstarten om OLLAMA_KV_CACHE_TYPE=$kv_cache_type toe te passen..."
+            if ! _stop_ollama; then
+                echo "⚠️  Ollama kon niet worden gestopt; herstart overslaan."
+                return 1
+            fi
+        else
+            echo "✅ Ollama draait al"
+            return 0
+        fi
     fi
 
-    MODEL_NAME="${OLLAMA_MODEL:-gemma3:4b}"
-    if ! ollama list | grep -q "$MODEL_NAME"; then
+    echo "⏳ Ollama server starten..."
+    if [ -n "$kv_cache_type" ]; then
+        export OLLAMA_KV_CACHE_TYPE="$kv_cache_type"
+        echo "✅ OLLAMA_KV_CACHE_TYPE=$OLLAMA_KV_CACHE_TYPE"
+    else
+        unset OLLAMA_KV_CACHE_TYPE
+    fi
+    _run_ollama serve > "$PROJECT_ROOT/ollama.log" 2>&1 &
+    ollama_pid=$!
+    echo "$ollama_pid" > "$PROJECT_ROOT/ollama.pid" 2>/dev/null || true
+    echo "✅ Ollama server gestart (PID: $ollama_pid)"
+    if ! _wait_for_ollama; then
+        echo "⚠️  Ollama kwam niet op tijd op."
+        return 1
+    fi
+    if ! _run_ollama list | grep -q "$MODEL_NAME"; then
         echo "📥 Model $MODEL_NAME downloaden (dit kan even duren bij eerste keer)..."
-        if ollama pull "$MODEL_NAME"; then
+        if _run_ollama pull "$MODEL_NAME"; then
             echo "✅ Model $MODEL_NAME gedownload"
         else
             echo "⚠️  Model download mislukt. Check netwerk verbinding."
