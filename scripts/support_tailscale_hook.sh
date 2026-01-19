@@ -41,11 +41,6 @@ enable_ssh="${TAILSCALE_ENABLE_SSH:-1}"
 ephemeral="${TAILSCALE_EPHEMERAL:-0}"
 logout_on_disable="${TAILSCALE_LOGOUT_ON_DISABLE:-0}"
 
-extra_args=()
-if [[ -n "${TAILSCALE_EXTRA_ARGS:-}" ]]; then
-  read -r -a extra_args <<<"${TAILSCALE_EXTRA_ARGS}"
-fi
-
 case "${action}" in
   enable)
     if [[ -z "${auth_key}" && "${TAILSCALE_ALLOW_NO_AUTHKEY:-0}" != "1" ]]; then
@@ -71,7 +66,12 @@ case "${action}" in
     if [[ "${ephemeral}" == "1" ]]; then
       args+=(--ephemeral)
     fi
-    "${run_cmd[@]}" "${args[@]}" "${extra_args[@]}"
+    if [[ -n "${TAILSCALE_EXTRA_ARGS:-}" ]]; then
+      read -r -a extra_args <<<"${TAILSCALE_EXTRA_ARGS}"
+      "${run_cmd[@]}" "${args[@]}" "${extra_args[@]}"
+    else
+      "${run_cmd[@]}" "${args[@]}"
+    fi
     ;;
   disable)
     "${run_cmd[@]}" down
