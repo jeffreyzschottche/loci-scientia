@@ -9,6 +9,9 @@ app/maps/europe.pmtilesp
 fastembed_models/
 fileslociscientiamaps/
 
+gemma2:2b,gemma3:1b,gemma3:4b/
+**/blobs/
+
 .env
 .env.*
 
