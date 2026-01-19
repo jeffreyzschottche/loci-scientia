@@ -49,6 +49,7 @@ class ChatPage(QWidget):
         self.message_rows: list[QWidget] = []
         self._bearer_token = BACKEND_BEARER_TOKEN or ""
         self._auto_token_error: str | None = None
+        self.conversation_history: list[dict[str, str]] = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -139,6 +140,7 @@ class ChatPage(QWidget):
     def _start_new_chat(self):
         """Reset the conversation history."""
         self._clear_history()
+        self.conversation_history.clear()
         self.current_message = ""
         self.current_reply_label = None
         self.queue_label = None
@@ -148,23 +150,25 @@ class ChatPage(QWidget):
         text = self.input.text().strip()
         if not text:
             return
+        history_payload = self._history_payload()
         self._append_message("user", text)
+        self._append_history_entry("user", text)
         self.input.clear()
         self.current_message = ""  # Reset message buffer
         self.current_reply_label = None
         self._show_typing_indicator()
-        asyncio.create_task(self._stream(text))
+        asyncio.create_task(self._stream(text, history_payload))
 
-    async def _stream(self, prompt: str):
+    async def _stream(self, prompt: str, history: list[dict[str, str]]):
         try:
-            await asyncio.to_thread(self._stream_sse, prompt)
+            await asyncio.to_thread(self._stream_sse, prompt, history)
             return
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             if status == 401:
                 # Probeer automatisch een token op te halen voor de lokale admin.
                 if self._refresh_auto_token():
-                    await asyncio.to_thread(self._stream_sse, prompt)
+                    await asyncio.to_thread(self._stream_sse, prompt, history)
                     return
                 message = (
                     self._auto_token_error
@@ -185,20 +189,25 @@ class ChatPage(QWidget):
             return
 
         try:
-            message = await asyncio.to_thread(self._legacy_post, prompt)
+            message = await asyncio.to_thread(self._legacy_post, prompt, history)
         except Exception as exc:
             self.signals.token.emit(f"[fout] {exc}")
         else:
             self.signals.token.emit(message)
         self.signals.done.emit()
 
-    def _stream_sse(self, prompt: str) -> None:
+    def _stream_sse(self, prompt: str, history: list[dict[str, str]]) -> None:
         """Stream SSE events van het backend (incl. wachtrij status)."""
 
         url = f"{API_BASE}/api/v1/ask/stream"
+        payload = {
+            "prompt": prompt,
+            "max_new_tokens": 128,
+            "history": history or [],
+        }
         with requests.post(
             url,
-            json={"prompt": prompt, "max_new_tokens": 128},
+            json=payload,
             stream=True,
             timeout=60,
             headers=self._auth_headers(),
@@ -236,7 +245,7 @@ class ChatPage(QWidget):
         # Als de stream eindigt zonder done-event, sluit netjes af.
         self.signals.done.emit()
 
-    def _legacy_post(self, prompt: str) -> str:
+    def _legacy_post(self, prompt: str, history: list[dict[str, str]]) -> str:
         """Fallback naar het niet-streamende endpoint."""
 
         endpoints = ["/api/v1/ask"]
@@ -247,7 +256,7 @@ class ChatPage(QWidget):
             try:
                 resp = requests.post(
                     url,
-                    json={"prompt": prompt},
+                    json={"prompt": prompt, "history": history or []},
                     timeout=5,
                     headers=headers,
                 )
@@ -369,10 +378,13 @@ class ChatPage(QWidget):
     @Slot()
     def _on_done(self):
         """Finalize the current message."""
-        if self.current_reply_label and not self.current_message:
-            self._set_label_text(
-                self.current_reply_label, "Geen antwoord beschikbaar."
-            )
+        assistant_text = (self.current_message or "").strip()
+        if self.current_reply_label and not assistant_text:
+            fallback = "Geen antwoord beschikbaar."
+            self._set_label_text(self.current_reply_label, fallback)
+            assistant_text = fallback
+        if assistant_text:
+            self._append_history_entry("assistant", assistant_text)
         self.current_message = ""
         self.current_reply_label = None
 
@@ -569,6 +581,21 @@ class ChatPage(QWidget):
         self.queue_label = None
         if self.empty_label:
             self.empty_label.show()
+
+    def _append_history_entry(self, role: str, text: str):
+        clean = (text or "").strip()
+        if not clean:
+            return
+        # Skip propagating backend error messages to the model context.
+        if clean.startswith("[fout]"):
+            return
+        self.conversation_history.append({"role": role, "content": clean})
+
+    def _history_payload(self) -> list[dict[str, str]]:
+        return [
+            {"role": entry.get("role", ""), "content": entry.get("content", "")}
+            for entry in self.conversation_history
+        ]
 
     def _scroll_to_bottom(self):
         def _do_scroll():

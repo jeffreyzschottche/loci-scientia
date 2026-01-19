@@ -339,7 +339,7 @@ async def api_ask(req: ChatRequest, _: TokenRecord = Depends(require_token)):
 async def sse_stream_generator(req: ChatRequest):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
-    final_prompt = build_augmented_prompt(req.prompt)
+    final_prompt = build_augmented_prompt(req.prompt, req.history)
     log_prompt(final_prompt)
 
     # Short queue countdown: 2 to 0 with 1 second between each

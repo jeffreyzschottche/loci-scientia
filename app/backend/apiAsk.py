@@ -2,11 +2,12 @@ import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional, Sequence
 import httpx
 
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
-from .schemas import ChatRequest, Contact, Device
+from .schemas import ChatMessage, ChatRequest, Contact, Device
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -110,8 +111,37 @@ def _prompt_template() -> str:
         )
 
 
-def build_augmented_prompt(user_prompt: str) -> str:
-    base_lines = [f"User Prompt: {user_prompt.strip()}"]
+def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]:
+    if not history:
+        return []
+    lines: list[str] = []
+    for idx, message in enumerate(history, 1):
+        role = (message.role or "").lower()
+        if role == "assistant":
+            speaker = "AITJE"
+        elif role == "system":
+            speaker = "Systeem"
+        else:
+            speaker = "Gebruiker"
+        content = _flatten_multiline(message.content or "")
+        if not content:
+            continue
+        lines.append(f"{idx}. {speaker}: {content}")
+    return lines
+
+
+def build_augmented_prompt(
+    user_prompt: str, history: Optional[Sequence[ChatMessage]] = None
+) -> str:
+    base_lines: list[str] = []
+
+    history_lines = _format_history_lines(history)
+    if history_lines:
+        base_lines.append("Vorige chat:")
+        base_lines.extend(history_lines)
+        base_lines.append("")
+
+    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
     context_lines = _gather_context_lines(user_prompt)
     if context_lines:
         base_lines.append("> context:")
@@ -159,7 +189,7 @@ def _fallback_response(original_prompt: str) -> str:
 
 
 async def handle_ask(req: ChatRequest) -> dict:
-    final_prompt = build_augmented_prompt(req.prompt)
+    final_prompt = build_augmented_prompt(req.prompt, req.history)
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt)

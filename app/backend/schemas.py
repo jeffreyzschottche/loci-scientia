@@ -1,12 +1,18 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"] = "user"
+    content: str
 
 
 class ChatRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 128
+    history: list[ChatMessage] = Field(default_factory=list)
 
 
 class ContactBase(BaseModel):
