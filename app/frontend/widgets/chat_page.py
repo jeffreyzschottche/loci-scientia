@@ -49,7 +49,6 @@ class ChatPage(QWidget):
         self.message_rows: list[QWidget] = []
         self._bearer_token = BACKEND_BEARER_TOKEN or ""
         self._auto_token_error: str | None = None
-        self.conversation_history: list[dict[str, str]] = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -140,28 +139,26 @@ class ChatPage(QWidget):
     def _start_new_chat(self):
         """Reset the conversation history."""
         self._clear_history()
-        self.conversation_history.clear()
         self.current_message = ""
         self.current_reply_label = None
         self.queue_label = None
+        asyncio.create_task(self._reset_remote_history())
 
     @Slot()
     def _on_send(self):
         text = self.input.text().strip()
         if not text:
             return
-        history_payload = self._history_payload()
         self._append_message("user", text)
-        self._append_history_entry("user", text)
         self.input.clear()
         self.current_message = ""  # Reset message buffer
         self.current_reply_label = None
         self._show_typing_indicator()
-        asyncio.create_task(self._stream(text, history_payload))
+        asyncio.create_task(self._stream(text))
 
-    async def _stream(self, prompt: str, history: list[dict[str, str]]):
+    async def _stream(self, prompt: str):
         try:
-            await asyncio.to_thread(self._stream_sse, prompt, history)
+            await asyncio.to_thread(self._stream_sse, prompt)
             return
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
@@ -189,21 +186,20 @@ class ChatPage(QWidget):
             return
 
         try:
-            message = await asyncio.to_thread(self._legacy_post, prompt, history)
+            message = await asyncio.to_thread(self._legacy_post, prompt)
         except Exception as exc:
             self.signals.token.emit(f"[fout] {exc}")
         else:
             self.signals.token.emit(message)
         self.signals.done.emit()
 
-    def _stream_sse(self, prompt: str, history: list[dict[str, str]]) -> None:
+    def _stream_sse(self, prompt: str) -> None:
         """Stream SSE events van het backend (incl. wachtrij status)."""
 
         url = f"{API_BASE}/api/v1/ask/stream"
         payload = {
             "prompt": prompt,
             "max_new_tokens": 128,
-            "history": history or [],
         }
         with requests.post(
             url,
@@ -245,7 +241,7 @@ class ChatPage(QWidget):
         # Als de stream eindigt zonder done-event, sluit netjes af.
         self.signals.done.emit()
 
-    def _legacy_post(self, prompt: str, history: list[dict[str, str]]) -> str:
+    def _legacy_post(self, prompt: str) -> str:
         """Fallback naar het niet-streamende endpoint."""
 
         endpoints = ["/api/v1/ask"]
@@ -256,7 +252,7 @@ class ChatPage(QWidget):
             try:
                 resp = requests.post(
                     url,
-                    json={"prompt": prompt, "history": history or []},
+                    json={"prompt": prompt},
                     timeout=5,
                     headers=headers,
                 )
@@ -383,8 +379,6 @@ class ChatPage(QWidget):
             fallback = "Geen antwoord beschikbaar."
             self._set_label_text(self.current_reply_label, fallback)
             assistant_text = fallback
-        if assistant_text:
-            self._append_history_entry("assistant", assistant_text)
         self.current_message = ""
         self.current_reply_label = None
 
@@ -582,24 +576,27 @@ class ChatPage(QWidget):
         if self.empty_label:
             self.empty_label.show()
 
-    def _append_history_entry(self, role: str, text: str):
-        clean = (text or "").strip()
-        if not clean:
-            return
-        # Skip propagating backend error messages to the model context.
-        if clean.startswith("[fout]"):
-            return
-        self.conversation_history.append({"role": role, "content": clean})
-
-    def _history_payload(self) -> list[dict[str, str]]:
-        return [
-            {"role": entry.get("role", ""), "content": entry.get("content", "")}
-            for entry in self.conversation_history
-        ]
-
     def _scroll_to_bottom(self):
         def _do_scroll():
             bar = self.history_scroll.verticalScrollBar()
             bar.setValue(bar.maximum())
 
         QTimer.singleShot(0, _do_scroll)
+
+    async def _reset_remote_history(self) -> None:
+        try:
+            await asyncio.to_thread(self._post_reset_history)
+        except Exception:
+            pass
+
+    def _post_reset_history(self) -> None:
+        url = f"{API_BASE}/api/v1/ask/reset"
+        headers = self._auth_headers()
+        try:
+            resp = requests.post(url, timeout=5, headers=headers)
+            if resp.status_code == 401 and self._refresh_auto_token():
+                headers = self._auth_headers()
+                resp = requests.post(url, timeout=5, headers=headers)
+            resp.raise_for_status()
+        except Exception:
+            return

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import build_augmented_prompt, handle_ask, log_prompt
+from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
@@ -63,6 +64,7 @@ store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
+chat_history = ChatHistoryStore(max_items=20)
 ollama_switch_lock = asyncio.Lock()
 support_access = SupportAccessManager()
 admin_tokens = AdminTokenManager(
@@ -332,15 +334,26 @@ def api_signon(req: SignOnRequest):
 
 
 @app.post("/api/v1/ask")
-async def api_ask(req: ChatRequest, _: TokenRecord = Depends(require_token)):
-    return await handle_ask(req)
+async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
+    history = chat_history.get(record.token)
+    chat_history.append(record.token, "user", req.prompt)
+    response = await handle_ask(req, history=history)
+    chat_history.append(record.token, "assistant", response.get("message", ""))
+    return response
 
 
-async def sse_stream_generator(req: ChatRequest):
+@app.post("/api/v1/ask/reset")
+def api_ask_reset(record: TokenRecord = Depends(require_token)):
+    chat_history.clear(record.token)
+    return {"ok": True}
+
+
+async def sse_stream_generator(req: ChatRequest, history: list, history_key: str):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
-    final_prompt = build_augmented_prompt(req.prompt, req.history)
+    final_prompt = build_augmented_prompt(req.prompt, history)
     log_prompt(final_prompt)
+    assistant_chunks: list[str] = []
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -385,6 +398,7 @@ async def sse_stream_generator(req: ChatRequest):
                         if "response" in data:
                             token = data["response"]
                             if token:  # Only send non-empty tokens
+                                assistant_chunks.append(token)
                                 event_data = json.dumps({"token": token, "done": False})
                                 yield f"data: {event_data}\n\n"
 
@@ -413,9 +427,14 @@ async def sse_stream_generator(req: ChatRequest):
         words = mock_response.split()
         for word in words:
             token = word + " "
+            assistant_chunks.append(token)
             event_data = json.dumps({"token": token, "done": False})
             yield f"data: {event_data}\n\n"
             await asyncio.sleep(0.1)
+
+    assistant_text = "".join(assistant_chunks).strip()
+    if assistant_text:
+        chat_history.append(history_key, "assistant", assistant_text)
 
     # Send final done event
     event_data = json.dumps({"done": True})
@@ -423,10 +442,12 @@ async def sse_stream_generator(req: ChatRequest):
 
 
 @app.post("/api/v1/ask/stream")
-async def api_ask_stream(req: ChatRequest, _: TokenRecord = Depends(require_token)):
+async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     """Stream SSE response with queue position and token-by-token LLM output."""
+    history = chat_history.get(record.token)
+    chat_history.append(record.token, "user", req.prompt)
     return StreamingResponse(
-        sse_stream_generator(req),
+        sse_stream_generator(req, history, record.token),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

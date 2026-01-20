@@ -188,8 +188,12 @@ def _fallback_response(original_prompt: str) -> str:
     )
 
 
-async def handle_ask(req: ChatRequest) -> dict:
-    final_prompt = build_augmented_prompt(req.prompt, req.history)
+async def handle_ask(
+    req: ChatRequest,
+    history: Optional[Sequence[ChatMessage]] = None,
+) -> dict:
+    history_to_use = req.history if history is None else history
+    final_prompt = build_augmented_prompt(req.prompt, history_to_use)
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt)
