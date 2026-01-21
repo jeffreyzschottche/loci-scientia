@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -12,7 +13,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth_tokens import BearerTokenStore, TokenRecord
-from .apiAsk import build_augmented_prompt, handle_ask, log_prompt
+from .apiAsk import build_augmented_prompt, handle_ask, log_prompt, summarize_history
+from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
@@ -63,6 +65,7 @@ store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
+chat_history = ChatHistoryStore(max_items=20)
 ollama_switch_lock = asyncio.Lock()
 support_access = SupportAccessManager()
 admin_tokens = AdminTokenManager(
@@ -70,6 +73,11 @@ admin_tokens = AdminTokenManager(
     admin_usernames=settings.admin_usernames,
 )
 admin_tokens.ensure()
+summary_task: Optional[asyncio.Task] = None
+last_prompt_at: Optional[datetime] = None
+last_idle_summary_at: Optional[datetime] = None
+
+SUMMARY_POLL_SECONDS = 60
 
 
 def _extract_bearer_token(auth_header: Optional[str]) -> str:
@@ -96,6 +104,76 @@ def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRe
     ):
         raise HTTPException(status_code=403, detail="Admin token vereist")
     return record
+
+
+def _mark_prompt_activity() -> None:
+    global last_prompt_at
+    last_prompt_at = datetime.now(timezone.utc)
+
+
+async def _run_summary_cycle() -> None:
+    snapshots = chat_history.snapshot_pending()
+    for snapshot in snapshots:
+        try:
+            summary = await summarize_history(
+                snapshot.messages,
+                existing_summary=snapshot.summary,
+            )
+        except Exception as exc:  # pragma: no cover - onverwachte fout
+            logger.warning("Samenvatting maken faalde voor sessie %s: %s", snapshot.key, exc)
+            continue
+        if not summary:
+            continue
+        chat_history.apply_summary(
+            snapshot.key,
+            summary,
+            snapshot.updated_at,
+            snapshot.summarized_at,
+        )
+
+
+async def _maybe_run_idle_summary() -> None:
+    global last_idle_summary_at
+    if settings.chat_summary_idle_minutes <= 0:
+        return
+    if last_prompt_at is None:
+        return
+    idle_for = datetime.now(timezone.utc) - last_prompt_at
+    if idle_for < timedelta(minutes=settings.chat_summary_idle_minutes):
+        return
+    if last_idle_summary_at and last_idle_summary_at >= last_prompt_at:
+        return
+    await _run_summary_cycle()
+    last_idle_summary_at = datetime.now(timezone.utc)
+
+
+async def _idle_summary_loop() -> None:
+    if settings.chat_summary_idle_minutes <= 0:
+        return
+    while True:
+        await _maybe_run_idle_summary()
+        await asyncio.sleep(SUMMARY_POLL_SECONDS)
+
+
+@app.on_event("startup")
+async def start_idle_summary_task() -> None:
+    global summary_task
+    if settings.chat_summary_idle_minutes <= 0:
+        return
+    if summary_task is None or summary_task.done():
+        summary_task = asyncio.create_task(_idle_summary_loop())
+
+
+@app.on_event("shutdown")
+async def stop_idle_summary_task() -> None:
+    global summary_task
+    if summary_task is None:
+        return
+    summary_task.cancel()
+    try:
+        await summary_task
+    except asyncio.CancelledError:
+        pass
 
 
 @app.get("/health")
@@ -332,15 +410,27 @@ def api_signon(req: SignOnRequest):
 
 
 @app.post("/api/v1/ask")
-async def api_ask(req: ChatRequest, _: TokenRecord = Depends(require_token)):
-    return await handle_ask(req)
+async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
+    _mark_prompt_activity()
+    history = chat_history.get(record.token)
+    chat_history.append(record.token, "user", req.prompt)
+    response = await handle_ask(req, history=history)
+    chat_history.append(record.token, "assistant", response.get("message", ""))
+    return response
 
 
-async def sse_stream_generator(req: ChatRequest):
+@app.post("/api/v1/ask/reset")
+def api_ask_reset(record: TokenRecord = Depends(require_token)):
+    chat_history.clear(record.token)
+    return {"ok": True}
+
+
+async def sse_stream_generator(req: ChatRequest, history: list, history_key: str):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
-    final_prompt = build_augmented_prompt(req.prompt)
+    final_prompt = build_augmented_prompt(req.prompt, history)
     log_prompt(final_prompt)
+    assistant_chunks: list[str] = []
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -385,6 +475,7 @@ async def sse_stream_generator(req: ChatRequest):
                         if "response" in data:
                             token = data["response"]
                             if token:  # Only send non-empty tokens
+                                assistant_chunks.append(token)
                                 event_data = json.dumps({"token": token, "done": False})
                                 yield f"data: {event_data}\n\n"
 
@@ -413,9 +504,14 @@ async def sse_stream_generator(req: ChatRequest):
         words = mock_response.split()
         for word in words:
             token = word + " "
+            assistant_chunks.append(token)
             event_data = json.dumps({"token": token, "done": False})
             yield f"data: {event_data}\n\n"
             await asyncio.sleep(0.1)
+
+    assistant_text = "".join(assistant_chunks).strip()
+    if assistant_text:
+        chat_history.append(history_key, "assistant", assistant_text)
 
     # Send final done event
     event_data = json.dumps({"done": True})
@@ -423,10 +519,13 @@ async def sse_stream_generator(req: ChatRequest):
 
 
 @app.post("/api/v1/ask/stream")
-async def api_ask_stream(req: ChatRequest, _: TokenRecord = Depends(require_token)):
+async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     """Stream SSE response with queue position and token-by-token LLM output."""
+    _mark_prompt_activity()
+    history = chat_history.get(record.token)
+    chat_history.append(record.token, "user", req.prompt)
     return StreamingResponse(
-        sse_stream_generator(req),
+        sse_stream_generator(req, history, record.token),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

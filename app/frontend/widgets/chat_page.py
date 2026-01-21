@@ -142,6 +142,7 @@ class ChatPage(QWidget):
         self.current_message = ""
         self.current_reply_label = None
         self.queue_label = None
+        asyncio.create_task(self._reset_remote_history())
 
     @Slot()
     def _on_send(self):
@@ -164,7 +165,7 @@ class ChatPage(QWidget):
             if status == 401:
                 # Probeer automatisch een token op te halen voor de lokale admin.
                 if self._refresh_auto_token():
-                    await asyncio.to_thread(self._stream_sse, prompt)
+                    await asyncio.to_thread(self._stream_sse, prompt, history)
                     return
                 message = (
                     self._auto_token_error
@@ -196,9 +197,13 @@ class ChatPage(QWidget):
         """Stream SSE events van het backend (incl. wachtrij status)."""
 
         url = f"{API_BASE}/api/v1/ask/stream"
+        payload = {
+            "prompt": prompt,
+            "max_new_tokens": 128,
+        }
         with requests.post(
             url,
-            json={"prompt": prompt, "max_new_tokens": 128},
+            json=payload,
             stream=True,
             timeout=60,
             headers=self._auth_headers(),
@@ -369,10 +374,11 @@ class ChatPage(QWidget):
     @Slot()
     def _on_done(self):
         """Finalize the current message."""
-        if self.current_reply_label and not self.current_message:
-            self._set_label_text(
-                self.current_reply_label, "Geen antwoord beschikbaar."
-            )
+        assistant_text = (self.current_message or "").strip()
+        if self.current_reply_label and not assistant_text:
+            fallback = "Geen antwoord beschikbaar."
+            self._set_label_text(self.current_reply_label, fallback)
+            assistant_text = fallback
         self.current_message = ""
         self.current_reply_label = None
 
@@ -576,3 +582,21 @@ class ChatPage(QWidget):
             bar.setValue(bar.maximum())
 
         QTimer.singleShot(0, _do_scroll)
+
+    async def _reset_remote_history(self) -> None:
+        try:
+            await asyncio.to_thread(self._post_reset_history)
+        except Exception:
+            pass
+
+    def _post_reset_history(self) -> None:
+        url = f"{API_BASE}/api/v1/ask/reset"
+        headers = self._auth_headers()
+        try:
+            resp = requests.post(url, timeout=5, headers=headers)
+            if resp.status_code == 401 and self._refresh_auto_token():
+                headers = self._auth_headers()
+                resp = requests.post(url, timeout=5, headers=headers)
+            resp.raise_for_status()
+        except Exception:
+            return

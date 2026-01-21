@@ -2,11 +2,12 @@ import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional, Sequence
 import httpx
 
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
-from .schemas import ChatRequest, Contact, Device
+from .schemas import ChatMessage, ChatRequest, Contact, Device
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -110,8 +111,37 @@ def _prompt_template() -> str:
         )
 
 
-def build_augmented_prompt(user_prompt: str) -> str:
-    base_lines = [f"User Prompt: {user_prompt.strip()}"]
+def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]:
+    if not history:
+        return []
+    lines: list[str] = []
+    for idx, message in enumerate(history, 1):
+        role = (message.role or "").lower()
+        if role == "assistant":
+            speaker = "AITJE"
+        elif role == "system":
+            speaker = "Systeem"
+        else:
+            speaker = "Gebruiker"
+        content = _flatten_multiline(message.content or "")
+        if not content:
+            continue
+        lines.append(f"{idx}. {speaker}: {content}")
+    return lines
+
+
+def build_augmented_prompt(
+    user_prompt: str, history: Optional[Sequence[ChatMessage]] = None
+) -> str:
+    base_lines: list[str] = []
+
+    history_lines = _format_history_lines(history)
+    if history_lines:
+        base_lines.append("Vorige chat:")
+        base_lines.extend(history_lines)
+        base_lines.append("")
+
+    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
     context_lines = _gather_context_lines(user_prompt)
     if context_lines:
         base_lines.append("> context:")
@@ -132,7 +162,52 @@ def log_prompt(final_prompt: str) -> None:
         pass
 
 
-async def _call_ollama(prompt: str) -> str:
+def _build_summary_prompt(
+    history_lines: Sequence[str],
+    existing_summary: Optional[str] = None,
+) -> str:
+    lines: list[str] = [
+        "Vat de chatgeschiedenis compact samen.",
+        "Bewaar namen, afspraken, besluiten, open vragen en voorkeuren.",
+        "Schrijf in het Nederlands en blijf feitelijk.",
+        "Gebruik maximaal 8 zinnen.",
+        "",
+    ]
+    if existing_summary:
+        lines.append("Bestaande samenvatting:")
+        lines.append(existing_summary.strip())
+        lines.append("")
+    lines.append("Nieuwe berichten:")
+    lines.extend(history_lines)
+    return "\n".join(lines).strip()
+
+
+def _fallback_summary(existing_summary: Optional[str], history_lines: Sequence[str]) -> str:
+    combined = []
+    if existing_summary:
+        combined.append(existing_summary.strip())
+    combined.append(" ".join(history_lines))
+    text = " ".join(part for part in combined if part)
+    return text[:1200].rstrip()
+
+
+async def summarize_history(
+    history: Optional[Sequence[ChatMessage]] = None,
+    existing_summary: Optional[str] = None,
+) -> str:
+    history_lines = _format_history_lines(history)
+    if not history_lines:
+        return (existing_summary or "").strip()
+    prompt = _build_summary_prompt(history_lines, existing_summary)
+    try:
+        summary = await _call_ollama(prompt, options={"num_predict": 256})
+    except Exception as exc:  # pragma: no cover - netwerkfout
+        logger.warning("Samenvatting maken faalde: %s", exc)
+        summary = _fallback_summary(existing_summary, history_lines)
+    return (summary or "").strip()
+
+
+async def _call_ollama(prompt: str, options: Optional[dict] = None) -> str:
     ollama_url = f"{settings.ollama_base_url}/api/generate"
     payload = {
         "model": settings.ollama_model,
@@ -142,6 +217,11 @@ async def _call_ollama(prompt: str) -> str:
     max_context = settings.ollama_max_context.get(settings.ollama_model)
     if isinstance(max_context, int) and max_context > 0:
         payload["options"] = {"num_ctx": max_context}
+    if options:
+        if "options" in payload:
+            payload["options"].update(options)
+        else:
+            payload["options"] = dict(options)
     async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
         response = await client.post(ollama_url, json=payload)
         response.raise_for_status()
@@ -158,8 +238,12 @@ def _fallback_response(original_prompt: str) -> str:
     )
 
 
-async def handle_ask(req: ChatRequest) -> dict:
-    final_prompt = build_augmented_prompt(req.prompt)
+async def handle_ask(
+    req: ChatRequest,
+    history: Optional[Sequence[ChatMessage]] = None,
+) -> dict:
+    history_to_use = req.history if history is None else history
+    final_prompt = build_augmented_prompt(req.prompt, history_to_use)
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt)
