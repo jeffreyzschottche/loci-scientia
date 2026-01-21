@@ -1,11 +1,13 @@
 from functools import partial
 from typing import Optional
 
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QFrame,
+    QGraphicsDropShadowEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -100,13 +102,17 @@ class DevicesPage(QWidget):
                 background-color: #ffffff;
                 border-radius: 28px;
                 border: 1px solid #e5e7eb;
-                box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
             }
             QLabel {
                 color: #111111;
             }
             """
         )
+        shadow = QGraphicsDropShadowEffect(card)
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(15, 23, 42, 30))
+        card.setGraphicsEffect(shadow)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)

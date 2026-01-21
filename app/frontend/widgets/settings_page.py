@@ -68,8 +68,9 @@ class SettingsPage(QWidget):
         vbox.setSpacing(12)
 
         theme_box = self._settings_card("Interface Instellingen")
-        theme_layout = QVBoxLayout(theme_box)
-        theme_layout.setSpacing(12)
+        theme_layout = theme_box.layout()
+        if theme_layout is not None:
+            theme_layout.setSpacing(12)
         theme_selector = QHBoxLayout()
         theme_selector.addWidget(QLabel("Thema"))
         combo = QComboBox()
