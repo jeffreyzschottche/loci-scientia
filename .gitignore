@@ -22,3 +22,5 @@ pmtiles.log
 promptlog.log
 
 *.pmtiles
+
+ollama.pid

@@ -162,7 +162,52 @@ def log_prompt(final_prompt: str) -> None:
         pass
 
 
-async def _call_ollama(prompt: str) -> str:
+def _build_summary_prompt(
+    history_lines: Sequence[str],
+    existing_summary: Optional[str] = None,
+) -> str:
+    lines: list[str] = [
+        "Vat de chatgeschiedenis compact samen.",
+        "Bewaar namen, afspraken, besluiten, open vragen en voorkeuren.",
+        "Schrijf in het Nederlands en blijf feitelijk.",
+        "Gebruik maximaal 8 zinnen.",
+        "",
+    ]
+    if existing_summary:
+        lines.append("Bestaande samenvatting:")
+        lines.append(existing_summary.strip())
+        lines.append("")
+    lines.append("Nieuwe berichten:")
+    lines.extend(history_lines)
+    return "\n".join(lines).strip()
+
+
+def _fallback_summary(existing_summary: Optional[str], history_lines: Sequence[str]) -> str:
+    combined = []
+    if existing_summary:
+        combined.append(existing_summary.strip())
+    combined.append(" ".join(history_lines))
+    text = " ".join(part for part in combined if part)
+    return text[:1200].rstrip()
+
+
+async def summarize_history(
+    history: Optional[Sequence[ChatMessage]] = None,
+    existing_summary: Optional[str] = None,
+) -> str:
+    history_lines = _format_history_lines(history)
+    if not history_lines:
+        return (existing_summary or "").strip()
+    prompt = _build_summary_prompt(history_lines, existing_summary)
+    try:
+        summary = await _call_ollama(prompt, options={"num_predict": 256})
+    except Exception as exc:  # pragma: no cover - netwerkfout
+        logger.warning("Samenvatting maken faalde: %s", exc)
+        summary = _fallback_summary(existing_summary, history_lines)
+    return (summary or "").strip()
+
+
+async def _call_ollama(prompt: str, options: Optional[dict] = None) -> str:
     ollama_url = f"{settings.ollama_base_url}/api/generate"
     payload = {
         "model": settings.ollama_model,
@@ -172,6 +217,11 @@ async def _call_ollama(prompt: str) -> str:
     max_context = settings.ollama_max_context.get(settings.ollama_model)
     if isinstance(max_context, int) and max_context > 0:
         payload["options"] = {"num_ctx": max_context}
+    if options:
+        if "options" in payload:
+            payload["options"].update(options)
+        else:
+            payload["options"] = dict(options)
     async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
         response = await client.post(ollama_url, json=payload)
         response.raise_for_status()

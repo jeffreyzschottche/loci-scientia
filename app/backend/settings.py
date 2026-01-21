@@ -54,6 +54,7 @@ class Settings(BaseModel):
     ollama_max_context: dict[str, Optional[int]] = Field(default_factory=dict)
     ollama_timeout: float = 60.0
     admin_usernames: list[str] = ["ADMIN"]
+    chat_summary_idle_minutes: int = 0
 
 
 def get_settings() -> "Settings":
@@ -87,6 +88,13 @@ def get_settings() -> "Settings":
         ollama_timeout = 60.0
     raw_admins = os.environ.get("ADMIN_USERS", "ADMIN")
     admin_usernames = [name.strip() for name in raw_admins.split(",") if name.strip()]
+    raw_idle_summary = os.environ.get("CHAT_SUMMARY_IDLE_MINUTES", "").strip()
+    try:
+        chat_summary_idle_minutes = int(raw_idle_summary) if raw_idle_summary else 0
+    except ValueError:
+        chat_summary_idle_minutes = 0
+    if chat_summary_idle_minutes < 0:
+        chat_summary_idle_minutes = 0
     return Settings(
         offline_assets_dir=offline_assets_dir,
         ollama_base_url=ollama_base_url,
@@ -96,6 +104,7 @@ def get_settings() -> "Settings":
         ollama_max_context=ollama_max_context,
         ollama_timeout=ollama_timeout,
         admin_usernames=admin_usernames or ["ADMIN"],
+        chat_summary_idle_minutes=chat_summary_idle_minutes,
     )
 
 
