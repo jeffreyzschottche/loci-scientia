@@ -1,86 +1,25 @@
 import requests
-from datetime import datetime
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox,
     QDialog,
-    QFormLayout,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QPlainTextEdit,
-    QScrollArea,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from ..config import (
-    API_ROUTES_DEFAULT_PORT,
     BACKEND_BEARER_TOKEN,
     BACKEND_HTTP,
     DEVICE_MDNS,
     PUBLIC_BASE_URL,
 )
-from .dialog_style import MODAL_QSS, show_error_dialog
+from .dialog_style import MODAL_QSS
 
 API_BASE = BACKEND_HTTP
-
-
-class ApiDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Nieuwe API Route")
-        self.setStyleSheet(MODAL_QSS)
-        wrapper = QVBoxLayout(self)
-        wrapper.setContentsMargins(0, 0, 0, 0)
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QScrollArea.NoFrame)
-        wrapper.addWidget(scroll_area)
-        form_host = QWidget()
-        scroll_area.setWidget(form_host)
-        form = QFormLayout(form_host)
-        form.setContentsMargins(24, 24, 24, 24)
-        self.name = QLineEdit()
-        self.method = QComboBox()
-        self.method.addItems(["GET", "POST", "PUT", "DELETE"])
-        self.path = QLineEdit("/api/example")
-        self.port = QSpinBox()
-        self.port.setRange(1, 65535)
-        self.port.setValue(API_ROUTES_DEFAULT_PORT)
-        self.kb = QLineEdit("Algemene Kennisbank")
-        self.api_key = QLineEdit("aitje_sk_xxx")
-
-        form.addRow("Naam", self.name)
-        form.addRow("Methode", self.method)
-        form.addRow("Pad", self.path)
-        form.addRow("Port", self.port)
-        form.addRow("Kennisbank", self.kb)
-        form.addRow("API Key", self.api_key)
-
-        buttons = QHBoxLayout()
-        save = QPushButton("Opslaan")
-        cancel = QPushButton("Annuleren")
-        save.clicked.connect(self.accept)
-        cancel.clicked.connect(self.reject)
-        buttons.addWidget(save)
-        buttons.addWidget(cancel)
-        form.addRow(buttons)
-
-    def payload(self) -> dict:
-        return {
-            "name": self.name.text(),
-            "method": self.method.currentText(),
-            "path": self.path.text(),
-            "port": int(self.port.value()),
-            "knowledge_base": self.kb.text() or None,
-            "api_key": self.api_key.text() or None,
-            "active": True,
-        }
 
 
 class ApiPage(QWidget):
@@ -90,72 +29,23 @@ class ApiPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
 
-        self.stats_cards = []
+        self.stats_cards = {}
         stats_row = QHBoxLayout()
         stats_row.setSpacing(16)
-        for heading, caption in [
-            ("Vandaag", "+12% vs gisteren"),
-            ("Deze week", "+8% vs vorige week"),
-            ("Deze maand", "+15% vs vorige maand"),
-            ("Actieve keys", "van 10 mogelijk"),
+        for key, heading, caption in [
+            ("requests_today", "TOTAAL VANDAAG", "Hoe vaak de API is gebruikt."),
+            ("active_users", "ACTIEVE GEBRUIKERS", "Aantal klanten of apps vandaag."),
+            ("avg_response", "GEM. REACTIETIJD", "Gemiddelde wachttijd."),
         ]:
             card, metric_label, caption_label = self._build_stat_card(
-                heading, "0", caption
+                heading, "n.v.t.", caption
             )
-            self.stats_cards.append(
-                {"metric": metric_label, "caption": caption_label, "title": heading}
-            )
+            self.stats_cards[key] = {
+                "metric": metric_label,
+                "caption": caption_label,
+            }
             stats_row.addWidget(card)
         layout.addLayout(stats_row)
-
-        self.chart_card = self._card()
-        chart_layout = QVBoxLayout(self.chart_card)
-        chart_layout.setContentsMargins(20, 16, 20, 20)
-        chart_layout.setSpacing(12)
-        chart_title = QLabel("API Verkeer vandaag")
-        chart_title.setStyleSheet("font-size:18px; font-weight:700;")
-        chart_layout.addWidget(chart_title)
-        self.chart_placeholder = QFrame()
-        self.chart_placeholder.setMinimumHeight(220)
-        self.chart_placeholder.setStyleSheet(
-            "background:#f9fafb; border:1px solid #f2f2f2; border-radius:18px;"
-        )
-        chart_layout.addWidget(self.chart_placeholder)
-        layout.addWidget(self.chart_card)
-
-        self.keys_card = self._card()
-        keys_layout = QVBoxLayout(self.keys_card)
-        keys_layout.setContentsMargins(20, 20, 20, 20)
-        keys_layout.setSpacing(16)
-
-        keys_header = QHBoxLayout()
-        keys_title = QLabel("API Keys")
-        keys_title.setStyleSheet("font-size:20px; font-weight:700;")
-        keys_sub = QLabel("Toegangssleutels per omgeving")
-        keys_sub.setStyleSheet("color:#9ca3af; letter-spacing:0.08em;")
-        title_group = QVBoxLayout()
-        title_group.setContentsMargins(0, 0, 0, 0)
-        title_group.setSpacing(2)
-        title_group.addWidget(keys_title)
-        title_group.addWidget(keys_sub)
-        keys_header.addLayout(title_group)
-        keys_header.addStretch(1)
-        new_key = QPushButton("Nieuwe key aanmaken")
-        new_key.setCursor(Qt.PointingHandCursor)
-        new_key.setStyleSheet(
-            "QPushButton { background:#facc15; color:#050505; padding:10px 26px;"
-            "border-radius:20px; font-weight:600; }"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        new_key.setFixedHeight(40)
-        new_key.clicked.connect(self._add_route)
-        keys_header.addWidget(new_key)
-        keys_layout.addLayout(keys_header)
-
-        self.keys_list = QVBoxLayout()
-        self.keys_list.setContentsMargins(0, 0, 0, 0)
-        self.keys_list.setSpacing(12)
-        keys_layout.addLayout(self.keys_list)
 
         self.doc_card = self._card()
         doc_layout = QVBoxLayout(self.doc_card)
@@ -211,7 +101,6 @@ class ApiPage(QWidget):
         doc_layout.addWidget(mdns_hint)
         doc_layout.addWidget(example_label)
         doc_layout.addWidget(example)
-        layout.addWidget(self.keys_card)
         layout.addWidget(self.doc_card)
 
         self._reload()
@@ -226,7 +115,7 @@ class ApiPage(QWidget):
         metric = QLabel(value)
         metric.setStyleSheet("font-size:32px; font-weight:800;")
         detail = QLabel(caption)
-        detail.setStyleSheet("color:#16a34a; font-size:12px;")
+        detail.setStyleSheet("color:#6b7280; font-size:12px;")
         card_layout.addWidget(heading)
         card_layout.addWidget(metric)
         card_layout.addWidget(detail)
@@ -238,175 +127,102 @@ class ApiPage(QWidget):
         card.setObjectName("Card")
         return card
 
-    def _clear_layout(self, layout: QVBoxLayout):
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+    def _update_stats(self, routes: list[dict]):
+        def fmt_int(value: int) -> str:
+            return f"{value:,}".replace(",", ".")
 
-    def _render_empty_state(self, message: str):
-        placeholder = QLabel(message)
-        placeholder.setStyleSheet("color:#9ca3af; font-style:italic;")
-        placeholder.setAlignment(Qt.AlignCenter)
-        placeholder.setMinimumHeight(80)
-        self.keys_list.addWidget(placeholder)
+        total_requests = None
+        avg_response_ms = None
+        active_users = None
 
-    def _render_route(self, route: dict):
-        entry = QFrame()
-        entry.setStyleSheet("background:#fdfdfd; border:none; border-radius:18px;")
-        row = QHBoxLayout(entry)
-        row.setContentsMargins(16, 12, 16, 12)
-        row.setSpacing(16)
+        stats = self._fetch_stats()
+        if stats:
+            if isinstance(stats.get("requests_today"), int):
+                total_requests = stats["requests_today"]
+            if isinstance(stats.get("active_users_today"), int):
+                active_users = stats["active_users_today"]
+            avg_response_ms = stats.get("avg_response_ms")
+            if isinstance(avg_response_ms, int):
+                avg_response_ms = float(avg_response_ms)
+            if not isinstance(avg_response_ms, (int, float)):
+                avg_response_ms = None
 
-        icon = QLabel("🔐")
-        icon.setFixedSize(40, 40)
-        icon.setAlignment(Qt.AlignCenter)
-        row.addWidget(icon, 0, Qt.AlignTop)
+        if total_requests is None:
+            request_values = [
+                route.get("requests_today")
+                for route in routes
+                if isinstance(route.get("requests_today"), (int, float))
+            ]
+            if request_values:
+                total_requests = int(sum(request_values))
 
-        info = QVBoxLayout()
-        info.setSpacing(4)
-        name = QLabel(route.get("name", "Onbekende route"))
-        name.setStyleSheet("font-size:16px; font-weight:600;")
-        details = QLabel(
-            f"{route.get('method', 'POST')} {route.get('path', '')}  •  Port {route.get('port', '-')}"
-        )
-        details.setStyleSheet("color:#6b7280;")
-        info.addWidget(name)
-        info.addWidget(details)
-        info.addWidget(
-            QLabel(
-                f"Laatst gebruikt: {datetime.now().strftime('%d-%m-%Y, %H:%M')}  •  API Key: {route.get('api_key') or '-'}"
-            )
-        )
-        row.addLayout(info, 1)
+        if avg_response_ms is None:
+            response_values = [
+                route.get("avg_response_ms")
+                for route in routes
+                if isinstance(route.get("avg_response_ms"), (int, float))
+            ]
+            if response_values:
+                avg_response_ms = sum(response_values) / len(response_values)
 
-        actions = QVBoxLayout()
-        actions.setSpacing(6)
-        is_active = bool(route.get("active"))
-        status = QLabel("Actief" if is_active else "Inactief")
-        active_styles = ("#fef9c3", "#facc15", "#111111")
-        inactive_styles = ("#f5f5f5", "#d4d4d8", "#6b7280")
-        bg, border, text_color = active_styles if is_active else inactive_styles
-        status.setAlignment(Qt.AlignCenter)
-        status.setStyleSheet(
-            f"background:{bg}; border:1px solid {border}; border-radius:14px;"
-            f"padding:4px 16px; color:{text_color}; font-weight:600;"
-        )
-        status.setFixedHeight(28)
-        actions.addWidget(status, 0, Qt.AlignRight)
+        if active_users is None:
+            active_ids = []
+            for route in routes:
+                if route.get("active"):
+                    key = route.get("api_key") or route.get("id")
+                    if key:
+                        active_ids.append(key)
+            active_users = len(set(active_ids))
 
-        buttons = QHBoxLayout()
-        edit = QPushButton("Bewerken")
-        edit.setCursor(Qt.PointingHandCursor)
-        edit.setStyleSheet(
-            "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 18px; }"
-            "QPushButton:hover { border-color:#111111; }"
-        )
-        edit.setFixedHeight(40)
-        delete = QPushButton("Verwijderen")
-        delete.setCursor(Qt.PointingHandCursor)
-        delete.setStyleSheet(
-            "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 18px; }"
-            "QPushButton:hover { background:#facc15; color:#050505; }"
-        )
-        delete.setFixedHeight(40)
-        edit.clicked.connect(lambda _=False, rid=route["id"]: self._edit_route(rid))
-        delete.clicked.connect(lambda _=False, rid=route["id"]: self._delete_route(rid))
-        buttons.addWidget(edit)
-        buttons.addWidget(delete)
-        actions.addLayout(buttons)
-        row.addLayout(actions)
+        if avg_response_ms is None:
+            avg_label = "n.v.t."
+            avg_caption = "Nog geen metingen."
+        elif avg_response_ms >= 1000:
+            avg_label = f"{avg_response_ms / 1000:.1f}s".replace(".", ",")
+            avg_caption = "Gemiddelde wachttijd."
+        else:
+            avg_label = f"{int(avg_response_ms)} ms"
+            avg_caption = "Gemiddelde wachttijd."
 
-        self.keys_list.addWidget(entry)
+        if total_requests is None:
+            req_label = "n.v.t."
+            req_caption = "Nog geen metingen."
+        else:
+            req_label = fmt_int(total_requests)
+            req_caption = "Hoe vaak de API is gebruikt."
 
-    def _update_stats(self, count: int, active: int):
-        today = str(300 + count * 7)
-        week = f"{2.4 + count * 0.1:.1f}k"
-        month = f"{19 + count * 0.2:.1f}k"
-        active_caption = f"{active} van 10 mogelijk"
-        values = [today, week, month, str(active)]
-        captions = [
-            "+12% vs gisteren",
-            "+8% vs vorige week",
-            "+15% vs vorige maand",
-            active_caption,
-        ]
-        for idx, card in enumerate(self.stats_cards):
-            card["metric"].setText(values[idx])
-            card["caption"].setText(captions[idx])
+        active_caption = "Aantal klanten of apps vandaag."
+
+        self.stats_cards["requests_today"]["metric"].setText(req_label)
+        self.stats_cards["requests_today"]["caption"].setText(req_caption)
+        self.stats_cards["active_users"]["metric"].setText(str(active_users))
+        self.stats_cards["active_users"]["caption"].setText(active_caption)
+        self.stats_cards["avg_response"]["metric"].setText(avg_label)
+        self.stats_cards["avg_response"]["caption"].setText(avg_caption)
 
     def _reload(self):
-        self._clear_layout(self.keys_list)
+        self._update_stats([])
+
+    def _fetch_stats(self):
         try:
             resp = requests.get(
-                f"{API_BASE}/routes",
+                f"{API_BASE}/api/stats",
                 timeout=3,
                 headers=self._auth_headers(),
             )
             resp.raise_for_status()
-        except requests.RequestException as exc:  # pragma: no cover - UI feedback only
-            self._render_empty_state(f"Kan routes niet laden: {exc}")
-            return
+            data = resp.json()
+            if isinstance(data, dict):
+                return data
+        except requests.RequestException:
+            return None
+        except ValueError:
+            return None
+        return None
 
-        if not resp.content.strip():
-            data = []
-        else:
-            try:
-                data = resp.json()
-            except ValueError:  # pragma: no cover - UI feedback only
-                self._render_empty_state("Kan routes niet laden: ongeldige JSON.")
-                return
-
-        if not isinstance(data, list):  # pragma: no cover - UI feedback only
-            self._render_empty_state("Kan routes niet laden: onverwacht antwoordtype.")
-            return
-
-        if not data:
-            self._render_empty_state("Nog geen API keys ingesteld.")
-        else:
-            for route in data:
-                self._render_route(route)
-
-        active = sum(1 for route in data if route.get("active"))
-        self._update_stats(len(data), active)
-
-    def _add_route(self):
-        dialog = ApiDialog(self)
-        if dialog.exec():
-            try:
-                requests.post(
-                    f"{API_BASE}/routes",
-                    json=dialog.payload(),
-                    timeout=3,
-                    headers=self._auth_headers(),
-                )
-                self._reload()
-            except Exception as exc:
-                show_error_dialog(self, "Fout", str(exc))
-
-    def _edit_route(self, rid: str):
-        try:
-            requests.patch(
-                f"{API_BASE}/routes/{rid}",
-                json={"active": True},
-                timeout=3,
-                headers=self._auth_headers(),
-            )
-            self._reload()
-        except Exception as exc:
-            show_error_dialog(self, "Fout", str(exc))
-
-    def _delete_route(self, rid: str):
-        try:
-            requests.delete(
-                f"{API_BASE}/routes/{rid}",
-                timeout=3,
-                headers=self._auth_headers(),
-            )
-            self._reload()
-        except Exception as exc:
-            show_error_dialog(self, "Fout", str(exc))
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._update_stats([])
 
     @staticmethod
     def _auth_headers() -> dict:

@@ -1,12 +1,23 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Lock
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -19,7 +30,6 @@ from .admin_access import AdminTokenManager
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .schemas import (
-    ApiRouteCreate,
     BearerTokenResponse,
     ChatRequest,
     Contact,
@@ -34,7 +44,6 @@ from .schemas import (
     SupportAccessStatus,
 )
 from .settings import settings
-from .store import Store
 from .support_access import SupportAccessError, SupportAccessManager
 
 logger = logging.getLogger(__name__)
@@ -61,7 +70,6 @@ if settings.offline_assets_dir and settings.offline_assets_dir.exists():
     if sprites_dir.exists():
         app.mount("/sprites", StaticFiles(directory=str(sprites_dir)), name="sprites")
 
-store = Store()
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
@@ -78,6 +86,66 @@ last_prompt_at: Optional[datetime] = None
 last_idle_summary_at: Optional[datetime] = None
 
 SUMMARY_POLL_SECONDS = 60
+
+
+class ApiStats:
+    def __init__(self):
+        self._lock = Lock()
+        self._day = datetime.now(timezone.utc).date()
+        self._requests_today = 0
+        self._latency_total_ms = 0.0
+        self._latency_count = 0
+        self._active_ids: set[str] = set()
+
+    def _rollover(self, now: datetime) -> None:
+        today = now.date()
+        if today == self._day:
+            return
+        self._day = today
+        self._requests_today = 0
+        self._latency_total_ms = 0.0
+        self._latency_count = 0
+        self._active_ids.clear()
+
+    def record(self, path: str, auth_header: Optional[str], duration_ms: float) -> None:
+        if not path.startswith("/api/v1/"):
+            return
+        now = datetime.now(timezone.utc)
+        token_value = None
+        if auth_header:
+            scheme, _, value = auth_header.partition(" ")
+            if scheme.lower() == "bearer" and value.strip():
+                token_value = value.strip()
+            else:
+                token_value = auth_header.strip()
+        with self._lock:
+            self._rollover(now)
+            self._requests_today += 1
+            self._latency_total_ms += duration_ms
+            self._latency_count += 1
+            if token_value:
+                token_hash = hashlib.sha256(token_value.encode("utf-8")).hexdigest()[:16]
+                self._active_ids.add(token_hash)
+
+    def snapshot(self) -> dict:
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            self._rollover(now)
+            avg = (
+                self._latency_total_ms / self._latency_count
+                if self._latency_count
+                else None
+            )
+            avg_ms = round(avg, 1) if avg is not None else None
+            return {
+                "date": self._day.isoformat(),
+                "requests_today": self._requests_today,
+                "active_users_today": len(self._active_ids),
+                "avg_response_ms": avg_ms,
+            }
+
+
+api_stats = ApiStats()
 
 
 def _extract_bearer_token(auth_header: Optional[str]) -> str:
@@ -104,6 +172,24 @@ def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRe
     ):
         raise HTTPException(status_code=403, detail="Admin token vereist")
     return record
+
+
+@app.middleware("http")
+async def collect_api_stats(request: Request, call_next):
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000
+        try:
+            api_stats.record(
+                request.url.path,
+                request.headers.get("authorization"),
+                duration_ms,
+            )
+        except Exception:  # pragma: no cover - best effort
+            pass
 
 
 def _mark_prompt_activity() -> None:
@@ -181,6 +267,11 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/stats")
+def api_stats_snapshot(_: TokenRecord = Depends(require_admin_token)):
+    return api_stats.snapshot()
+
+
 async def _pull_ollama_model(model: str) -> None:
     success = False
     async for data in _stream_ollama_pull(model):
@@ -244,11 +335,6 @@ def _persist_ollama_model(model: str) -> None:
         ENV_FILE_PATH.write_text("".join(lines), encoding="utf-8")
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f".env schrijven faalde: {exc}") from exc
-
-
-@app.get("/routes")
-def list_routes(_: TokenRecord = Depends(require_admin_token)):
-    return [route.model_dump() for route in store.list()]
 
 
 @app.get("/api/v1/ollama/models")
@@ -371,31 +457,6 @@ def support_access_disable(
     except SupportAccessError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return state.to_response()
-
-
-@app.post("/routes")
-def create_route(
-    data: ApiRouteCreate,
-    _: TokenRecord = Depends(require_admin_token),
-):
-    return store.create(data).model_dump()
-
-
-@app.patch("/routes/{rid}")
-def update_route(
-    rid: str,
-    patch: dict,
-    _: TokenRecord = Depends(require_admin_token),
-):
-    if rid not in store.routes:
-        raise HTTPException(status_code=404, detail="not found")
-    return store.update(rid, patch).model_dump()
-
-
-@app.delete("/routes/{rid}")
-def delete_route(rid: str, _: TokenRecord = Depends(require_admin_token)):
-    store.delete(rid)
-    return {"ok": True}
 
 
 @app.post("/api/v1/signon", response_model=BearerTokenResponse)
