@@ -80,27 +80,6 @@ class DevicePatch(BaseModel):
     device_name: Optional[str] = None
 
 
-class ApiRoute(BaseModel):
-    id: str
-    name: str
-    method: Literal["GET", "POST", "PUT", "DELETE"]
-    path: str
-    port: int
-    knowledge_base: Optional[str] = None
-    api_key: Optional[str] = None
-    active: bool = True
-
-
-class ApiRouteCreate(BaseModel):
-    name: str
-    method: Literal["GET", "POST", "PUT", "DELETE"]
-    path: str
-    port: int
-    knowledge_base: Optional[str] = None
-    api_key: Optional[str] = None
-    active: bool = True
-
-
 class SignOnRequest(BaseModel):
     user_name: str
     password: str
