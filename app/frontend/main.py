@@ -357,7 +357,7 @@ def main():
     window = MainWindow()
 
     def on_boot_finished():
-        window.show()
+        window.showFullScreen()
 
     boot_screen = BootScreen(
         logo_path=boot_logo_path,
