@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -37,6 +38,7 @@ class ContactCard(QFrame):
         self.setStyleSheet(
             "QFrame#Card { background:#ffffff; border:1px solid #e5e7eb; border-radius:20px; }"
         )
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 14, 20, 14)
         layout.setSpacing(16)
@@ -229,6 +231,7 @@ class ContactsPage(QWidget):
                 card.map_requested.connect(self._handle_view_map)
                 card.add_location_requested.connect(self._handle_location_assignment)
                 self.list_layout.addWidget(card)
+            self.list_layout.addStretch(1)
 
     def reload_contacts(self, *, select_id: str | None = None) -> None:
         try:
