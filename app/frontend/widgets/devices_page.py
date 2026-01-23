@@ -2,27 +2,23 @@ from functools import partial
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QFrame,
-    QGraphicsDropShadowEffect,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
-    QPlainTextEdit,
     QScrollArea,
-    QToolButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 import requests
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP
 from .dialog_style import (
     OverlayDialog,
     ask_yes_no_dialog,
@@ -31,45 +27,87 @@ from .dialog_style import (
 )
 
 
+class DeviceCard(QFrame):
+    def __init__(self, device: dict, on_edit, on_delete):
+        super().__init__()
+        self.device = device
+        self.setObjectName("DeviceCard")
+        self.setStyleSheet(
+            "QFrame#DeviceCard { background:#ffffff; border:1px solid #e5e7eb; border-radius:20px; }"
+        )
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 14, 20, 14)
+        layout.setSpacing(16)
+
+        info = QVBoxLayout()
+        info.setSpacing(4)
+
+        name_label = QLabel(device.get("device_name", "Onbekend apparaat"))
+        name_label.setStyleSheet("font-size:18px; font-weight:700;")
+        info.addWidget(name_label)
+
+        info.addWidget(self._line_with_icon("👤", device.get("user_name", "")))
+        info.addWidget(self._line_with_icon("✉️", device.get("email", "")))
+        info.addWidget(self._line_with_icon("☎️", device.get("phone", "")))
+
+        actions = QHBoxLayout()
+        actions.setSpacing(6)
+        edit_btn = QPushButton("Bewerk")
+        edit_btn.setCursor(Qt.PointingHandCursor)
+        edit_btn.setStyleSheet(
+            "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 16px; }"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        edit_btn.setFixedHeight(40)
+        delete_btn = QPushButton("Verwijder")
+        delete_btn.setCursor(Qt.PointingHandCursor)
+        delete_btn.setStyleSheet(
+            "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 16px; }"
+            "QPushButton:hover { background:#facc15; color:#050505; }"
+        )
+        delete_btn.setFixedHeight(40)
+        edit_btn.clicked.connect(partial(on_edit, device))
+        delete_btn.clicked.connect(partial(on_delete, device))
+        actions.addWidget(edit_btn)
+        actions.addWidget(delete_btn)
+        actions.addStretch(1)
+        info.addLayout(actions)
+
+        layout.addLayout(info, 1)
+
+    def _line_with_icon(self, icon: str, text: str) -> QWidget:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        icon_label = QLabel(icon)
+        icon_label.setFixedWidth(18)
+        label = QLabel(text or "-")
+        label.setStyleSheet("color:#4b5563;")
+        row.addWidget(icon_label, 0, Qt.AlignTop)
+        row.addWidget(label, 1)
+        container = QWidget()
+        container.setLayout(row)
+        return container
+
+
 class DevicesPage(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 0, 16, 8)
-        layout.setSpacing(6)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         header = QHBoxLayout()
-        header.setSpacing(12)
-        header.setContentsMargins(0, 0, 0, 0)
-        title_block = QVBoxLayout()
-        title_block.setSpacing(2)
-        title_block.setContentsMargins(0, 0, 0, 0)
-        self.summary_label = QLabel("0 devices")
-        self.summary_label.setStyleSheet(
-            "color:#6b7280; letter-spacing:0.2em; font-size:11px;"
-        )
-        title_block.addWidget(self.summary_label)
-        header.addLayout(title_block)
         header.addStretch(1)
-        url_btn = QPushButton("Toon client URL")
-        url_btn.setStyleSheet(
-            "QPushButton {"
-            "  border:1px solid #d1d5db;"
-            "  border-radius:20px;"
-            "  padding:8px 20px;"
-            "}"
-            "QPushButton:hover { border-color:#111111; }"
-        )
-        url_btn.setFixedHeight(40)
-        url_btn.clicked.connect(self._show_client_hint)
-        header.addWidget(url_btn)
-        add_btn = QPushButton("Apparaat toevoegen")
+        add_btn = QPushButton("+ Apparaat toevoegen")
+        add_btn.setCursor(Qt.PointingHandCursor)
         add_btn.setStyleSheet(
             "QPushButton {"
             "  background:#facc15;"
             "  color:#050505;"
+            "  padding:10px 26px;"
             "  border-radius:20px;"
-            "  padding:10px 28px;"
             "  font-weight:600;"
             "}"
             "QPushButton:hover { background:#050505; color:#facc15; }"
@@ -79,87 +117,46 @@ class DevicesPage(QWidget):
         header.addWidget(add_btn)
         layout.addLayout(header)
 
-        grid_wrapper = QWidget()
-        grid_wrapper_layout = QVBoxLayout(grid_wrapper)
-        grid_wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
+        self.list_container = QWidget()
+        self.list_container.setStyleSheet("background: transparent;")
+        self.list_layout = QVBoxLayout(self.list_container)
+        self.list_layout.setContentsMargins(0, 0, 0, 0)
+        self.list_layout.setSpacing(12)
+        self.scroll_area.setWidget(self.list_container)
+        layout.addWidget(self.scroll_area, 1)
 
-        self.grid = QGridLayout()
-        self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(16)
-        grid_wrapper_layout.addLayout(self.grid)
-        layout.addWidget(grid_wrapper)
+        self.count_label = QLabel("Totaal: 0 apparaten")
+        self.count_label.setStyleSheet("color:#6b7280; font-size:12px;")
+        layout.addWidget(self.count_label, 0, Qt.AlignLeft)
 
         self.devices: list[dict] = []
         self._reload_devices()
 
-    def _device_card(self, device: dict) -> QFrame:
-        card = QFrame()
-        card.setObjectName("DeviceCard")
-        card.setStyleSheet(
-            """
-            QFrame#DeviceCard {
-                background-color: #ffffff;
-                border-radius: 28px;
-                border: 1px solid #e5e7eb;
-            }
-            QLabel {
-                color: #111111;
-            }
-            """
-        )
-        shadow = QGraphicsDropShadowEffect(card)
-        shadow.setBlurRadius(24)
-        shadow.setOffset(0, 8)
-        shadow.setColor(QColor(15, 23, 42, 30))
-        card.setGraphicsEffect(shadow)
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
+    def _render_devices(self):
+        while self.list_layout.count():
+            item = self.list_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
-        header = QHBoxLayout()
-        name = QLabel(device.get("device_name", "Onbekend apparaat"))
-        name.setStyleSheet("font-weight:700; letter-spacing:0.02em; color:#111111;")
-        header.addWidget(name)
-        header.addStretch(1)
-
-        edit_btn = QToolButton()
-        edit_btn.setToolTip("Bewerken")
-        edit_btn.setText("✏️")
-        edit_btn.setIconSize(edit_btn.size())
-        edit_btn.clicked.connect(partial(self._open_edit_dialog, device))
-        edit_btn.setStyleSheet(
-            "QToolButton { border:none; font-size:16px; }"
-            "QToolButton:hover { opacity:0.8; }"
-        )
-        header.addWidget(edit_btn)
-
-        delete_btn = QToolButton()
-        delete_btn.setToolTip("Verwijderen")
-        delete_btn.setText("🗑️")
-        delete_btn.setIconSize(delete_btn.size())
-        delete_btn.clicked.connect(partial(self._confirm_delete, device))
-        delete_btn.setStyleSheet(
-            "QToolButton { border:none; font-size:16px; }"
-            "QToolButton:hover { opacity:0.8; }"
-        )
-        header.addWidget(delete_btn)
-
-        layout.addLayout(header)
-
-        meta = QVBoxLayout()
-        for label, value in (
-            ("Gebruiker", device.get("user_name", "")),
-            ("E-mail", device.get("email", "")),
-            ("Telefoon", device.get("phone", "")),
-        ):
-            row = QLabel(f"{label}: {value or '-'}")
-            row.setStyleSheet(
-                "color:#111111; background:#f9fafb; border-radius:20px; padding:10px 16px;"
-            )
-            meta.addWidget(row)
-        layout.addLayout(meta)
-
-        return card
+        if not self.devices:
+            placeholder = QLabel("Geen apparaten gevonden.")
+            placeholder.setStyleSheet("color:#9ca3af; font-style:italic;")
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setMinimumHeight(160)
+            self.list_layout.addWidget(placeholder)
+        else:
+            for device in self.devices:
+                card = DeviceCard(device, self._open_edit_dialog, self._confirm_delete)
+                self.list_layout.addWidget(card)
+            self.list_layout.addStretch(1)
 
     def _reload_devices(self) -> None:
         try:
@@ -173,64 +170,14 @@ class DevicesPage(QWidget):
         except Exception:
             self.devices = []
 
-        # Clear grid
-        while self.grid.count():
-            item = self.grid.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setParent(None)
-
-        for idx, device in enumerate(self.devices):
-            self.grid.addWidget(self._device_card(device), idx // 2, idx % 2)
-
-        self.summary_label.setText(f"{len(self.devices)} devices")
+        self.count_label.setText(f"Totaal: {len(self.devices)} apparaten")
+        self._render_devices()
 
     def _open_add_dialog(self) -> None:
         self._open_device_dialog()
 
     def _open_edit_dialog(self, device: dict) -> None:
         self._open_device_dialog(device)
-
-    def _show_client_hint(self) -> None:
-        curl_cmd = (
-            f"# Bearer token ophalen\n"
-            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/signon \\\n"
-            '  -H "Content-Type: application/json" \\\n'
-            "  -d '{\"user_name\":\"<naam>\",\"password\":\"<wachtwoord>\"}'\n\n"
-            "# Vraag sturen met token\n"
-            f"curl -X POST {PUBLIC_BASE_URL}/api/v1/ask \\\n"
-            '  -H "Authorization: Bearer <token>" \\\n'
-            '  -H "Content-Type: application/json" \\\n'
-            "  -d '{\"prompt\":\"Hoi vanaf mijn device\"}'"
-        )
-        lines = [
-            f"Verbind clients met: {PUBLIC_BASE_URL}",
-            f"Sign-on endpoint: {PUBLIC_BASE_URL}/api/v1/signon",
-            f"Ask endpoint: {PUBLIC_BASE_URL}/api/v1/ask",
-            "",
-            "Gebruik onderstaand voorbeeld:",
-        ]
-        self._show_styled_popup("Client URL", lines, curl_cmd)
-
-    def _show_styled_popup(self, title: str, lines: list[str], code_block: str) -> None:
-        dialog = OverlayDialog(self)
-        dialog.setWindowTitle(title)
-        layout = dialog.card_layout
-        for line in lines:
-            label = QLabel(line)
-            label.setWordWrap(True)
-            layout.addWidget(label)
-        code = QPlainTextEdit()
-        code.setReadOnly(True)
-        code.setPlainText(code_block)
-        code.setStyleSheet("font-family:'SFMono-Regular','Menlo','Courier New',monospace;")
-        layout.addWidget(code)
-        close_btn = QPushButton("Sluiten")
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setFixedSize(120, 36)
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn, 0, Qt.AlignCenter)
-        dialog.exec()
 
     def _open_device_dialog(self, device: Optional[dict] = None) -> None:
         is_edit = device is not None
@@ -262,6 +209,7 @@ class DevicesPage(QWidget):
         device_name_edit = QLineEdit()
 
         password_row = QHBoxLayout()
+        password_row.setContentsMargins(0, 0, 0, 0)
         password_row.addWidget(password_edit)
         toggle_btn = QPushButton("Toon")
         toggle_btn.setCheckable(True)
