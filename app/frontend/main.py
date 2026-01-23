@@ -21,11 +21,9 @@ from qasync import QEventLoop
 from .config import BACKEND_WS
 from .net.ws_client import WSClient
 from .theme import AITJE_QSS
-from .widgets.api_page import ApiPage
 from .widgets.chat_page import ChatPage
 from .widgets.contacts_page import ContactsPage
 from .widgets.devices_page import DevicesPage
-from .widgets.faq_page import FAQPage
 from .widgets.headerbar import HeaderBar
 from .widgets.knowledge_page import KnowledgePage
 from .widgets.maps_page import MapsPage
@@ -233,14 +231,12 @@ class MainWindow(QMainWindow):
 
         self.pages = {
             "chat": ChatPage(self.ws_client),
-            "api": ApiPage(),
             "kb": KnowledgePage(),
             "maps": MapsPage(),
             "contacts": ContactsPage(),
             "net": NetworkStatusPage(),
             "devices": DevicesPage(),
             "settings": SettingsPage(),
-            "faq": FAQPage(),
         }
 
         contacts_page = self.pages.get("contacts")
@@ -308,25 +304,21 @@ class MainWindow(QMainWindow):
             page.setVisible(name == key)
         titles = {
             "chat": "Chat Assistant",
-            "api": "API Management",
             "kb": "Kennisbank",
             "maps": "Maps",
             "contacts": "Contacten",
             "net": "Netwerk Status",
             "devices": "Connected Devices & Gebruikersbeheer",
             "settings": "Instellingen",
-            "faq": "FAQ",
         }
         subtitles = {
             "chat": "Start een gesprek met je lokale AI-assistent",
-            "api": "Beheer je API keys en bekijk gebruik statistieken",
             "kb": "Beheer kennisbankdocumenten en SD-kaartopslag",
             "maps": "Bekijk contactlocaties op de kaart",
             "contacts": "Beheer je contacten en bekijk ze op de kaart",
             "net": "Realtime overzicht van netwerk- en systeemstatus",
             "devices": "Beheer verbonden apparaten en gebruikersaccounts voor het systeem",
             "settings": "Beheer de systeeminstellingen en voorkeuren voor AITJE OS",
-            "faq": "Veelgestelde vragen en antwoorden",
         }
         self.header.set_title(titles.get(key, "AITJE"))
         self.header.set_subtitle(subtitles.get(key, "Lokale AI-console"))
