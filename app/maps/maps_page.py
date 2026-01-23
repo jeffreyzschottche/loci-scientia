@@ -20,14 +20,12 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QFrame,
     QGridLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPushButton,
     QAbstractItemView,
     QStyledItemDelegate,
@@ -49,7 +47,13 @@ from app.frontend.config import (
     PMTILES_TILE_TEMPLATE,
 )
 from app.frontend.widgets.contact_form import ContactFormDialog
-from app.frontend.widgets.dialog_style import MODAL_QSS
+from app.frontend.widgets.dialog_style import (
+    OverlayDialog,
+    ask_yes_no_dialog,
+    show_error_dialog,
+    show_info_dialog,
+    show_warning_dialog,
+)
 
 
 class MapBridge(QObject):
@@ -688,12 +692,16 @@ class MapsPage(QWidget):
         location = self._last_location or {}
         contacts = self._fetch_contacts()
 
-        dialog = QDialog(self)
+        dialog = OverlayDialog(self)
         dialog.setWindowTitle("Locatie koppelen aan contact")
-        dialog.setStyleSheet(MODAL_QSS)
-        form = QFormLayout(dialog)
-        form.setContentsMargins(16, 16, 16, 16)
-        form.setSpacing(12)
+        form_host = QWidget()
+        form = QFormLayout(form_host)
+        form.setRowWrapPolicy(QFormLayout.WrapAllRows)
+        form.setContentsMargins(28, 24, 28, 24)
+        form.setSpacing(6)
+        form.setVerticalSpacing(14)
+        dialog.card_layout.setContentsMargins(0, 0, 0, 0)
+        dialog.card_layout.addWidget(form_host)
 
         label = location.get("label") or location.get("street") or "Onbekende locatie"
         city = location.get("city")
@@ -732,10 +740,23 @@ class MapsPage(QWidget):
                     break
 
         new_btn = QPushButton("Nieuw contact…")
+        new_btn.setCursor(Qt.PointingHandCursor)
+        new_btn.setFixedSize(140, 36)
         form.addRow(new_btn)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        form.addRow(buttons)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(16)
+        btn_row.addStretch(1)
+        cancel_btn = QPushButton("Annuleren")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.setFixedSize(120, 36)
+        save_btn = QPushButton("Opslaan")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.setFixedSize(120, 36)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(save_btn)
+        btn_row.addStretch(1)
+        form.addRow(btn_row)
 
         def create_new_contact() -> None:
             contact = self._create_contact_with_location(location)
@@ -746,15 +767,15 @@ class MapsPage(QWidget):
         def save_location() -> None:
             selected = combo.currentData()
             if selected is None:
-                QMessageBox.warning(dialog, "Geen contact", "Selecteer een contact.")
+                show_warning_dialog(dialog, "Geen contact", "Selecteer een contact.")
                 return
             dialog.done(1)
             self._update_contact_location(selected, location)
             self._pending_contact_id_for_pin = None
 
         new_btn.clicked.connect(create_new_contact)
-        buttons.accepted.connect(save_location)
-        buttons.rejected.connect(dialog.reject)
+        save_btn.clicked.connect(save_location)
+        cancel_btn.clicked.connect(dialog.reject)
 
         result = dialog.exec()
         if result != QDialog.Accepted:
@@ -767,7 +788,7 @@ class MapsPage(QWidget):
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Kon contacten niet laden:\n{exc}",
@@ -913,7 +934,7 @@ class MapsPage(QWidget):
             resp.raise_for_status()
             updated = resp.json()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Contact kon niet worden bijgewerkt:\n{exc}",
@@ -938,12 +959,12 @@ class MapsPage(QWidget):
         contact_id = contact.get("id")
         if contact_id is None:
             return
-        confirm = QMessageBox.question(
+        confirm = ask_yes_no_dialog(
             self,
             "Locatie verwijderen",
             "Weet je zeker dat je de locatie voor dit contact wilt verwijderen?",
         )
-        if confirm != QMessageBox.Yes:
+        if not confirm:
             return
         payload = {
             "location_label": None,
@@ -963,7 +984,7 @@ class MapsPage(QWidget):
             )
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Locatie kon niet worden verwijderd:\n{exc}",
@@ -980,12 +1001,12 @@ class MapsPage(QWidget):
         contact_id = contact.get("id")
         if contact_id is None:
             return
-        confirm = QMessageBox.question(
+        confirm = ask_yes_no_dialog(
             self,
             "Contact verwijderen",
             f"Weet je zeker dat je {contact.get('name', 'dit contact')} wilt verwijderen?",
         )
-        if confirm != QMessageBox.Yes:
+        if not confirm:
             return
         try:
             resp = requests.delete(
@@ -994,7 +1015,7 @@ class MapsPage(QWidget):
             )
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Contact kon niet worden verwijderd:\n{exc}",
@@ -1074,7 +1095,7 @@ class MapsPage(QWidget):
             return
         contact_id = str(contact_id_value)
         if contact.get("location_lat") is None or contact.get("location_lon") is None:
-            QMessageBox.information(
+            show_info_dialog(
                 self,
                 "Geen locatie",
                 "Dit contact heeft geen GPS-locatie om te tonen.",
@@ -1094,7 +1115,7 @@ class MapsPage(QWidget):
             return
         contact_id_value = contact.get("id")
         if contact_id_value is None:
-            QMessageBox.warning(
+            show_warning_dialog(
                 self,
                 "Contact onbekend",
                 "Dit contact kan niet gekoppeld worden omdat het geen ID heeft.",
@@ -1112,7 +1133,7 @@ class MapsPage(QWidget):
             message = f"Selecteer op de kaart een nieuwe locatie voor {name}."
         else:
             message = f"Selecteer op de kaart een locatie voor {name}."
-        QMessageBox.information(self, "Locatie koppelen", message)
+        show_info_dialog(self, "Locatie koppelen", message)
         self._start_pin_mode()
 
     def _location_payload(self, location: Dict[str, Any]) -> Dict[str, Any]:
@@ -1137,14 +1158,14 @@ class MapsPage(QWidget):
             )
             resp.raise_for_status()
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Locatie kon niet opgeslagen worden:\n{exc}",
             )
             return
 
-        QMessageBox.information(
+        show_info_dialog(
             self,
             "Locatie opgeslagen",
             f"Locatie is gekoppeld aan {contact.get('name', 'contact')}.",
@@ -1185,7 +1206,7 @@ class MapsPage(QWidget):
                 self.contact_changed.emit(str(contact_id))
             return created
         except Exception as exc:
-            QMessageBox.critical(
+            show_error_dialog(
                 self,
                 "Fout",
                 f"Contact kon niet aangemaakt worden:\n{exc}",

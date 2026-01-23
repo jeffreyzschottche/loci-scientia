@@ -1,10 +1,10 @@
 from functools import partial
 from typing import Optional
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QFrame,
     QGraphicsDropShadowEffect,
@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QPlainTextEdit,
     QScrollArea,
-    QStyle,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -25,7 +24,7 @@ import requests
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL
 from .dialog_style import (
-    MODAL_QSS,
+    OverlayDialog,
     ask_yes_no_dialog,
     show_error_dialog,
     show_warning_dialog,
@@ -214,12 +213,9 @@ class DevicesPage(QWidget):
         self._show_styled_popup("Client URL", lines, curl_cmd)
 
     def _show_styled_popup(self, title: str, lines: list[str], code_block: str) -> None:
-        dialog = QDialog(self)
+        dialog = OverlayDialog(self)
         dialog.setWindowTitle(title)
-        dialog.setStyleSheet(MODAL_QSS)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(12)
+        layout = dialog.card_layout
         for line in lines:
             label = QLabel(line)
             label.setWordWrap(True)
@@ -230,28 +226,32 @@ class DevicesPage(QWidget):
         code.setStyleSheet("font-family:'SFMono-Regular','Menlo','Courier New',monospace;")
         layout.addWidget(code)
         close_btn = QPushButton("Sluiten")
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setFixedSize(120, 36)
         close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn, 0, Qt.AlignRight)
+        layout.addWidget(close_btn, 0, Qt.AlignCenter)
         dialog.exec()
 
     def _open_device_dialog(self, device: Optional[dict] = None) -> None:
         is_edit = device is not None
-        dialog = QDialog(self)
+        dialog = OverlayDialog(self)
         dialog.setWindowTitle(
             "Apparaat bewerken" if is_edit else "Nieuw apparaat & gebruiker"
         )
-        dialog.setStyleSheet(MODAL_QSS)
 
-        dialog_layout = QVBoxLayout(dialog)
-        dialog_layout.setContentsMargins(0, 0, 0, 0)
+        dialog.card_layout.setContentsMargins(0, 0, 0, 0)
+        dialog.card_layout.setSpacing(0)
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QScrollArea.NoFrame)
-        dialog_layout.addWidget(scroll_area)
+        dialog.card_layout.addWidget(scroll_area)
         form_host = QWidget()
         scroll_area.setWidget(form_host)
         form = QFormLayout(form_host)
-        form.setContentsMargins(24, 24, 24, 24)
+        form.setRowWrapPolicy(QFormLayout.WrapAllRows)
+        form.setContentsMargins(28, 24, 28, 24)
+        form.setSpacing(6)
+        form.setVerticalSpacing(14)
         user_name_edit = QLineEdit()
         email_edit = QLineEdit()
         password_edit = QLineEdit()
@@ -265,6 +265,10 @@ class DevicesPage(QWidget):
         password_row.addWidget(password_edit)
         toggle_btn = QPushButton("Toon")
         toggle_btn.setCheckable(True)
+        toggle_btn.setStyleSheet(
+            "QPushButton { background:#f3f4f6; color:#0f172a; min-width:70px; min-height:36px; border-radius:18px; font-size:12px; }"
+            "QPushButton:hover { background:#e5e7eb; }"
+        )
 
         def _toggle_password(checked: bool) -> None:
             if checked:
@@ -296,13 +300,21 @@ class DevicesPage(QWidget):
         form.addRow("Telefoon (06)", phone_edit)
         form.addRow("Device naam", device_name_edit)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog
-        )
-        form.addRow(buttons)
-
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(16)
+        btn_row.addStretch(1)
+        cancel_btn = QPushButton("Annuleren")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.setFixedSize(120, 36)
+        cancel_btn.clicked.connect(dialog.reject)
+        save_btn = QPushButton("Opslaan")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.setFixedSize(120, 36)
+        save_btn.clicked.connect(dialog.accept)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(save_btn)
+        btn_row.addStretch(1)
+        form.addRow(btn_row)
 
         if dialog.exec() != QDialog.Accepted:
             return

@@ -2,20 +2,20 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLineEdit,
     QPushButton,
     QScrollArea,
     QWidget,
-    QVBoxLayout,
 )
 
-from .dialog_style import MODAL_QSS, show_warning_dialog
+from .dialog_style import OverlayDialog, show_warning_dialog
 
-class ContactFormDialog(QDialog):
+
+class ContactFormDialog(OverlayDialog):
     """Reusable contact form dialog that can prefill location data."""
 
     def __init__(
@@ -28,21 +28,23 @@ class ContactFormDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setStyleSheet(MODAL_QSS)
         self._payload_cache: Optional[Dict[str, Any]] = None
         self._save_mode: str = "save"
 
-        wrapper = QVBoxLayout(self)
-        wrapper.setContentsMargins(0, 0, 0, 0)
+        self.card_layout.setContentsMargins(0, 0, 0, 0)
+        self.card_layout.setSpacing(0)
+
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QScrollArea.NoFrame)
-        wrapper.addWidget(scroll_area)
+        self.card_layout.addWidget(scroll_area)
         form_host = QWidget()
         scroll_area.setWidget(form_host)
         form = QFormLayout(form_host)
-        form.setContentsMargins(24, 24, 24, 24)
-        form.setSpacing(12)
+        form.setRowWrapPolicy(QFormLayout.WrapAllRows)
+        form.setContentsMargins(28, 24, 28, 24)
+        form.setSpacing(6)
+        form.setVerticalSpacing(14)
 
         self.name_edit = QLineEdit()
         self.company_edit = QLineEdit()
@@ -72,18 +74,26 @@ class ContactFormDialog(QDialog):
         form.addRow("Latitude", self.lat_edit)
         form.addRow("Longitude", self.lon_edit)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self
-        )
-        save_button = buttons.button(QDialogButtonBox.Save)
-        if save_button:
-            save_button.setText("Opslaan")
-        buttons.accepted.connect(self._handle_save_clicked)
-        buttons.rejected.connect(self.reject)
-        self.save_and_map_button = QPushButton("Opslaan + locatie via kaart")
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(16)
+        btn_row.addStretch(1)
+        cancel_btn = QPushButton("Annuleren")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.setFixedSize(120, 36)
+        cancel_btn.clicked.connect(self.reject)
+        save_btn = QPushButton("Opslaan")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.setFixedSize(120, 36)
+        save_btn.clicked.connect(self._handle_save_clicked)
+        self.save_and_map_button = QPushButton("Opslaan + kaart")
+        self.save_and_map_button.setCursor(Qt.PointingHandCursor)
+        self.save_and_map_button.setFixedSize(140, 36)
         self.save_and_map_button.clicked.connect(self._handle_save_and_map_clicked)
-        buttons.addButton(self.save_and_map_button, QDialogButtonBox.ActionRole)
-        form.addRow(buttons)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(save_btn)
+        btn_row.addWidget(self.save_and_map_button)
+        btn_row.addStretch(1)
+        form.addRow(btn_row)
 
         if initial:
             self._apply_initial(initial)

@@ -1,7 +1,6 @@
 import requests
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -17,7 +16,7 @@ from ..config import (
     DEVICE_MDNS,
     PUBLIC_BASE_URL,
 )
-from .dialog_style import MODAL_QSS
+from .dialog_style import OverlayDialog
 
 API_BASE = BACKEND_HTTP
 
@@ -252,12 +251,9 @@ class ApiPage(QWidget):
         self._show_styled_popup("API URL", body, curl_cmd)
 
     def _show_styled_popup(self, title: str, lines: list[str], code_block: str):
-        dialog = QDialog(self)
+        dialog = OverlayDialog(self)
         dialog.setWindowTitle(title)
-        dialog.setStyleSheet(MODAL_QSS)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(12)
+        layout = dialog.card_layout
         for line in lines:
             label = QLabel(line)
             label.setWordWrap(True)
@@ -268,6 +264,8 @@ class ApiPage(QWidget):
         code.setStyleSheet("font-family:'SFMono-Regular','Menlo','Courier New',monospace;")
         layout.addWidget(code)
         close_btn = QPushButton("Sluiten")
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setFixedSize(120, 36)
         close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn, 0, Qt.AlignRight)
+        layout.addWidget(close_btn, 0, Qt.AlignCenter)
         dialog.exec()
