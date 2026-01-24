@@ -7,6 +7,8 @@ app/maps/europe.pmtilesx
 app/maps/europe.pmtilesb
 app/maps/europe.pmtilesp
 fastembed_models/
+qdrant_storage/*
+!qdrant_storage/.gitkeep
 fileslociscientiamaps/
 
 gemma2:2b,gemma3:1b,gemma3:4b/
