@@ -45,14 +45,12 @@ class Sidebar(QWidget):
         self.buttons: dict[str, QPushButton] = {}
         nav_items = [
             ("chat", "💬", "Chat"),
-            ("api", "📊", "API Management"),
             ("kb", "📚", "Kennisbank"),
             ("maps", "🗺", "Maps"),
             ("contacts", "👥", "Contacten"),
-            ("net", "🌐", "Netwerk Status"),
+            ("net", "🌐", "Netwerk"),
             ("devices", "📱", "Connected Devices"),
             ("settings", "⚡", "Instellingen"),
-            ("faq", "❓", "FAQ"),
         ]
         for key, icon, label in nav_items:
             btn = QPushButton()
