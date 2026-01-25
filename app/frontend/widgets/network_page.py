@@ -41,7 +41,7 @@ class NetworkStatusPage(QWidget):
 
         layout.addStretch(1)
 
-        wifi_button = QPushButton("Open WiFi instellingen")
+        wifi_button = QPushButton("Open WiFi configuratie")
         wifi_button.setFixedHeight(56)
         wifi_button.setStyleSheet(
             "QPushButton {"
@@ -185,8 +185,10 @@ class NetworkStatusPage(QWidget):
         return {}
 
     def _open_wifi_settings(self):
-        if QProcess.startDetached(
-            "nm-connection-editor", ["--show", "--type=802-11-wireless"]
-        ):
+        if QProcess.startDetached("iwgtk"):
             return
-        QProcess.startDetached("nm-connection-editor")
+        if QProcess.startDetached("x-terminal-emulator", ["-e", "nmtui"]):
+            return
+        if QProcess.startDetached("gnome-terminal", ["--", "nmtui"]):
+            return
+        QProcess.startDetached("xterm", ["-e", "nmtui"])
