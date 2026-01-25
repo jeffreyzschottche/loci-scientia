@@ -9,7 +9,7 @@ import shutil
 
 from fastembed import TextEmbedding
 
-DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "fastembed"
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LOCAL_MODEL_ROOT = _PROJECT_ROOT / "fastembed_models"
@@ -69,15 +69,17 @@ def _seed_local_model(embedder: TextEmbedding, target_dir: Path) -> None:
 
 
 @lru_cache(maxsize=None)
-def _model_metadata(model_name: str) -> dict:
+def _model_metadata(model_name: str) -> Optional[dict]:
     for model in TextEmbedding.list_supported_models():
         if model_name.lower() == model["model"].lower():
             return model
-    raise ValueError(f"Onbekend fastembed model: {model_name}")
+    return None
 
 
 def _snapshot_dir_from_cache(cache_dir: Path, model_name: str) -> Optional[Path]:
     meta = _model_metadata(model_name)
+    if not meta:
+        return None
     sources = meta.get("sources") or {}
     hf_repo = sources.get("hf")
     if not hf_repo:
@@ -114,12 +116,10 @@ def _is_model_complete(model_dir: Path) -> bool:
     """Check of het model compleet is door te kijken of de essentiële bestanden bestaan."""
     if not model_dir.exists():
         return False
-    # Check voor de ONNX model bestanden
-    required_files = ["model_optimized.onnx", "config.json"]
-    for filename in required_files:
-        if not (model_dir / filename).exists():
-            return False
-    return True
+    # Check voor een ONNX model bestand (model_optimized.onnx of dynamic_uint8.onnx)
+    has_onnx = any(model_dir.glob("*.onnx"))
+    has_config = (model_dir / "config.json").exists()
+    return has_onnx and has_config
 
 
 @lru_cache(maxsize=1)
