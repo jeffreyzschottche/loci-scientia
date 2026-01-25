@@ -48,7 +48,7 @@ class Sidebar(QWidget):
             ("kb", "📚", "Kennisbank"),
             ("maps", "🗺", "Maps"),
             ("contacts", "👥", "Contacten"),
-            ("net", "🌐", "Netwerk Status"),
+            ("net", "🌐", "Netwerk"),
             ("devices", "📱", "Connected Devices"),
             ("settings", "⚡", "Instellingen"),
         ]

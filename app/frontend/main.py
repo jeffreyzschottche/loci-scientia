@@ -307,7 +307,7 @@ class MainWindow(QMainWindow):
             "kb": "Kennisbank",
             "maps": "Maps",
             "contacts": "Contacten",
-            "net": "Netwerk Status",
+            "net": "Netwerk",
             "devices": "Connected Devices & Gebruikersbeheer",
             "settings": "Instellingen",
         }
