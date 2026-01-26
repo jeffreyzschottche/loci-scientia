@@ -41,7 +41,6 @@ class SettingsPage(QWidget):
         self._timezone_combo: QComboBox | None = None
         self._timezone_loading = False
         self._language_combo: QComboBox | None = None
-        self._display_timeout_combo: QComboBox | None = None
         self._system_loading = False
         self._support_active = False
         self._support_durations = {
@@ -112,23 +111,6 @@ class SettingsPage(QWidget):
         language_wrap.addStretch(1)
         grid.addLayout(language_wrap, 1, 1)
 
-        grid.addWidget(QLabel("Beeldscherm timeout"), 2, 0)
-        self._display_timeout_combo = QComboBox()
-        for label, value in self._display_timeout_options():
-            self._display_timeout_combo.addItem(label, value)
-        current_timeout = self._current_display_timeout()
-        if current_timeout is not None:
-            for index in range(self._display_timeout_combo.count()):
-                if self._display_timeout_combo.itemData(index) == current_timeout:
-                    self._display_timeout_combo.setCurrentIndex(index)
-                    break
-        self._display_timeout_combo.currentIndexChanged.connect(
-            self._on_display_timeout_changed
-        )
-        timeout_wrap = QHBoxLayout()
-        timeout_wrap.addWidget(self._display_timeout_combo)
-        timeout_wrap.addStretch(1)
-        grid.addLayout(timeout_wrap, 2, 1)
         self._system_loading = False
         card.layout().addWidget(body)
         layout.addWidget(card)
@@ -222,17 +204,6 @@ class SettingsPage(QWidget):
             ("English", "en-US"),
         ]
 
-    @staticmethod
-    def _display_timeout_options() -> list[tuple[str, int]]:
-        return [
-            ("Nooit", 0),
-            ("1 minuut", 1),
-            ("5 minuten", 5),
-            ("15 minuten", 15),
-            ("30 minuten", 30),
-            ("1 uur", 60),
-        ]
-
     def _current_timezone(self) -> str | None:
         env_value = os.environ.get("TIMEZONE")
         if env_value:
@@ -250,22 +221,6 @@ class SettingsPage(QWidget):
         if value:
             return value
         return None
-
-    def _current_display_timeout(self) -> int | None:
-        env_value = os.environ.get("DISPLAY_TIMEOUT_MINUTES")
-        if env_value:
-            return self._parse_timeout(env_value)
-        value = self._read_env_value("DISPLAY_TIMEOUT_MINUTES")
-        if value:
-            return self._parse_timeout(value)
-        return None
-
-    @staticmethod
-    def _parse_timeout(value: str) -> int | None:
-        try:
-            return int(str(value).strip())
-        except (TypeError, ValueError):
-            return None
 
     @staticmethod
     def _env_file_path() -> Path:
@@ -341,17 +296,6 @@ class SettingsPage(QWidget):
         except Exception as exc:
             show_error_dialog(self, "Fout", f"Kon taal niet opslaan: {exc}")
 
-    def _on_display_timeout_changed(self, _index: int | None = None) -> None:
-        if self._system_loading or not self._display_timeout_combo:
-            return
-        value = self._display_timeout_combo.currentData()
-        if value is None:
-            return
-        try:
-            self._set_env_value("DISPLAY_TIMEOUT_MINUTES", str(value))
-            os.environ["DISPLAY_TIMEOUT_MINUTES"] = str(value)
-        except Exception as exc:
-            show_error_dialog(self, "Fout", f"Kon beeldscherm timeout niet opslaan: {exc}")
 
     def _auth_headers(self) -> dict:
         if BACKEND_BEARER_TOKEN:
