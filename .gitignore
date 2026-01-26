@@ -26,3 +26,4 @@ promptlog.log
 *.pmtiles
 
 ollama.pid
+support_access.json

@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QProgressDialog,
     QPushButton,
-    QSlider,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -51,49 +50,13 @@ class SettingsPage(QWidget):
 
         tabs = QTabWidget()
         tabs.setObjectName("SettingsTabs")
-        tabs.addTab(self._appearance_tab(), "Uiterlijk")
         tabs.addTab(self._system_tab(), "Systeem")
-        tabs.addTab(self._network_tab(), "Netwerk")
-        tabs.addTab(self._security_tab(), "Beveiliging")
         tabs.addTab(self._advanced_tab(), "Geavanceerd")
         tabs.tabBar().setObjectName("SettingsTabsBar")
         layout.addWidget(tabs, 1)
 
         QTimer.singleShot(0, self._load_models)
         QTimer.singleShot(0, self._load_support_status)
-
-    def _appearance_tab(self) -> QWidget:
-        tab = QWidget()
-        vbox = QVBoxLayout(tab)
-        vbox.setSpacing(12)
-
-        theme_box = self._settings_card("Interface Instellingen")
-        theme_layout = theme_box.layout()
-        if theme_layout is not None:
-            theme_layout.setSpacing(12)
-        theme_selector = QHBoxLayout()
-        theme_selector.addWidget(QLabel("Thema"))
-        combo = QComboBox()
-        combo.addItems(["Donker", "Licht"])
-        theme_selector.addWidget(combo)
-        theme_layout.addLayout(theme_selector)
-
-        font_layout = QHBoxLayout()
-        font_layout.addWidget(QLabel("Lettergrootte"))
-        slider = QSlider(Qt.Horizontal)
-        slider.setValue(50)
-        font_layout.addWidget(slider)
-        theme_layout.addLayout(font_layout)
-
-        checkbox = QCheckBox("Toon systeem notificaties")
-        checkbox.setChecked(True)
-        theme_layout.addWidget(checkbox)
-
-        compact = QCheckBox("Compacte modus")
-        theme_layout.addWidget(compact)
-
-        vbox.addWidget(theme_box)
-        return tab
 
     def _system_tab(self) -> QWidget:
         tab = QWidget()
@@ -107,34 +70,6 @@ class SettingsPage(QWidget):
         grid.addWidget(tz, 0, 1)
         grid.addWidget(QLabel("Updates"), 1, 0)
         grid.addWidget(QCheckBox("Automatisch installeren"), 1, 1)
-        card.layout().addWidget(body)
-        layout.addWidget(card)
-        return tab
-
-    def _network_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        card = self._settings_card("Netwerk")
-        body = QWidget()
-        grid = QGridLayout(body)
-        grid.addWidget(QLabel("WiFi SSID"), 0, 0)
-        grid.addWidget(QLineEditPlaceholder("AITJE-Net"), 0, 1)
-        grid.addWidget(QLabel("VPN Status"), 1, 0)
-        vpn = QLabel("UITGESCHAKELD")
-        vpn.setStyleSheet("color:#6b7280; letter-spacing:0.3em; font-size:11px;")
-        grid.addWidget(vpn, 1, 1)
-        card.layout().addWidget(body)
-        layout.addWidget(card)
-        return tab
-
-    def _security_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        card = self._settings_card("Beveiliging")
-        body = QWidget()
-        vbox = QVBoxLayout(body)
-        vbox.addWidget(QCheckBox("2FA vereisen voor admin"))
-        vbox.addWidget(QCheckBox("Automatisch vergrendelen na 5 minuten"))
         card.layout().addWidget(body)
         layout.addWidget(card)
         return tab
@@ -159,24 +94,6 @@ class SettingsPage(QWidget):
         model_layout.addWidget(self._ollama_status, 1, 0, 1, 3)
         model_card.layout().addWidget(model_body)
         layout.addWidget(model_card)
-
-        card = self._settings_card("Geavanceerde opties")
-        body = QWidget()
-        vbox = QVBoxLayout(body)
-        flush = QPushButton("Cache legen")
-        flush.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15;"
-            "  color:#050505;"
-            "  border-radius:999px;"
-            "  padding:8px 24px;"
-            "  font-weight:600;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        vbox.addWidget(flush)
-        card.layout().addWidget(body)
-        layout.addWidget(card)
 
         support_card = self._settings_card("Remote support (Tailscale)")
         support_body = QWidget()
