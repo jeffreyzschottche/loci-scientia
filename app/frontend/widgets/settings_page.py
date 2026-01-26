@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import available_timezones
 
 import requests
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
@@ -35,6 +38,11 @@ class SettingsPage(QWidget):
         self._support_enable: QPushButton | None = None
         self._support_disable: QPushButton | None = None
         self._support_duration: QComboBox | None = None
+        self._timezone_combo: QComboBox | None = None
+        self._timezone_loading = False
+        self._language_combo: QComboBox | None = None
+        self._display_timeout_combo: QComboBox | None = None
+        self._system_loading = False
         self._support_active = False
         self._support_durations = {
             "30 min": 30,
@@ -61,15 +69,67 @@ class SettingsPage(QWidget):
     def _system_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        card = self._settings_card("Systeem")
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        card = self._settings_card()
         body = QWidget()
         grid = QGridLayout(body)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+        grid.setColumnStretch(1, 1)
         grid.addWidget(QLabel("Tijdzone"), 0, 0)
-        tz = QComboBox()
-        tz.addItems(["Europe/Amsterdam", "UTC"])
-        grid.addWidget(tz, 0, 1)
-        grid.addWidget(QLabel("Updates"), 1, 0)
-        grid.addWidget(QCheckBox("Automatisch installeren"), 1, 1)
+        self._timezone_combo = QComboBox()
+        self._timezone_combo.setMaxVisibleItems(18)
+        timezones = self._available_timezones()
+        self._timezone_loading = True
+        self._system_loading = True
+        self._timezone_combo.addItems(timezones)
+        current_timezone = self._current_timezone()
+        if current_timezone and current_timezone in timezones:
+            self._timezone_combo.setCurrentText(current_timezone)
+        elif "Europe/Amsterdam" in timezones:
+            self._timezone_combo.setCurrentText("Europe/Amsterdam")
+        self._timezone_loading = False
+        self._timezone_combo.currentTextChanged.connect(self._on_timezone_changed)
+        timezone_wrap = QHBoxLayout()
+        timezone_wrap.addWidget(self._timezone_combo)
+        timezone_wrap.addStretch(1)
+        grid.addLayout(timezone_wrap, 0, 1)
+
+        grid.addWidget(QLabel("Taal"), 1, 0)
+        self._language_combo = QComboBox()
+        for label, value in self._language_options():
+            self._language_combo.addItem(label, value)
+        current_language = self._current_language()
+        if current_language:
+            for index in range(self._language_combo.count()):
+                if self._language_combo.itemData(index) == current_language:
+                    self._language_combo.setCurrentIndex(index)
+                    break
+        self._language_combo.currentIndexChanged.connect(self._on_language_changed)
+        language_wrap = QHBoxLayout()
+        language_wrap.addWidget(self._language_combo)
+        language_wrap.addStretch(1)
+        grid.addLayout(language_wrap, 1, 1)
+
+        grid.addWidget(QLabel("Beeldscherm timeout"), 2, 0)
+        self._display_timeout_combo = QComboBox()
+        for label, value in self._display_timeout_options():
+            self._display_timeout_combo.addItem(label, value)
+        current_timeout = self._current_display_timeout()
+        if current_timeout is not None:
+            for index in range(self._display_timeout_combo.count()):
+                if self._display_timeout_combo.itemData(index) == current_timeout:
+                    self._display_timeout_combo.setCurrentIndex(index)
+                    break
+        self._display_timeout_combo.currentIndexChanged.connect(
+            self._on_display_timeout_changed
+        )
+        timeout_wrap = QHBoxLayout()
+        timeout_wrap.addWidget(self._display_timeout_combo)
+        timeout_wrap.addStretch(1)
+        grid.addLayout(timeout_wrap, 2, 1)
+        self._system_loading = False
         card.layout().addWidget(body)
         layout.addWidget(card)
         return tab
@@ -134,15 +194,164 @@ class SettingsPage(QWidget):
         return tab
 
     @staticmethod
-    def _settings_card(title: str) -> QFrame:
+    def _settings_card(title: str | None = None) -> QFrame:
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
-        label = QLabel(title)
-        label.setStyleSheet("font-weight:700; letter-spacing:0.02em;")
-        layout.addWidget(label)
+        if title:
+            label = QLabel(title)
+            label.setStyleSheet("font-weight:700; letter-spacing:0.02em;")
+            layout.addWidget(label)
         return card
+
+    def _available_timezones(self) -> list[str]:
+        try:
+            zones = sorted(available_timezones())
+        except Exception:
+            zones = ["UTC"]
+        if "UTC" in zones:
+            zones.remove("UTC")
+            zones.insert(0, "UTC")
+        return zones
+
+    @staticmethod
+    def _language_options() -> list[tuple[str, str]]:
+        return [
+            ("Nederlands", "nl-NL"),
+            ("English", "en-US"),
+        ]
+
+    @staticmethod
+    def _display_timeout_options() -> list[tuple[str, int]]:
+        return [
+            ("Nooit", 0),
+            ("1 minuut", 1),
+            ("5 minuten", 5),
+            ("15 minuten", 15),
+            ("30 minuten", 30),
+            ("1 uur", 60),
+        ]
+
+    def _current_timezone(self) -> str | None:
+        env_value = os.environ.get("TIMEZONE")
+        if env_value:
+            return env_value.strip()
+        value = self._read_env_value("TIMEZONE")
+        if value:
+            return value
+        return None
+
+    def _current_language(self) -> str | None:
+        env_value = os.environ.get("LANGUAGE")
+        if env_value:
+            return env_value.strip()
+        value = self._read_env_value("LANGUAGE")
+        if value:
+            return value
+        return None
+
+    def _current_display_timeout(self) -> int | None:
+        env_value = os.environ.get("DISPLAY_TIMEOUT_MINUTES")
+        if env_value:
+            return self._parse_timeout(env_value)
+        value = self._read_env_value("DISPLAY_TIMEOUT_MINUTES")
+        if value:
+            return self._parse_timeout(value)
+        return None
+
+    @staticmethod
+    def _parse_timeout(value: str) -> int | None:
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _env_file_path() -> Path:
+        return Path(__file__).resolve().parents[3] / ".env"
+
+    def _read_env_value(self, key: str) -> str | None:
+        path = self._env_file_path()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return None
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            if name.strip() != key:
+                continue
+            value = value.strip()
+            if (value.startswith('"') and value.endswith('"')) or (
+                value.startswith("'") and value.endswith("'")
+            ):
+                value = value[1:-1]
+            return value.strip()
+        return None
+
+    def _set_env_value(self, key: str, value: str) -> None:
+        path = self._env_file_path()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            lines = []
+        updated = False
+        new_lines: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                new_lines.append(line)
+                continue
+            name, _ = line.split("=", 1)
+            if name.strip() == key:
+                new_lines.append(f"{key}={value}")
+                updated = True
+            else:
+                new_lines.append(line)
+        if not updated:
+            if new_lines and new_lines[-1].strip():
+                new_lines.append("")
+            new_lines.append(f"{key}={value}")
+        path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+    def _on_timezone_changed(self, timezone: str) -> None:
+        if self._timezone_loading:
+            return
+        value = timezone.strip()
+        if not value:
+            return
+        try:
+            self._set_env_value("TIMEZONE", value)
+            os.environ["TIMEZONE"] = value
+        except Exception as exc:
+            show_error_dialog(self, "Fout", f"Kon tijdzone niet opslaan: {exc}")
+
+    def _on_language_changed(self, _index: int | None = None) -> None:
+        if self._system_loading or not self._language_combo:
+            return
+        value = self._language_combo.currentData()
+        if not value:
+            return
+        try:
+            self._set_env_value("LANGUAGE", str(value))
+            os.environ["LANGUAGE"] = str(value)
+        except Exception as exc:
+            show_error_dialog(self, "Fout", f"Kon taal niet opslaan: {exc}")
+
+    def _on_display_timeout_changed(self, _index: int | None = None) -> None:
+        if self._system_loading or not self._display_timeout_combo:
+            return
+        value = self._display_timeout_combo.currentData()
+        if value is None:
+            return
+        try:
+            self._set_env_value("DISPLAY_TIMEOUT_MINUTES", str(value))
+            os.environ["DISPLAY_TIMEOUT_MINUTES"] = str(value)
+        except Exception as exc:
+            show_error_dialog(self, "Fout", f"Kon beeldscherm timeout niet opslaan: {exc}")
 
     def _auth_headers(self) -> dict:
         if BACKEND_BEARER_TOKEN:
