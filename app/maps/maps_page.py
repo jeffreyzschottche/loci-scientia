@@ -222,6 +222,13 @@ class MapsPage(QWidget):
         js_loading_text = t("maps_loading")
         js_labeled_location = t("maps_labeled_location")
         js_click_to_pin = t("maps_click_to_pin")
+        translations_json = json.dumps(
+            {
+                "loading": js_loading_text,
+                "labeledLocation": js_labeled_location,
+                "clickToPin": js_click_to_pin,
+            }
+        )
 
         html_template = f"""
 <!DOCTYPE html>
@@ -284,11 +291,13 @@ class MapsPage(QWidget):
 {style_json}
     ;
     const tileErrorHint = {json.dumps(tile_hint)};
+    const translations = {translations_json};
 
     let pyBridge = null;
     let pendingPin = false;
     let activePinMarker = null;
     let contactMarkers = new Map();
+    let mapReady = false;
 
     const statusOverlay = document.getElementById("status-overlay");
     const showStatus = (message) => {{
@@ -338,7 +347,8 @@ class MapsPage(QWidget):
       info.city = locality?.properties?.name || null;
       info.region = region?.properties?.name || null;
       info.country = country?.properties?.name || locality?.properties?.country || null;
-      info.label = info.street || info.city || info.region || info.country || "{js_labeled_location}";
+      info.label =
+        info.street || info.city || info.region || info.country || translations.labeledLocation;
       info.context = [info.city, info.region, info.country].filter(Boolean).join(", ");
       return info;
     }};
@@ -358,7 +368,7 @@ class MapsPage(QWidget):
     window.enablePinMode = () => {{
       if (!window.map) return;
       pendingPin = true;
-      showStatus("{js_click_to_pin}");
+      showStatus(translations.clickToPin);
     }};
 
     window.setActiveContacts = (contacts, focusId) => {{
@@ -462,6 +472,7 @@ class MapsPage(QWidget):
     window.map.once("load", function() {{
       hideStatus();
       window.map.resize();
+      mapReady = true;
     }});
 
     window.map.on("error", function(event) {{
@@ -497,6 +508,26 @@ class MapsPage(QWidget):
         window.map.resize();
       }}
     }});
+
+    window.updateMapTranslations = (next) => {{
+      if (!next || typeof next !== "object") {{
+        return;
+      }}
+      if (typeof next.loading === "string") {{
+        translations.loading = next.loading;
+      }}
+      if (typeof next.labeledLocation === "string") {{
+        translations.labeledLocation = next.labeledLocation;
+      }}
+      if (typeof next.clickToPin === "string") {{
+        translations.clickToPin = next.clickToPin;
+      }}
+      if (pendingPin) {{
+        showStatus(translations.clickToPin);
+      }} else if (!mapReady && statusOverlay && !statusOverlay.classList.contains("hidden")) {{
+        statusOverlay.textContent = translations.loading;
+      }}
+    }};
 
     initBridge();
   </script>
@@ -656,6 +687,22 @@ class MapsPage(QWidget):
             self.clear_location_btn.setText(t("maps_remove_location"))
         if hasattr(self, "delete_contact_btn"):
             self.delete_contact_btn.setText(t("maps_delete_contact"))
+
+        self._sync_map_language()
+
+    def _sync_map_language(self) -> None:
+        if not hasattr(self, "webview"):
+            return
+        translations_payload = json.dumps(
+            {
+                "loading": t("maps_loading"),
+                "labeledLocation": t("maps_labeled_location"),
+                "clickToPin": t("maps_click_to_pin"),
+            }
+        )
+        self.webview.page().runJavaScript(
+            f"if (window.updateMapTranslations) {{ window.updateMapTranslations({translations_payload}); }}"
+        )
 
     def zoom_in(self):
         if hasattr(self, "webview"):
