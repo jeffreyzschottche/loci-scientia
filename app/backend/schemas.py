@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 128
     history: list[ChatMessage] = Field(default_factory=list)
+    images: list[str] = Field(default_factory=list)
 
 
 class ContactBase(BaseModel):
