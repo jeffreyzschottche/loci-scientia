@@ -4,9 +4,22 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout
 
+from ..translations import t, register_language_change_callback
+
 
 class Sidebar(QWidget):
     navigate = Signal(str)
+
+    # Define nav items with translation keys
+    NAV_ITEMS = [
+        ("chat", "💬", "nav_chat"),
+        ("kb", "📚", "nav_knowledge_bank"),
+        ("maps", "🗺", "nav_maps"),
+        ("contacts", "👥", "nav_contacts"),
+        ("net", "🌐", "nav_network"),
+        ("devices", "📱", "nav_devices"),
+        ("settings", "⚡", "nav_settings"),
+    ]
 
     def __init__(self):
         super().__init__()
@@ -35,24 +48,16 @@ class Sidebar(QWidget):
                 "font-size:24px; font-weight:800; letter-spacing:0.4em; color:#111111;"
             )
         head_layout.addWidget(logo)
-        subtitle = QLabel("Lokale AI console")
-        subtitle.setStyleSheet(
+        self._subtitle = QLabel(t("sidebar_subtitle"))
+        self._subtitle.setStyleSheet(
             "color:#9ca3af; font-size:11px; letter-spacing:0.45em;"
         )
-        head_layout.addWidget(subtitle)
+        head_layout.addWidget(self._subtitle)
         layout.addWidget(header)
 
         self.buttons: dict[str, QPushButton] = {}
-        nav_items = [
-            ("chat", "💬", "Chat"),
-            ("kb", "📚", "Kennisbank"),
-            ("maps", "🗺", "Maps"),
-            ("contacts", "👥", "Contacten"),
-            ("net", "🌐", "Netwerk"),
-            ("devices", "📱", "Connected Devices"),
-            ("settings", "⚡", "Instellingen"),
-        ]
-        for key, icon, label in nav_items:
+        self._button_labels: dict[str, QLabel] = {}
+        for key, icon, label_key in self.NAV_ITEMS:
             btn = QPushButton()
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
@@ -62,13 +67,14 @@ class Sidebar(QWidget):
             icon_label = QLabel(icon)
             icon_label.setFixedWidth(26)
             icon_label.setStyleSheet("font-size:16px; color:#212121;")
-            text_label = QLabel(label)
+            text_label = QLabel(t(label_key))
             text_label.setStyleSheet("font-weight:600; letter-spacing:0.02em;")
             btn_layout.addWidget(icon_label)
             btn_layout.addWidget(text_label)
             btn_layout.addStretch(1)
             btn.clicked.connect(lambda _checked, k=key: self._on_nav(k))
             self.buttons[key] = btn
+            self._button_labels[key] = text_label
             layout.addWidget(btn)
 
         layout.addStretch(1)
@@ -77,6 +83,15 @@ class Sidebar(QWidget):
             "color:#9ca3af; font-size:11px; padding:12px; letter-spacing:0.2em;"
         )
         layout.addWidget(footer)
+
+        register_language_change_callback(self._update_translations)
+
+    def _update_translations(self) -> None:
+        """Update all translatable labels when language changes."""
+        self._subtitle.setText(t("sidebar_subtitle"))
+        for key, icon, label_key in self.NAV_ITEMS:
+            if key in self._button_labels:
+                self._button_labels[key].setText(t(label_key))
 
     def _on_nav(self, key: str):
         self.set_current(key)

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 import requests
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP
+from ..translations import t, register_language_change_callback
 from .dialog_style import (
     OverlayDialog,
     ask_yes_no_dialog,
@@ -43,7 +44,7 @@ class DeviceCard(QFrame):
         info = QVBoxLayout()
         info.setSpacing(4)
 
-        name_label = QLabel(device.get("device_name", "Onbekend apparaat"))
+        name_label = QLabel(device.get("device_name") or t("devices_unknown_device"))
         name_label.setStyleSheet("font-size:18px; font-weight:700;")
         info.addWidget(name_label)
 
@@ -53,14 +54,14 @@ class DeviceCard(QFrame):
 
         actions = QHBoxLayout()
         actions.setSpacing(6)
-        edit_btn = QPushButton("Bewerk")
+        edit_btn = QPushButton(t("edit"))
         edit_btn.setCursor(Qt.PointingHandCursor)
         edit_btn.setStyleSheet(
             "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 16px; }"
             "QPushButton:hover { border-color:#111111; }"
         )
         edit_btn.setFixedHeight(40)
-        delete_btn = QPushButton("Verwijder")
+        delete_btn = QPushButton(t("delete"))
         delete_btn.setCursor(Qt.PointingHandCursor)
         delete_btn.setStyleSheet(
             "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 16px; }"
@@ -100,9 +101,9 @@ class DevicesPage(QWidget):
 
         header = QHBoxLayout()
         header.addStretch(1)
-        add_btn = QPushButton("+ Apparaat toevoegen")
-        add_btn.setCursor(Qt.PointingHandCursor)
-        add_btn.setStyleSheet(
+        self._add_btn = QPushButton(t("devices_add_device"))
+        self._add_btn.setCursor(Qt.PointingHandCursor)
+        self._add_btn.setStyleSheet(
             "QPushButton {"
             "  background:#facc15;"
             "  color:#050505;"
@@ -112,9 +113,9 @@ class DevicesPage(QWidget):
             "}"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
-        add_btn.setFixedHeight(40)
-        add_btn.clicked.connect(self._open_add_dialog)
-        header.addWidget(add_btn)
+        self._add_btn.setFixedHeight(40)
+        self._add_btn.clicked.connect(self._open_add_dialog)
+        header.addWidget(self._add_btn)
         layout.addLayout(header)
 
         self.scroll_area = QScrollArea()
@@ -132,12 +133,20 @@ class DevicesPage(QWidget):
         self.scroll_area.setWidget(self.list_container)
         layout.addWidget(self.scroll_area, 1)
 
-        self.count_label = QLabel("Totaal: 0 apparaten")
+        self.count_label = QLabel(t("devices_total_devices", count=0))
         self.count_label.setStyleSheet("color:#6b7280; font-size:12px;")
         layout.addWidget(self.count_label, 0, Qt.AlignLeft)
 
         self.devices: list[dict] = []
         self._reload_devices()
+
+        register_language_change_callback(self._update_translations)
+
+    def _update_translations(self) -> None:
+        """Update UI elements when language changes."""
+        self._add_btn.setText(t("devices_add_device"))
+        self.count_label.setText(t("devices_total_devices", count=len(self.devices)))
+        self._render_devices()
 
     def _render_devices(self):
         while self.list_layout.count():
@@ -147,7 +156,7 @@ class DevicesPage(QWidget):
                 widget.deleteLater()
 
         if not self.devices:
-            placeholder = QLabel("Geen apparaten gevonden.")
+            placeholder = QLabel(t("devices_no_devices_found"))
             placeholder.setStyleSheet("color:#9ca3af; font-style:italic;")
             placeholder.setAlignment(Qt.AlignCenter)
             placeholder.setMinimumHeight(160)
@@ -170,7 +179,7 @@ class DevicesPage(QWidget):
         except Exception:
             self.devices = []
 
-        self.count_label.setText(f"Totaal: {len(self.devices)} apparaten")
+        self.count_label.setText(t("devices_total_devices", count=len(self.devices)))
         self._render_devices()
 
     def _open_add_dialog(self) -> None:
@@ -183,7 +192,7 @@ class DevicesPage(QWidget):
         is_edit = device is not None
         dialog = OverlayDialog(self)
         dialog.setWindowTitle(
-            "Apparaat bewerken" if is_edit else "Nieuw apparaat & gebruiker"
+            t("devices_edit_device") if is_edit else t("devices_new_device_user")
         )
 
         dialog.card_layout.setContentsMargins(0, 0, 0, 0)
@@ -211,7 +220,7 @@ class DevicesPage(QWidget):
         password_row = QHBoxLayout()
         password_row.setContentsMargins(0, 0, 0, 0)
         password_row.addWidget(password_edit)
-        toggle_btn = QPushButton("Toon")
+        toggle_btn = QPushButton(t("devices_show"))
         toggle_btn.setCheckable(True)
         toggle_btn.setStyleSheet(
             "QPushButton { background:#f3f4f6; color:#0f172a; min-width:70px; min-height:36px; border-radius:18px; font-size:12px; }"
@@ -222,11 +231,11 @@ class DevicesPage(QWidget):
             if checked:
                 password_edit.setEchoMode(QLineEdit.Normal)
                 confirm_edit.setEchoMode(QLineEdit.Normal)
-                toggle_btn.setText("Verberg")
+                toggle_btn.setText(t("devices_hide"))
             else:
                 password_edit.setEchoMode(QLineEdit.Password)
                 confirm_edit.setEchoMode(QLineEdit.Password)
-                toggle_btn.setText("Toon")
+                toggle_btn.setText(t("devices_show"))
 
         toggle_btn.toggled.connect(_toggle_password)
         password_row.addWidget(toggle_btn)
@@ -241,21 +250,21 @@ class DevicesPage(QWidget):
             phone_edit.setText(device.get("phone", ""))
             device_name_edit.setText(device.get("device_name", ""))
 
-        form.addRow("Naam gebruiker", user_name_edit)
-        form.addRow("E-mail", email_edit)
-        form.addRow("Wachtwoord", password_container)
-        form.addRow("Herhaal wachtwoord", confirm_edit)
-        form.addRow("Telefoon (06)", phone_edit)
-        form.addRow("Device naam", device_name_edit)
+        form.addRow(t("devices_username"), user_name_edit)
+        form.addRow(t("devices_email"), email_edit)
+        form.addRow(t("devices_password"), password_container)
+        form.addRow(t("devices_repeat_password"), confirm_edit)
+        form.addRow(t("devices_phone"), phone_edit)
+        form.addRow(t("devices_device_name"), device_name_edit)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(16)
         btn_row.addStretch(1)
-        cancel_btn = QPushButton("Annuleren")
+        cancel_btn = QPushButton(t("cancel"))
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.setFixedSize(120, 36)
         cancel_btn.clicked.connect(dialog.reject)
-        save_btn = QPushButton("Opslaan")
+        save_btn = QPushButton(t("save"))
         save_btn.setCursor(Qt.PointingHandCursor)
         save_btn.setFixedSize(120, 36)
         save_btn.clicked.connect(dialog.accept)
@@ -274,16 +283,16 @@ class DevicesPage(QWidget):
         if not user_name or not device_name:
             show_warning_dialog(
                 self,
-                "Ongeldig",
-                "Naam gebruiker en device naam zijn verplicht.",
+                t("invalid"),
+                t("devices_username_device_required"),
             )
             return
 
         if password != password2:
             show_warning_dialog(
                 self,
-                "Ongeldig",
-                "De wachtwoorden komen niet overeen.",
+                t("error"),
+                t("devices_passwords_dont_match"),
             )
             return
 
@@ -314,8 +323,8 @@ class DevicesPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Device kon niet worden opgeslagen:\n{exc}",
+                t("error"),
+                f"{t('devices_could_not_save')}\n{exc}",
             )
             return
 
@@ -324,8 +333,8 @@ class DevicesPage(QWidget):
     def _confirm_delete(self, device: dict) -> None:
         answer = ask_yes_no_dialog(
             self,
-            "Verwijderen",
-            f"Weet je zeker dat je '{device.get('device_name')}' wilt verwijderen?",
+            t("delete"),
+            t("devices_confirm_delete", device_name=device.get("device_name", "")),
         )
         if not answer:
             return
@@ -340,8 +349,8 @@ class DevicesPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Device kon niet worden verwijderd:\n{exc}",
+                t("error"),
+                f"{t('devices_could_not_delete')}\n{exc}",
             )
             return
 

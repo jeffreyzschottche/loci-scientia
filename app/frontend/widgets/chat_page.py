@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import BACKEND_HTTP, BACKEND_BEARER_TOKEN
+from ..translations import t, register_language_change_callback
 
 API_BASE = BACKEND_HTTP
 MAX_BUBBLE_WIDTH = 680
@@ -57,7 +58,7 @@ class ChatPage(QWidget):
         controls = QHBoxLayout()
         controls.setContentsMargins(0, 0, 0, 0)
         controls.addStretch(1)
-        self.new_chat_btn = QPushButton("Start nieuwe chat")
+        self.new_chat_btn = QPushButton(t("chat_start_new"))
         self.new_chat_btn.setCursor(Qt.PointingHandCursor)
         self.new_chat_btn.setStyleSheet(
             "QPushButton {"
@@ -95,7 +96,7 @@ class ChatPage(QWidget):
         self.history_layout = QVBoxLayout(self.history_container)
         self.history_layout.setContentsMargins(SIDE_PADDING, 16, SIDE_PADDING, 16)
         self.history_layout.setSpacing(ROW_GAP)
-        self.empty_label = QLabel("Welkom bij AITJE…")
+        self.empty_label = QLabel(t("chat_welcome"))
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet("color:#9ca3af; font-size:14px; background:transparent;")
         self.history_layout.addWidget(self.empty_label, 0, Qt.AlignCenter)
@@ -111,8 +112,8 @@ class ChatPage(QWidget):
         input_layout.setSpacing(8)
 
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Stel een vraag aan Aitje.")
-        self.send_btn = QPushButton("Stuur")
+        self.input.setPlaceholderText(t("chat_placeholder"))
+        self.send_btn = QPushButton(t("chat_send"))
         input_layout.addWidget(self.input, 1)
         input_layout.addWidget(self.send_btn)
         layout.addWidget(input_card)
@@ -122,6 +123,8 @@ class ChatPage(QWidget):
         self.signals.token.connect(self._on_token)
         self.signals.done.connect(self._on_done)
         self.signals.queue_position.connect(self._on_queue_position)
+
+        register_language_change_callback(self._update_translations)
         self.send_btn.setStyleSheet(
             "QPushButton {"
             "  background: black;"
@@ -135,6 +138,14 @@ class ChatPage(QWidget):
         )
         self.send_btn.setMinimumHeight(40)
 
+
+    def _update_translations(self) -> None:
+        """Update UI elements when language changes."""
+        self.new_chat_btn.setText(t("chat_start_new"))
+        self.input.setPlaceholderText(t("chat_placeholder"))
+        self.send_btn.setText(t("chat_send"))
+        if self.empty_label:
+            self.empty_label.setText(t("chat_welcome"))
 
     def _start_new_chat(self):
         """Reset the conversation history."""
@@ -165,30 +176,29 @@ class ChatPage(QWidget):
             if status == 401:
                 # Probeer automatisch een token op te halen voor de lokale admin.
                 if self._refresh_auto_token():
-                    await asyncio.to_thread(self._stream_sse, prompt, history)
+                    await asyncio.to_thread(self._stream_sse, prompt)
                     return
                 message = (
                     self._auto_token_error
-                    or "[fout] 401 Unauthorized: backend verwacht een Bearer token. "
-                    "Vraag een token op via /api/v1/signon en zet AITJE_BEARER_TOKEN in de omgeving."
+                    or f"{t('chat_error_prefix')} {t('chat_error_401')}"
                 )
                 self.signals.token.emit(message)
                 self.signals.done.emit()
                 return
             if status != 404:
-                self.signals.token.emit(f"[fout] {exc}")
+                self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
                 self.signals.done.emit()
                 return
             # 404 betekent dat streaming endpoint nog niet bestaat -> fallback
         except Exception as exc:
-            self.signals.token.emit(f"[fout] {exc}")
+            self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
             self.signals.done.emit()
             return
 
         try:
             message = await asyncio.to_thread(self._legacy_post, prompt)
         except Exception as exc:
-            self.signals.token.emit(f"[fout] {exc}")
+            self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
         else:
             self.signals.token.emit(message)
         self.signals.done.emit()
@@ -269,16 +279,16 @@ class ChatPage(QWidget):
             try:
                 data = resp.json()
             except ValueError:
-                return resp.text.strip() or "<leeg antwoord>"
+                return resp.text.strip() or t("chat_empty_response")
             if isinstance(data, dict):
                 return data.get("message") or data.get("text") or str(data)
             return str(data)
-        raise last_error or RuntimeError("Geen geldig antwoord van backend")
+        raise last_error or RuntimeError(t("chat_no_valid_response"))
 
     @Slot(str)
     def _on_token(self, token: str):
         """Append token to the current message."""
-        if token.startswith("[fout]"):
+        if token.startswith(t("chat_error_prefix")):
             if self.current_reply_label is None:
                 self.current_reply_label = self._append_message("assistant", token)
             else:
@@ -336,11 +346,11 @@ class ChatPage(QWidget):
             devices = resp.json() or []
         except Exception as exc:
             self._auto_token_error = (
-                f"[fout] Kon geen apparaatlijst ophalen voor automatische login: {exc}"
+                f"{t('chat_error_prefix')} {t('chat_could_not_fetch_devices')} {exc}"
             )
             return None
         if not devices:
-            self._auto_token_error = "[fout] Geen apparaten gevonden voor auto-login."
+            self._auto_token_error = f"{t('chat_error_prefix')} {t('chat_no_devices_found')}"
             return None
         primary = devices[0]
         payload = {
@@ -349,7 +359,7 @@ class ChatPage(QWidget):
         }
         if not payload["user_name"] or not payload["password"]:
             self._auto_token_error = (
-                "[fout] Onvolledige apparaatgegevens voor auto-login."
+                f"{t('chat_error_prefix')} {t('chat_incomplete_device_data')}"
             )
             return None
         try:
@@ -362,12 +372,12 @@ class ChatPage(QWidget):
             data = resp.json() or {}
             token = data.get("token")
             if not token:
-                self._auto_token_error = "[fout] Sign-on gaf geen token terug."
+                self._auto_token_error = f"{t('chat_error_prefix')} {t('chat_signon_no_token')}"
                 return None
             return token
         except Exception as exc:
             self._auto_token_error = (
-                f"[fout] Automatisch token ophalen mislukt: {exc}"
+                f"{t('chat_error_prefix')} {t('chat_auto_token_failed')} {exc}"
             )
             return None
 
@@ -376,7 +386,7 @@ class ChatPage(QWidget):
         """Finalize the current message."""
         assistant_text = (self.current_message or "").strip()
         if self.current_reply_label and not assistant_text:
-            fallback = "Geen antwoord beschikbaar."
+            fallback = t("chat_no_response")
             self._set_label_text(self.current_reply_label, fallback)
             assistant_text = fallback
         self.current_message = ""
@@ -388,10 +398,10 @@ class ChatPage(QWidget):
         if position > 0:
             if not self.queue_label:
                 self.queue_label = self._append_system_message(
-                    f"In wachtrij... positie {position}"
+                    t("chat_in_queue", position=position)
                 )
             else:
-                self.queue_label.setText(f"In wachtrij... positie {position}")
+                self.queue_label.setText(t("chat_in_queue", position=position))
         elif self.queue_label:
             container = self.queue_label.parentWidget()
             self.history_layout.removeWidget(container)
@@ -442,7 +452,7 @@ class ChatPage(QWidget):
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(8)
-        role_chip = QLabel("IK" if role == "user" else "AITJE")
+        role_chip = QLabel(t("chat_role_user") if role == "user" else t("chat_role_assistant"))
         role_chip.setStyleSheet(
             "font-size:11px; font-weight:600; letter-spacing:0.08em; color:#a1a1aa;"
         )
@@ -462,7 +472,7 @@ class ChatPage(QWidget):
         )
 
         if role == "assistant":
-            copy_btn = QPushButton("Kopieer")
+            copy_btn = QPushButton(t("chat_copy"))
             copy_btn.setObjectName("CopyButton")
             copy_btn.setCursor(Qt.PointingHandCursor)
             copy_btn.setFixedHeight(26)
@@ -471,7 +481,7 @@ class ChatPage(QWidget):
             )
             top_row.addWidget(copy_btn, 0, Qt.AlignRight)
 
-            print_btn = QPushButton("Print")
+            print_btn = QPushButton(t("chat_print"))
             print_btn.setObjectName("CopyButton")
             print_btn.setCursor(Qt.PointingHandCursor)
             print_btn.setFixedHeight(26)
@@ -533,7 +543,7 @@ class ChatPage(QWidget):
     def _handle_copy_click(self, label: QLabel, button: QPushButton):
         self._copy_label_text(label)
         original = button.text()
-        button.setText("Gekopieerd")
+        button.setText(t("chat_copied"))
         button.setEnabled(False)
 
         def _restore():

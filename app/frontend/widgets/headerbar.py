@@ -1,11 +1,73 @@
+import os
+from typing import Optional
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+
+from ..translations import t, get_current_language, set_language, register_language_change_callback
+
+
+class LanguageSelectorButton(QPushButton):
+    """A button that displays the current language flag and allows switching."""
+
+    language_changed = Signal(str)
+
+    FLAG_STYLES = """
+        QPushButton {{
+            background-color: transparent;
+            border: 2px solid {border_color};
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 50px;
+        }}
+        QPushButton:hover {{
+            background-color: #f3f4f6;
+            border-color: #facc15;
+        }}
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.setCursor(Qt.PointingHandCursor)
+        self._current_lang = get_current_language()
+        self._update_display()
+        self.clicked.connect(self._toggle_language)
+
+    def _update_display(self):
+        """Update button text and style based on current language."""
+        if self._current_lang == "nl":
+            self.setText("🇳🇱 NL")
+            border_color = "#facc15"
+        else:
+            self.setText("🇬🇧 EN")
+            border_color = "#facc15"
+        self.setStyleSheet(self.FLAG_STYLES.format(border_color=border_color))
+
+    def _toggle_language(self):
+        """Toggle between NL and EN."""
+        if self._current_lang == "nl":
+            self._current_lang = "en"
+            os.environ["LANGUAGE"] = "en-US"
+        else:
+            self._current_lang = "nl"
+            os.environ["LANGUAGE"] = "nl-NL"
+        set_language(self._current_lang)
+        self._update_display()
+        self.language_changed.emit(self._current_lang)
+
+    def refresh(self):
+        """Refresh the display from current language setting."""
+        self._current_lang = get_current_language()
+        self._update_display()
 
 
 class HeaderBar(QWidget):
     home_requested = Signal()
+    language_changed = Signal(str)
 
-    def __init__(self, title: str, subtitle: str = "Lokale AI-console"):
+    def __init__(self, title: str, subtitle: Optional[str] = None):
         super().__init__()
         self.setObjectName("Header")
         layout = QHBoxLayout(self)
@@ -22,7 +84,7 @@ class HeaderBar(QWidget):
         self.title.setStyleSheet(
             "font-size:26px; font-weight:800; letter-spacing:0.02em; color:#111111;"
         )
-        self.subtitle = QLabel(subtitle)
+        self.subtitle = QLabel(subtitle or t("subtitle_local_ai_console"))
         self.subtitle.setStyleSheet(
             "color:#9ca3af; font-size:11px; letter-spacing:0.45em;"
         )
@@ -32,10 +94,15 @@ class HeaderBar(QWidget):
         layout.addWidget(brand, 0, Qt.AlignVCenter)
         layout.addStretch(1)
 
+        self._is_online = True
         self.status = QLabel()
         self.status.setObjectName("HeaderStatus")
-        self.set_online(True)
+        self._update_online_text()
         layout.addWidget(self.status, 0, Qt.AlignVCenter)
+
+        self.lang_selector = LanguageSelectorButton()
+        self.lang_selector.language_changed.connect(self._on_language_changed)
+        layout.addWidget(self.lang_selector, 0, Qt.AlignVCenter)
 
         self.home_btn = QPushButton("Chat")
         self.home_btn.setObjectName("HeaderHomeButton")
@@ -55,6 +122,31 @@ class HeaderBar(QWidget):
         self.home_btn.clicked.connect(self.home_requested.emit)
         layout.addWidget(self.home_btn, 0, Qt.AlignVCenter)
 
+        register_language_change_callback(self._on_language_update)
+
+    def _on_language_changed(self, lang: str):
+        """Handle language change from selector."""
+        self._update_online_text()
+        self.language_changed.emit(lang)
+
+    def _on_language_update(self):
+        """Update UI when language changes."""
+        self._update_online_text()
+        self.lang_selector.refresh()
+
+    def _update_online_text(self):
+        """Update online/offline text based on current language."""
+        if self._is_online:
+            text = f"● {t('online')}"
+            color = "#16a34a"
+        else:
+            text = f"● {t('offline')}"
+            color = "#ef4444"
+        self.status.setText(text)
+        self.status.setStyleSheet(
+            f"color:{color}; font-weight:600; letter-spacing:0.08em;"
+        )
+
     def set_title(self, title: str):
         self.title.setText(title)
 
@@ -62,9 +154,5 @@ class HeaderBar(QWidget):
         self.subtitle.setText(subtitle)
 
     def set_online(self, online: bool):
-        text = "● ONLINE" if online else "● OFFLINE"
-        color = "#16a34a" if online else "#ef4444"
-        self.status.setText(text)
-        self.status.setStyleSheet(
-            f"color:{color}; font-weight:600; letter-spacing:0.08em;"
-        )
+        self._is_online = online
+        self._update_online_text()

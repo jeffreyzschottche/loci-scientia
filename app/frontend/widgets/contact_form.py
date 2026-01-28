@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..translations import t
 from .dialog_style import OverlayDialog, show_warning_dialog
 
 
@@ -22,12 +23,12 @@ class ContactFormDialog(OverlayDialog):
         self,
         parent=None,
         *,
-        title: str = "Nieuw contact",
+        title: str | None = None,
         initial: Optional[Dict[str, Any]] = None,
         location_defaults: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle(title)
+        self.setWindowTitle(title or t("contact_form_new_contact"))
         self._payload_cache: Optional[Dict[str, Any]] = None
         self._save_mode: str = "save"
 
@@ -60,32 +61,32 @@ class ContactFormDialog(OverlayDialog):
         self.lat_edit = QLineEdit()
         self.lon_edit = QLineEdit()
 
-        form.addRow("Naam", self.name_edit)
-        form.addRow("Bedrijf", self.company_edit)
-        form.addRow("E-mail", self.email_edit)
-        form.addRow("Telefoon", self.phone_edit)
-        form.addRow("Notities", self.notes_edit)
-        form.addRow("Label", self.location_label_edit)
-        form.addRow("Straat", self.location_street_edit)
-        form.addRow("Plaats", self.location_city_edit)
-        form.addRow("Regio", self.location_region_edit)
-        form.addRow("Land", self.location_country_edit)
-        form.addRow("Context", self.location_context_edit)
-        form.addRow("Latitude", self.lat_edit)
-        form.addRow("Longitude", self.lon_edit)
+        form.addRow(t("contact_form_name"), self.name_edit)
+        form.addRow(t("contact_form_company"), self.company_edit)
+        form.addRow(t("contact_form_email"), self.email_edit)
+        form.addRow(t("contact_form_phone"), self.phone_edit)
+        form.addRow(t("contact_form_notes"), self.notes_edit)
+        form.addRow(t("contact_form_label"), self.location_label_edit)
+        form.addRow(t("contact_form_street"), self.location_street_edit)
+        form.addRow(t("contact_form_city"), self.location_city_edit)
+        form.addRow(t("contact_form_region"), self.location_region_edit)
+        form.addRow(t("contact_form_country"), self.location_country_edit)
+        form.addRow(t("contact_form_context"), self.location_context_edit)
+        form.addRow(t("contact_form_latitude"), self.lat_edit)
+        form.addRow(t("contact_form_longitude"), self.lon_edit)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(16)
         btn_row.addStretch(1)
-        cancel_btn = QPushButton("Annuleren")
+        cancel_btn = QPushButton(t("cancel"))
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.setFixedSize(120, 36)
         cancel_btn.clicked.connect(self.reject)
-        save_btn = QPushButton("Opslaan")
+        save_btn = QPushButton(t("save"))
         save_btn.setCursor(Qt.PointingHandCursor)
         save_btn.setFixedSize(120, 36)
         save_btn.clicked.connect(self._handle_save_clicked)
-        self.save_and_map_button = QPushButton("Opslaan + kaart")
+        self.save_and_map_button = QPushButton(t("contact_form_save_map"))
         self.save_and_map_button.setCursor(Qt.PointingHandCursor)
         self.save_and_map_button.setFixedSize(140, 36)
         self.save_and_map_button.clicked.connect(self._handle_save_and_map_clicked)
@@ -164,7 +165,7 @@ class ContactFormDialog(OverlayDialog):
 
     def accept(self) -> None:  # type: ignore[override]
         if not self.name_edit.text().strip():
-            show_warning_dialog(self, "Ongeldig", "Naam is verplicht.")
+            show_warning_dialog(self, t("invalid"), t("contact_form_name_required"))
             return
         self._payload_cache = self.payload()
         super().accept()
