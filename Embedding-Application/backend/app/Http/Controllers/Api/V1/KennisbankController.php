@@ -57,6 +57,7 @@ class KennisbankController extends Controller
             $result = $this->gitSyncService->syncToGit();
 
             Log::info('Git push completed', $result);
+
             return response()->json([
                 'message' => $result['pushed']
                     ? 'Kennisbank pushed to git successfully'
@@ -65,6 +66,7 @@ class KennisbankController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Git push failed', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'message' => 'Git push failed',
                 'error' => $e->getMessage(),

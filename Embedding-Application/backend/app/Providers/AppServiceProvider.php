@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\KennisbankUserSynchronizer;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,6 +15,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        App::booted(function () {
+            App::make(KennisbankUserSynchronizer::class)->sync();
+        });
     }
 }

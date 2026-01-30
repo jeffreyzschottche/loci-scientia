@@ -13,3 +13,8 @@ export interface RegisterResponse {
 export interface MessageResponse {
   message: string;
 }
+
+export interface ProfileResponse {
+  message: string;
+  user: User;
+}

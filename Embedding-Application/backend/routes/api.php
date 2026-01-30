@@ -1,9 +1,13 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\LibraryController;
+use App\Http\Controllers\Api\V1\InsightsController;
 use App\Http\Controllers\Api\V1\KennisbankController;
+use App\Http\Controllers\Api\V1\RelationController;
+use App\Http\Controllers\Api\V1\PriorityController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     // Public routes
@@ -21,14 +25,65 @@ Route::prefix('v1')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/email/resend', [AuthController::class, 'resendVerification']);
+        Route::patch('/profile', [AuthController::class, 'updateProfile']);
+        Route::patch('/password', [AuthController::class, 'updatePassword']);
 
-        // Documents
+        // Documents (Upload API)
         Route::get('/documents', [DocumentController::class, 'index']);
         Route::post('/documents', [DocumentController::class, 'store']);
+        Route::get('/documents/{document}', [DocumentController::class, 'show']);
+        Route::patch('/documents/{document}', [DocumentController::class, 'update']);
+        Route::post('/documents/{document}/mapping', [DocumentController::class, 'saveMapping']);
         Route::post('/documents/{document}/process', [DocumentController::class, 'process']);
+        Route::get('/documents/{document}/status', [DocumentController::class, 'status']);
         Route::delete('/documents/{document}', [DocumentController::class, 'destroy']);
 
-        // Kennisbank / Git sync
+        // Library API
+        Route::prefix('library')->group(function () {
+            Route::get('/tree', [LibraryController::class, 'tree']);
+            Route::get('/search', [LibraryController::class, 'search']);
+            Route::get('/relation-types', [LibraryController::class, 'relationTypes']);
+
+            Route::get('/documents/{document}', [LibraryController::class, 'document']);
+            Route::patch('/documents/{document}', [LibraryController::class, 'updateDocument']);
+            Route::patch('/documents/{document}/move', [LibraryController::class, 'moveDocument']);
+
+            Route::get('/sections/{section}', [LibraryController::class, 'section']);
+            Route::patch('/sections/{section}', [LibraryController::class, 'updateSection']);
+            Route::post('/sections/{section}/relations', [LibraryController::class, 'addRelation']);
+
+            Route::delete('/relations/{relation}', [LibraryController::class, 'removeRelation']);
+        });
+
+        // Insights API
+        Route::prefix('insights')->group(function () {
+            Route::get('/stats', [InsightsController::class, 'stats']);
+            Route::get('/categories', [InsightsController::class, 'categories']);
+            Route::get('/versions', [InsightsController::class, 'versions']);
+
+            Route::get('/export/manifest', [InsightsController::class, 'exportManifest']);
+            Route::get('/export/chunks', [InsightsController::class, 'exportChunks']);
+            Route::post('/exports', [InsightsController::class, 'createExport']);
+            Route::get('/exports', [InsightsController::class, 'listExports']);
+            Route::get('/exports/{export}/download', [InsightsController::class, 'downloadExport']);
+        });
+
+        // Document Relations API (for mindmap)
+        Route::prefix('relations')->group(function () {
+            Route::get('/graph', [RelationController::class, 'graph']);
+            Route::get('/types', [RelationController::class, 'types']);
+            Route::post('/', [RelationController::class, 'store']);
+            Route::delete('/{relation}', [RelationController::class, 'destroy']);
+        });
+
+        // Priority API
+        Route::prefix('priorities')->group(function () {
+            Route::get('/', [PriorityController::class, 'index']);
+            Route::patch('/{document}', [PriorityController::class, 'update']);
+            Route::post('/bulk', [PriorityController::class, 'bulkUpdate']);
+        });
+
+        // Kennisbank / Git sync (legacy - kept for compatibility)
         Route::get('/kennisbank/git-config', [KennisbankController::class, 'getGitConfig']);
         Route::post('/kennisbank/git-config', [KennisbankController::class, 'updateGitConfig']);
         Route::post('/kennisbank/push', [KennisbankController::class, 'pushToGit']);

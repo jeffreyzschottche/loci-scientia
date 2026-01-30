@@ -99,7 +99,7 @@ async function handleRegister() {
       form.password,
       form.password_confirmation
     );
-    router.push('/dashboard');
+    router.push('/kennisbank');
   } catch (err: any) {
     if (err.data?.errors) {
       error.value = Object.values(err.data.errors).flat().join(', ');

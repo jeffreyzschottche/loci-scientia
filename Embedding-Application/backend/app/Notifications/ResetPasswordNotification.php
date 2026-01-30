@@ -7,9 +7,7 @@ use Illuminate\Notifications\Notification;
 
 class ResetPasswordNotification extends Notification
 {
-    public function __construct(public string $token)
-    {
-    }
+    public function __construct(public string $token) {}
 
     public function via($notifiable): array
     {
@@ -18,7 +16,7 @@ class ResetPasswordNotification extends Notification
 
     public function toMail($notifiable): MailMessage
     {
-        $url = config('app.frontend_url') . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
+        $url = config('app.frontend_url').'/reset-password?token='.$this->token.'&email='.urlencode($notifiable->email);
 
         return (new MailMessage)
             ->subject('Reset Password Notification')

@@ -2,6 +2,6 @@ export default defineNuxtRouteMiddleware(() => {
   const authStore = useAuthStore();
 
   if (authStore.isLoggedIn) {
-    return navigateTo('/dashboard');
+    return navigateTo('/kennisbank');
   }
 });

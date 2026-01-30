@@ -18,7 +18,7 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         VerifyEmail::toMailUsing(function ($notifiable, $url) {
-            $frontendUrl = config('app.frontend_url') . '/verify-email?url=' . urlencode($url);
+            $frontendUrl = config('app.frontend_url').'/verify-email?url='.urlencode($url);
 
             return (new MailMessage)
                 ->subject('Verify Email Address')

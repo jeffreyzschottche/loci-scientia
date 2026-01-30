@@ -1,14 +1,14 @@
 <template>
   <nav class="bg-white shadow">
     <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-      <NuxtLink to="/" class="text-xl font-bold">Starter Kit</NuxtLink>
+      <NuxtLink :to="brandLink" class="text-xl font-bold">Embedding Platform</NuxtLink>
 
-      <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-6">
         <NuxtLink
-          v-for="link in navLinks"
+          v-for="link in primaryLinks"
           :key="link.to"
           :to="link.to"
-          class="text-sm text-gray-700 transition hover:text-blue-600"
+          class="text-sm font-medium text-gray-700 transition hover:text-blue-600"
         >
           {{ link.label }}
         </NuxtLink>
@@ -16,16 +16,28 @@
 
       <div class="flex items-center space-x-4">
         <template v-if="authStore.isLoggedIn">
-          <span class="text-sm text-gray-700">{{ authStore.user?.name }}</span>
-          <button
-            @click="handleLogout"
-            class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-          >
-            Logout
-          </button>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-700">
+              Ingelogd als : {{ authStore.user?.name || 'onbekend' }}
+            </span>
+            <button
+              @click="handleLogout"
+              class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
         </template>
         <template v-else>
-          <span class="text-sm text-gray-500">{{ t('not_logged_in') }}</span>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-500">Niet ingelogd</span>
+            <NuxtLink
+              class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              to="/"
+            >
+              Login
+            </NuxtLink>
+          </div>
         </template>
       </div>
     </div>
@@ -35,18 +47,24 @@
 <script setup lang="ts">
 const authStore = useAuthStore();
 const router = useRouter();
-const { t } = useTranslations();
+const kennisbankLabel = 'Kennisbank';
+const accountLabel = 'Mijn Account';
 
-const navLinks = computed(() => [
-  { to: '/', label: 'Home' },
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/kennisbank', label: t('kennisbank') },
-  { to: '/login', label: 'Login' },
-  { to: '/register', label: 'Register' },
-  { to: '/forgot-password', label: 'Forgot Password' },
-  { to: '/reset-password', label: 'Reset Password' },
-  { to: '/verify-email', label: 'Verify Email' },
-]);
+const primaryLinks = computed(() => {
+  if (authStore.isLoggedIn) {
+    return [
+      { to: '/kennisbank', label: kennisbankLabel },
+      { to: '/account', label: accountLabel },
+    ];
+  }
+
+  return [
+    { to: '/', label: 'Login' },
+    { to: '/register', label: 'Register' },
+  ];
+});
+
+const brandLink = computed(() => (authStore.isLoggedIn ? '/kennisbank' : '/'));
 
 async function handleLogout() {
   try {
@@ -56,7 +74,7 @@ async function handleLogout() {
     console.error('Logout error:', error);
   } finally {
     authStore.logout();
-    router.push('/login');
+    router.push('/');
   }
 }
 </script>

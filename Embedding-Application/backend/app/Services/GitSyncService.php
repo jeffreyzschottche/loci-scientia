@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Embedding;
 use App\Models\GitConfiguration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -11,6 +10,7 @@ use RuntimeException;
 class GitSyncService
 {
     private string $repoPath;
+
     private string $sqliteFile = 'kennisbank.db';
 
     public function __construct()
@@ -55,16 +55,16 @@ class GitSyncService
         $pdo = new \PDO("sqlite:{$dbPath}");
         $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
-        $pdo->exec("
+        $pdo->exec('
             CREATE TABLE documents (
                 id INTEGER PRIMARY KEY,
                 original_filename TEXT NOT NULL,
                 chunk_count INTEGER DEFAULT 0,
                 created_at TEXT
             )
-        ");
+        ');
 
-        $pdo->exec("
+        $pdo->exec('
             CREATE TABLE embeddings (
                 id INTEGER PRIMARY KEY,
                 document_id INTEGER NOT NULL,
@@ -73,7 +73,7 @@ class GitSyncService
                 vector TEXT NOT NULL,
                 FOREIGN KEY (document_id) REFERENCES documents(id)
             )
-        ");
+        ');
 
         // Export documents that have embeddings
         $documents = DB::table('documents')
@@ -81,11 +81,11 @@ class GitSyncService
             ->get();
 
         $docStmt = $pdo->prepare(
-            "INSERT INTO documents (id, original_filename, chunk_count, created_at) VALUES (?, ?, ?, ?)"
+            'INSERT INTO documents (id, original_filename, chunk_count, created_at) VALUES (?, ?, ?, ?)'
         );
 
         $embStmt = $pdo->prepare(
-            "INSERT INTO embeddings (id, document_id, chunk_index, text_content, vector) VALUES (?, ?, ?, ?, ?)"
+            'INSERT INTO embeddings (id, document_id, chunk_index, text_content, vector) VALUES (?, ?, ?, ?, ?)'
         );
 
         $pdo->beginTransaction();
@@ -122,20 +122,20 @@ class GitSyncService
      */
     private function ensureRepoCloned(GitConfiguration $config): void
     {
-        if (!is_dir($this->repoPath)) {
+        if (! is_dir($this->repoPath)) {
             $url = $this->authenticatedUrl($config);
             $result = Process::run(
                 "git clone --branch {$config->branch} {$url} {$this->repoPath}"
             );
 
             if ($result->failed()) {
-                throw new RuntimeException("Git clone failed: " . $result->errorOutput());
+                throw new RuntimeException('Git clone failed: '.$result->errorOutput());
             }
         } else {
             // Pull latest
             $result = Process::path($this->repoPath)->run("git pull origin {$config->branch}");
             if ($result->failed()) {
-                throw new RuntimeException("Git pull failed: " . $result->errorOutput());
+                throw new RuntimeException('Git pull failed: '.$result->errorOutput());
             }
         }
     }
@@ -145,7 +145,7 @@ class GitSyncService
      */
     private function commitAndPush(GitConfiguration $config): bool
     {
-        $result = Process::path($this->repoPath)->run("git status --porcelain");
+        $result = Process::path($this->repoPath)->run('git status --porcelain');
 
         if (empty(trim($result->output()))) {
             return false; // Nothing to commit
@@ -153,7 +153,7 @@ class GitSyncService
 
         Process::path($this->repoPath)->run("git add {$this->sqliteFile}");
 
-        $message = "Update kennisbank embeddings - " . now()->format('Y-m-d H:i:s');
+        $message = 'Update kennisbank embeddings - '.now()->format('Y-m-d H:i:s');
         Process::path($this->repoPath)->run("git commit -m \"{$message}\"");
 
         $url = $this->authenticatedUrl($config);
@@ -162,7 +162,7 @@ class GitSyncService
         );
 
         if ($result->failed()) {
-            throw new RuntimeException("Git push failed: " . $result->errorOutput());
+            throw new RuntimeException('Git push failed: '.$result->errorOutput());
         }
 
         return true;
@@ -174,6 +174,7 @@ class GitSyncService
     private function authenticatedUrl(GitConfiguration $config): string
     {
         $parsed = parse_url($config->repo_url);
+
         return sprintf(
             '%s://%s@%s%s',
             $parsed['scheme'] ?? 'https',
