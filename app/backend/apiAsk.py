@@ -132,7 +132,9 @@ def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]
 
 
 def build_augmented_prompt(
-    user_prompt: str, history: Optional[Sequence[ChatMessage]] = None
+    user_prompt: str,
+    history: Optional[Sequence[ChatMessage]] = None,
+    images_count: int = 0,
 ) -> str:
     base_lines: list[str] = []
 
@@ -142,7 +144,9 @@ def build_augmented_prompt(
         base_lines.extend(history_lines)
         base_lines.append("")
 
-    base_lines.append(f"{t('current_question')} {user_prompt.strip()}")
+    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
+    if images_count > 0:
+        base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
     context_lines = _gather_context_lines(user_prompt)
     if context_lines:
         base_lines.append("> context:")
@@ -208,13 +212,38 @@ async def summarize_history(
     return (summary or "").strip()
 
 
-async def _call_ollama(prompt: str, options: Optional[dict] = None) -> str:
+def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
+    if not images:
+        return []
+    normalized: list[str] = []
+    for item in images:
+        if not item:
+            continue
+        data = item.strip()
+        if not data:
+            continue
+        if data.startswith("data:"):
+            _, _, b64 = data.partition("base64,")
+            if not b64:
+                continue
+            data = b64.strip()
+        normalized.append(data)
+    return normalized
+
+
+async def _call_ollama(
+    prompt: str,
+    options: Optional[dict] = None,
+    images: Optional[Sequence[str]] = None,
+) -> str:
     ollama_url = f"{settings.ollama_base_url}/api/generate"
     payload = {
         "model": settings.ollama_model,
         "prompt": prompt,
         "stream": False,
     }
+    if images:
+        payload["images"] = list(images)
     max_context = settings.ollama_max_context.get(settings.ollama_model)
     if isinstance(max_context, int) and max_context > 0:
         payload["options"] = {"num_ctx": max_context}
@@ -244,10 +273,15 @@ async def handle_ask(
     history: Optional[Sequence[ChatMessage]] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
-    final_prompt = build_augmented_prompt(req.prompt, history_to_use)
+    images = normalize_images(req.images)
+    final_prompt = build_augmented_prompt(
+        req.prompt,
+        history_to_use,
+        images_count=len(images),
+    )
     log_prompt(final_prompt)
     try:
-        message = await _call_ollama(final_prompt)
+        message = await _call_ollama(final_prompt, images=images)
     except Exception as exc:  # pragma: no cover - netwerkfout
         logger.warning(
             "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
