@@ -21,6 +21,7 @@ from qasync import QEventLoop
 from .config import BACKEND_WS
 from .net.ws_client import WSClient
 from .theme import AITJE_QSS
+from .translations import t, register_language_change_callback
 from .widgets.chat_page import ChatPage
 from .widgets.contacts_page import ContactsPage
 from .widgets.devices_page import DevicesPage
@@ -35,13 +36,14 @@ from .widgets.settings_page import SettingsPage
 class BootScreen(QWidget):
     """Animated splash screen that mimics the AITJE loading state from the Figma design."""
 
-    STATUS_STEPS = [
-        (0, "Lokale AI wordt opgestart..."),
-        (20, "Neurale netwerken laden..."),
-        (45, "API endpoints voorbereiden..."),
-        (70, "Devices synchroniseren..."),
-        (90, "Bijna klaar..."),
-        (100, "Welkom! ✓"),
+    # Translation keys for status steps
+    STATUS_STEP_KEYS = [
+        (0, "boot_starting"),
+        (20, "boot_loading_neural"),
+        (45, "boot_preparing_api"),
+        (70, "boot_syncing_devices"),
+        (90, "boot_almost_ready"),
+        (100, "boot_welcome"),
     ]
 
     def __init__(
@@ -117,12 +119,12 @@ class BootScreen(QWidget):
             hero_label.setPixmap(self._build_egg_pixmap(260, 320))
         center.addWidget(hero_label, 0, Qt.AlignCenter)
 
-        title = QLabel("AITJE ontwaakt...")
+        title = QLabel(t("boot_title"))
         title.setObjectName("BootTitle")
         title.setAlignment(Qt.AlignCenter)
         center.addWidget(title)
 
-        subtitle = QLabel("De antwoorden van het universum worden lokaal opgestart.")
+        subtitle = QLabel(t("boot_subtitle"))
         subtitle.setObjectName("BootSubtitle")
         subtitle.setAlignment(Qt.AlignCenter)
         center.addWidget(subtitle)
@@ -140,7 +142,7 @@ class BootScreen(QWidget):
         info_row = QHBoxLayout()
         info_row.setContentsMargins(0, 0, 0, 0)
 
-        self.status_label = QLabel(self.STATUS_STEPS[0][1])
+        self.status_label = QLabel(t(self.STATUS_STEP_KEYS[0][1]))
         self.status_label.setObjectName("BootSubtitle")
         info_row.addWidget(self.status_label, 1, Qt.AlignLeft)
 
@@ -184,9 +186,9 @@ class BootScreen(QWidget):
         self.progress_bar.setValue(self.progress_value)
         self.percent_label.setText(f"{self.progress_value}%")
 
-        for threshold, message in reversed(self.STATUS_STEPS):
+        for threshold, key in reversed(self.STATUS_STEP_KEYS):
             if self.progress_value >= threshold:
-                self.status_label.setText(message)
+                self.status_label.setText(t(key))
                 break
 
         if self.progress_value >= 100:
@@ -282,8 +284,16 @@ class MainWindow(QMainWindow):
         self.sidebar.navigate.connect(self.show_page)
         self.sidebar.set_current("chat")
         self.show_page("chat")
-        
+
         self.setStyleSheet(AITJE_QSS)
+
+        # Register for language changes
+        register_language_change_callback(self._on_language_change)
+        self.header.language_changed.connect(self._on_language_change)
+
+    def _on_language_change(self, _lang: str = "") -> None:
+        """Update all UI elements when language changes."""
+        self._update_page_header()
 
     def _handle_view_on_map_request(self, contact: dict) -> None:
         maps_page = self.pages.get("maps")
@@ -302,26 +312,32 @@ class MainWindow(QMainWindow):
     def show_page(self, key: str):
         for name, page in self.pages.items():
             page.setVisible(name == key)
-        titles = {
-            "chat": "Chat Assistant",
-            "kb": "Kennisbank",
-            "maps": "Maps",
-            "contacts": "Contacten",
-            "net": "Netwerk",
-            "devices": "Connected Devices & Gebruikersbeheer",
-            "settings": "Instellingen",
+        self._current_page_key = key
+        self._update_page_header()
+
+    def _update_page_header(self):
+        """Update header title and subtitle for current page."""
+        key = getattr(self, "_current_page_key", "chat")
+        title_keys = {
+            "chat": "page_title_chat",
+            "kb": "page_title_kb",
+            "maps": "page_title_maps",
+            "contacts": "page_title_contacts",
+            "net": "page_title_net",
+            "devices": "page_title_devices",
+            "settings": "page_title_settings",
         }
-        subtitles = {
-            "chat": "Start een gesprek met je lokale AI-assistent",
-            "kb": "Beheer kennisbankdocumenten en SD-kaartopslag",
-            "maps": "Bekijk contactlocaties op de kaart",
-            "contacts": "Beheer je contacten en bekijk ze op de kaart",
-            "net": "Realtime overzicht van netwerk- en systeemstatus",
-            "devices": "Beheer verbonden apparaten en gebruikersaccounts voor het systeem",
-            "settings": "Beheer de systeeminstellingen en voorkeuren voor AITJE OS",
+        subtitle_keys = {
+            "chat": "page_subtitle_chat",
+            "kb": "page_subtitle_kb",
+            "maps": "page_subtitle_maps",
+            "contacts": "page_subtitle_contacts",
+            "net": "page_subtitle_net",
+            "devices": "page_subtitle_devices",
+            "settings": "page_subtitle_settings",
         }
-        self.header.set_title(titles.get(key, "AITJE"))
-        self.header.set_subtitle(subtitles.get(key, "Lokale AI-console"))
+        self.header.set_title(t(title_keys.get(key, "page_title_chat")))
+        self.header.set_subtitle(t(subtitle_keys.get(key, "subtitle_local_ai_console")))
 
     def _go_home(self):
         self.sidebar.set_current("chat")

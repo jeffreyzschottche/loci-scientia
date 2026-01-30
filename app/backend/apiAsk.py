@@ -9,6 +9,7 @@ from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .schemas import ChatMessage, ChatRequest, Contact, Device
 from .settings import settings
+from .translations import t, get_current_language
 
 logger = logging.getLogger(__name__)
 
@@ -99,16 +100,16 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
     return lines
 
 
-@lru_cache(maxsize=1)
 def _prompt_template() -> str:
+    """Get the prompt template - NOT cached to allow language changes."""
     try:
-        return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
+        template = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
+        # If file exists but we're in English mode, use English template
+        if get_current_language() == "en":
+            return t("prompt_default_template")
+        return template
     except FileNotFoundError:
-        return (
-            "Je bent de AITJE assistent. Gebruik context waar mogelijk, "
-            "maar verzin niets als er geen relevante context beschikbaar is. "
-            "Leg je antwoord duidelijk uit en antwoord in het Nederlands."
-        )
+        return t("prompt_default_template")
 
 
 def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]:
@@ -118,11 +119,11 @@ def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]
     for idx, message in enumerate(history, 1):
         role = (message.role or "").lower()
         if role == "assistant":
-            speaker = "AITJE"
+            speaker = t("speaker_assistant")
         elif role == "system":
-            speaker = "Systeem"
+            speaker = t("speaker_system")
         else:
-            speaker = "Gebruiker"
+            speaker = t("speaker_user")
         content = _flatten_multiline(message.content or "")
         if not content:
             continue
@@ -139,7 +140,7 @@ def build_augmented_prompt(
 
     history_lines = _format_history_lines(history)
     if history_lines:
-        base_lines.append("Vorige chat:")
+        base_lines.append(t("previous_chat"))
         base_lines.extend(history_lines)
         base_lines.append("")
 
@@ -171,17 +172,17 @@ def _build_summary_prompt(
     existing_summary: Optional[str] = None,
 ) -> str:
     lines: list[str] = [
-        "Vat de chatgeschiedenis compact samen.",
-        "Bewaar namen, afspraken, besluiten, open vragen en voorkeuren.",
-        "Schrijf in het Nederlands en blijf feitelijk.",
-        "Gebruik maximaal 8 zinnen.",
+        t("summary_instruction_1"),
+        t("summary_instruction_2"),
+        t("summary_instruction_3"),
+        t("summary_instruction_4"),
         "",
     ]
     if existing_summary:
-        lines.append("Bestaande samenvatting:")
+        lines.append(t("existing_summary"))
         lines.append(existing_summary.strip())
         lines.append("")
-    lines.append("Nieuwe berichten:")
+    lines.append(t("new_messages"))
     lines.extend(history_lines)
     return "\n".join(lines).strip()
 
@@ -206,7 +207,7 @@ async def summarize_history(
     try:
         summary = await _call_ollama(prompt, options={"num_predict": 256})
     except Exception as exc:  # pragma: no cover - netwerkfout
-        logger.warning("Samenvatting maken faalde: %s", exc)
+        logger.warning("%s %s", t("summary_failed"), exc)
         summary = _fallback_summary(existing_summary, history_lines)
     return (summary or "").strip()
 
@@ -260,10 +261,10 @@ async def _call_ollama(
 
 def _fallback_response(original_prompt: str) -> str:
     return (
-        "[Ollama niet beschikbaar - Mock response] "
-        f"Kon geen antwoord krijgen van Ollama op {settings.ollama_base_url} "
-        f"met model '{settings.ollama_model}'. Je vroeg: '{original_prompt}'. "
-        "Controleer of de Ollama-service draait en bereikbaar is."
+        f"{t('ollama_not_available')} "
+        f"{t('ollama_no_response', url=settings.ollama_base_url, model=settings.ollama_model)} "
+        f"'{original_prompt}'. "
+        f"{t('ollama_check_service')}"
     )
 
 
@@ -290,5 +291,5 @@ async def handle_ask(
         )
         message = _fallback_response(req.prompt)
     if not message:
-        message = "Ik kon geen antwoord genereren."
+        message = t("no_response_generated")
     return {"message": message}

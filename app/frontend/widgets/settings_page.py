@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS
+from ..translations import t, register_language_change_callback
 from .dialog_style import ask_yes_no_dialog, show_error_dialog
 
 class SettingsPage(QWidget):
@@ -43,11 +44,8 @@ class SettingsPage(QWidget):
         self._language_combo: QComboBox | None = None
         self._system_loading = False
         self._support_active = False
-        self._support_durations = {
-            "30 min": 30,
-            "1 uur": 60,
-            "4 uur": 240,
-        }
+        self._support_duration_keys = ["settings_30_min", "settings_1_hour", "settings_4_hours"]
+        self._support_duration_values = [30, 60, 240]
         self._model_signals = ModelSwitchSignals()
         self._model_signals.progress.connect(self._on_model_progress)
         self._model_signals.done.connect(self._on_model_done)
@@ -55,12 +53,14 @@ class SettingsPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
 
-        tabs = QTabWidget()
-        tabs.setObjectName("SettingsTabs")
-        tabs.addTab(self._system_tab(), "Systeem")
-        tabs.addTab(self._advanced_tab(), "Geavanceerd")
-        tabs.tabBar().setObjectName("SettingsTabsBar")
-        layout.addWidget(tabs, 1)
+        self._tabs = QTabWidget()
+        self._tabs.setObjectName("SettingsTabs")
+        self._tabs.addTab(self._system_tab(), t("settings_tab_system"))
+        self._tabs.addTab(self._advanced_tab(), t("settings_tab_advanced"))
+        self._tabs.tabBar().setObjectName("SettingsTabsBar")
+        layout.addWidget(self._tabs, 1)
+
+        register_language_change_callback(self._update_translations)
 
         QTimer.singleShot(0, self._load_models)
         QTimer.singleShot(0, self._load_support_status)
@@ -76,7 +76,8 @@ class SettingsPage(QWidget):
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(12)
         grid.setColumnStretch(1, 1)
-        grid.addWidget(QLabel("Tijdzone"), 0, 0)
+        self._timezone_label = QLabel(t("settings_timezone"))
+        grid.addWidget(self._timezone_label, 0, 0)
         self._timezone_combo = QComboBox()
         self._timezone_combo.setMaxVisibleItems(18)
         timezones = self._available_timezones()
@@ -95,7 +96,8 @@ class SettingsPage(QWidget):
         timezone_wrap.addStretch(1)
         grid.addLayout(timezone_wrap, 0, 1)
 
-        grid.addWidget(QLabel("Taal"), 1, 0)
+        self._language_label = QLabel(t("settings_language"))
+        grid.addWidget(self._language_label, 1, 0)
         self._language_combo = QComboBox()
         for label, value in self._language_options():
             self._language_combo.addItem(label, value)
@@ -119,51 +121,50 @@ class SettingsPage(QWidget):
     def _advanced_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        model_card = self._settings_card("Ollama model")
+        model_card = self._settings_card(t("settings_ollama_model"))
         model_body = QWidget()
         model_layout = QGridLayout(model_body)
         model_layout.setHorizontalSpacing(12)
-        model_layout.addWidget(QLabel("Model"), 0, 0)
+        model_layout.addWidget(QLabel(t("settings_model")), 0, 0)
         self._ollama_combo = QComboBox()
         self._ollama_combo.setEnabled(False)
         model_layout.addWidget(self._ollama_combo, 0, 1)
-        self._ollama_apply = QPushButton("Gebruik")
+        self._ollama_apply = QPushButton(t("settings_use"))
         self._ollama_apply.setEnabled(False)
         self._ollama_apply.clicked.connect(self._on_apply_model)
         model_layout.addWidget(self._ollama_apply, 0, 2)
-        self._ollama_status = QLabel("Beschikbare modellen laden...")
+        self._ollama_status = QLabel(t("settings_loading_models"))
         self._ollama_status.setStyleSheet("color:#6b7280; font-size:12px;")
         model_layout.addWidget(self._ollama_status, 1, 0, 1, 3)
         model_card.layout().addWidget(model_body)
         layout.addWidget(model_card)
 
-        support_card = self._settings_card("Remote support (Tailscale)")
+        support_card = self._settings_card(t("settings_remote_support"))
         support_body = QWidget()
         support_layout = QVBoxLayout(support_body)
         support_layout.setSpacing(10)
-        support_hint = QLabel(
-            "Schakel alleen in met expliciete toestemming van de klant. "
-            "We starten tijdelijk een Tailscale-verbinding voor support en sluiten automatisch."
-        )
-        support_hint.setWordWrap(True)
-        support_hint.setStyleSheet("color:#6b7280; font-size:12px;")
-        support_layout.addWidget(support_hint)
+        self._support_hint = QLabel(t("settings_support_hint"))
+        self._support_hint.setWordWrap(True)
+        self._support_hint.setStyleSheet("color:#6b7280; font-size:12px;")
+        support_layout.addWidget(self._support_hint)
 
         support_form = QGridLayout()
         support_form.setHorizontalSpacing(12)
-        support_form.addWidget(QLabel("Duur"), 0, 0)
+        self._duration_label = QLabel(t("settings_duration"))
+        support_form.addWidget(self._duration_label, 0, 0)
         self._support_duration = QComboBox()
-        self._support_duration.addItems(list(self._support_durations.keys()))
+        for key in self._support_duration_keys:
+            self._support_duration.addItem(t(key))
         support_form.addWidget(self._support_duration, 0, 1)
         support_layout.addLayout(support_form)
 
-        self._support_status = QLabel("Support status laden...")
+        self._support_status = QLabel(t("settings_support_status_loading"))
         self._support_status.setStyleSheet("color:#6b7280; font-size:12px;")
         support_layout.addWidget(self._support_status)
 
         support_actions = QHBoxLayout()
-        self._support_enable = QPushButton("Activeer ondersteuning")
-        self._support_disable = QPushButton("Stop ondersteuning")
+        self._support_enable = QPushButton(t("settings_enable_support"))
+        self._support_disable = QPushButton(t("settings_stop_support"))
         self._support_disable.setEnabled(False)
         support_actions.addWidget(self._support_enable)
         support_actions.addWidget(self._support_disable)
@@ -282,7 +283,7 @@ class SettingsPage(QWidget):
             self._set_env_value("TIMEZONE", value)
             os.environ["TIMEZONE"] = value
         except Exception as exc:
-            show_error_dialog(self, "Fout", f"Kon tijdzone niet opslaan: {exc}")
+            show_error_dialog(self, t("error"), f"{t('settings_could_not_save_timezone')} {exc}")
 
     def _on_language_changed(self, _index: int | None = None) -> None:
         if self._system_loading or not self._language_combo:
@@ -294,7 +295,7 @@ class SettingsPage(QWidget):
             self._set_env_value("LANGUAGE", str(value))
             os.environ["LANGUAGE"] = str(value)
         except Exception as exc:
-            show_error_dialog(self, "Fout", f"Kon taal niet opslaan: {exc}")
+            show_error_dialog(self, t("error"), f"{t('settings_could_not_save_language')} {exc}")
 
 
     def _auth_headers(self) -> dict:
@@ -325,11 +326,9 @@ class SettingsPage(QWidget):
                 self._ollama_combo.addItems(fallback)
                 self._ollama_combo.setEnabled(True)
                 self._ollama_apply.setEnabled(True)
-                self._ollama_status.setText(
-                    "Backend niet bereikbaar; lokaal modellenlijstje geladen."
-                )
+                self._ollama_status.setText(t("settings_backend_not_reachable"))
                 return
-            self._ollama_status.setText(f"Kon modellen niet ophalen: {exc}")
+            self._ollama_status.setText(f"{t('settings_could_not_fetch_models')} {exc}")
             return
 
         available = payload.get("available", [])
@@ -342,9 +341,9 @@ class SettingsPage(QWidget):
         self._ollama_combo.setEnabled(bool(available))
         self._ollama_apply.setEnabled(bool(available))
         if current:
-            self._ollama_status.setText(f"Huidig model: {current}")
+            self._ollama_status.setText(f"{t('settings_current_model')} {current}")
         else:
-            self._ollama_status.setText("Geen actief model ingesteld.")
+            self._ollama_status.setText(t("settings_no_active_model"))
 
     def _on_apply_model(self) -> None:
         if not self._ollama_combo or not self._ollama_status:
@@ -353,10 +352,10 @@ class SettingsPage(QWidget):
         if not model:
             return
         if model == self._current_model:
-            self._ollama_status.setText(f"Model {model} is al actief.")
+            self._ollama_status.setText(t("settings_model_already_active", model=model))
             return
 
-        self._show_busy(f"Ollama haalt {model} op...")
+        self._show_busy(t("settings_ollama_fetching", model=model))
         asyncio.create_task(self._apply_model_async(model))
 
     async def _apply_model_async(self, model: str) -> None:
@@ -364,7 +363,7 @@ class SettingsPage(QWidget):
             await asyncio.to_thread(self._stream_model_switch, model)
         except Exception as exc:
             self._hide_busy()
-            self._ollama_status.setText(f"Switchen mislukt: {exc}")
+            self._ollama_status.setText(f"{t('settings_switch_failed')} {exc}")
             return
 
     def _stream_model_switch(self, model: str) -> None:
@@ -409,7 +408,7 @@ class SettingsPage(QWidget):
             self._busy_dialog.setCancelButton(None)
             self._busy_dialog.setRange(0, 100)
             self._busy_dialog.setMinimumDuration(0)
-            self._busy_dialog.setWindowTitle("Ollama bezig")
+            self._busy_dialog.setWindowTitle(t("settings_ollama_busy"))
             self._busy_dialog.setAutoClose(False)
             self._busy_dialog.setAutoReset(False)
             self._busy_dialog.setValue(0)
@@ -431,11 +430,11 @@ class SettingsPage(QWidget):
     def _on_model_done(self, current: str, error: str) -> None:
         self._hide_busy()
         if error:
-            self._ollama_status.setText(f"Switchen mislukt: {error}")
+            self._ollama_status.setText(f"{t('settings_switch_failed')} {error}")
             return
         if current:
             self._current_model = current
-            self._ollama_status.setText(f"Huidig model: {current}")
+            self._ollama_status.setText(f"{t('settings_current_model')} {current}")
             self._ollama_combo.setCurrentText(current)
 
     def _load_support_status(self) -> None:
@@ -453,7 +452,7 @@ class SettingsPage(QWidget):
             return
         except Exception as exc:
             self._set_support_busy(False)
-            self._support_status.setText(f"Kon support status niet laden: {exc}")
+            self._support_status.setText(f"{t('settings_could_not_load_support')} {exc}")
             return
         self._apply_support_state(payload)
 
@@ -471,13 +470,12 @@ class SettingsPage(QWidget):
             return
         if not ask_yes_no_dialog(
             self,
-            "Remote support inschakelen",
-            "Dit opent tijdelijke SSH-toegang voor support. "
-            "Schakel alleen in met expliciete toestemming. Doorgaan?",
+            t("settings_enable_remote_support"),
+            t("settings_enable_remote_support_confirm"),
         ):
             return
         duration = self._selected_support_duration()
-        self._set_support_busy(True, "Ondersteuning activeren...")
+        self._set_support_busy(True, t("settings_activating_support"))
         asyncio.create_task(self._enable_support_async(duration))
 
     async def _enable_support_async(self, duration: int) -> None:
@@ -488,11 +486,11 @@ class SettingsPage(QWidget):
             )
         except requests.HTTPError as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, "Fout", self._support_error_message(exc))
+            show_error_dialog(self, t("error"), self._support_error_message(exc))
             return
         except Exception as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, "Fout", str(exc))
+            show_error_dialog(self, t("error"), str(exc))
             return
         self._set_support_busy(False)
         self._apply_support_state(payload)
@@ -513,11 +511,11 @@ class SettingsPage(QWidget):
             return
         if not ask_yes_no_dialog(
             self,
-            "Remote support uitschakelen",
-            "Weet je zeker dat je de supporttoegang wilt afsluiten?",
+            t("settings_disable_remote_support"),
+            t("settings_disable_remote_support_confirm"),
         ):
             return
-        self._set_support_busy(True, "Ondersteuning afsluiten...")
+        self._set_support_busy(True, t("settings_closing_support"))
         asyncio.create_task(self._disable_support_async())
 
     async def _disable_support_async(self) -> None:
@@ -525,11 +523,11 @@ class SettingsPage(QWidget):
             payload = await asyncio.to_thread(self._post_support_disable)
         except requests.HTTPError as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, "Fout", self._support_error_message(exc))
+            show_error_dialog(self, t("error"), self._support_error_message(exc))
             return
         except Exception as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, "Fout", str(exc))
+            show_error_dialog(self, t("error"), str(exc))
             return
         self._set_support_busy(False)
         self._apply_support_state(payload)
@@ -551,10 +549,7 @@ class SettingsPage(QWidget):
         except Exception:
             detail = None
         if status == 401:
-            return (
-                "Backend verwacht een Bearer token. "
-                "Stel BACKEND_BEARER_TOKEN in op het apparaat."
-            )
+            return t("settings_bearer_token_required")
         if detail:
             return detail
         return str(exc)
@@ -567,16 +562,16 @@ class SettingsPage(QWidget):
         self._support_active = active
         if self._support_status:
             if active:
-                parts = ["Actief"]
+                parts = [t("settings_active")]
                 if expires_at:
-                    parts.append(f"tot {expires_at}")
+                    parts.append(f"{t('settings_until')} {expires_at}")
                 if session_id:
-                    parts.append(f"(sessie {session_id})")
+                    parts.append(f"({t('settings_session')} {session_id})")
                 self._support_status.setText(" ".join(parts))
             else:
-                message = "Uitgeschakeld"
+                message = t("settings_disabled")
                 if last_error:
-                    message = f"{message} (laatste fout: {last_error})"
+                    message = f"{message} ({t('settings_last_error')} {last_error})"
                 self._support_status.setText(message)
         if self._support_enable:
             self._support_enable.setEnabled(not active)
@@ -594,7 +589,36 @@ class SettingsPage(QWidget):
     def _selected_support_duration(self) -> int:
         if not self._support_duration:
             return 60
-        return self._support_durations.get(self._support_duration.currentText(), 60)
+        idx = self._support_duration.currentIndex()
+        if 0 <= idx < len(self._support_duration_values):
+            return self._support_duration_values[idx]
+        return 60
+
+    def _update_translations(self) -> None:
+        """Update all translatable UI elements when language changes."""
+        if hasattr(self, "_tabs"):
+            self._tabs.setTabText(0, t("settings_tab_system"))
+            self._tabs.setTabText(1, t("settings_tab_advanced"))
+        if hasattr(self, "_timezone_label"):
+            self._timezone_label.setText(t("settings_timezone"))
+        if hasattr(self, "_language_label"):
+            self._language_label.setText(t("settings_language"))
+        if hasattr(self, "_duration_label"):
+            self._duration_label.setText(t("settings_duration"))
+        if hasattr(self, "_support_hint"):
+            self._support_hint.setText(t("settings_support_hint"))
+        if hasattr(self, "_support_enable"):
+            self._support_enable.setText(t("settings_enable_support"))
+        if hasattr(self, "_support_disable"):
+            self._support_disable.setText(t("settings_stop_support"))
+        if hasattr(self, "_ollama_apply"):
+            self._ollama_apply.setText(t("settings_use"))
+        if hasattr(self, "_support_duration") and self._support_duration:
+            current_idx = self._support_duration.currentIndex()
+            self._support_duration.clear()
+            for key in self._support_duration_keys:
+                self._support_duration.addItem(t(key))
+            self._support_duration.setCurrentIndex(current_idx)
 
     @staticmethod
     def _format_support_timestamp(value: str | None) -> str:

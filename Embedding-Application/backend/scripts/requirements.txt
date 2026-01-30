@@ -1,0 +1,2 @@
+fastembed>=0.4.0
+pymupdf>=1.24.0

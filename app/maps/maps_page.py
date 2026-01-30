@@ -54,6 +54,7 @@ from app.frontend.widgets.dialog_style import (
     show_info_dialog,
     show_warning_dialog,
 )
+from app.frontend.translations import t, register_language_change_callback
 
 
 class MapBridge(QObject):
@@ -86,13 +87,13 @@ class ContactListDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.Antialiasing)
 
         contact = index.data(Qt.UserRole) or {}
-        name = contact.get("name") or "Onbekend"
+        name = contact.get("name") or t("maps_unknown")
         context_bits = [
             contact.get("location_label") or contact.get("location_street"),
             contact.get("location_city"),
             contact.get("location_country"),
         ]
-        meta = ", ".join([bit for bit in context_bits if bit]) or "Geen locatie-informatie"
+        meta = ", ".join([bit for bit in context_bits if bit]) or t("maps_no_location_info")
         is_checked = index.data(Qt.CheckStateRole) == Qt.Checked
 
         container = option.rect.adjusted(8, 4, -8, -4)
@@ -184,6 +185,8 @@ class MapsPage(QWidget):
         self._last_location: Optional[Dict[str, Any]] = None
         self._load_contacts_for_map()
 
+        register_language_change_callback(self._update_translations)
+
     def _build_map_view(self) -> QFrame:
         area = QFrame()
         area.setObjectName("MapFrame")
@@ -214,6 +217,18 @@ class MapsPage(QWidget):
 
         css_inline = (self._assets_dir / "maplibre-gl.css").read_text(encoding="utf-8")
         js_inline = (self._assets_dir / "maplibre-gl.js").read_text(encoding="utf-8")
+
+        # Translations for JavaScript
+        js_loading_text = t("maps_loading")
+        js_labeled_location = t("maps_labeled_location")
+        js_click_to_pin = t("maps_click_to_pin")
+        translations_json = json.dumps(
+            {
+                "loading": js_loading_text,
+                "labeledLocation": js_labeled_location,
+                "clickToPin": js_click_to_pin,
+            }
+        )
 
         html_template = f"""
 <!DOCTYPE html>
@@ -265,7 +280,7 @@ class MapsPage(QWidget):
 </head>
 <body>
   <div id=\"map\"></div>
-  <div id=\"status-overlay\">Offline kaart wordt geladen…</div>
+  <div id=\"status-overlay\">{js_loading_text}</div>
 
   <script>
   /*__MAPLIBRE_JS__*/
@@ -276,11 +291,13 @@ class MapsPage(QWidget):
 {style_json}
     ;
     const tileErrorHint = {json.dumps(tile_hint)};
+    const translations = {translations_json};
 
     let pyBridge = null;
     let pendingPin = false;
     let activePinMarker = null;
     let contactMarkers = new Map();
+    let mapReady = false;
 
     const statusOverlay = document.getElementById("status-overlay");
     const showStatus = (message) => {{
@@ -330,7 +347,8 @@ class MapsPage(QWidget):
       info.city = locality?.properties?.name || null;
       info.region = region?.properties?.name || null;
       info.country = country?.properties?.name || locality?.properties?.country || null;
-      info.label = info.street || info.city || info.region || info.country || "Gelabelde locatie";
+      info.label =
+        info.street || info.city || info.region || info.country || translations.labeledLocation;
       info.context = [info.city, info.region, info.country].filter(Boolean).join(", ");
       return info;
     }};
@@ -350,7 +368,7 @@ class MapsPage(QWidget):
     window.enablePinMode = () => {{
       if (!window.map) return;
       pendingPin = true;
-      showStatus("Klik op de kaart om een locatie te pinnen…");
+      showStatus(translations.clickToPin);
     }};
 
     window.setActiveContacts = (contacts, focusId) => {{
@@ -454,6 +472,7 @@ class MapsPage(QWidget):
     window.map.once("load", function() {{
       hideStatus();
       window.map.resize();
+      mapReady = true;
     }});
 
     window.map.on("error", function(event) {{
@@ -490,6 +509,26 @@ class MapsPage(QWidget):
       }}
     }});
 
+    window.updateMapTranslations = (next) => {{
+      if (!next || typeof next !== "object") {{
+        return;
+      }}
+      if (typeof next.loading === "string") {{
+        translations.loading = next.loading;
+      }}
+      if (typeof next.labeledLocation === "string") {{
+        translations.labeledLocation = next.labeledLocation;
+      }}
+      if (typeof next.clickToPin === "string") {{
+        translations.clickToPin = next.clickToPin;
+      }}
+      if (pendingPin) {{
+        showStatus(translations.clickToPin);
+      }} else if (!mapReady && statusOverlay && !statusOverlay.classList.contains("hidden")) {{
+        statusOverlay.textContent = translations.loading;
+      }}
+    }};
+
     initBridge();
   </script>
 </body>
@@ -521,7 +560,7 @@ class MapsPage(QWidget):
 
         controls_layout.addStretch(1)
 
-        self.pin_button = QPushButton("Voeg locatie toe")
+        self.pin_button = QPushButton(t("maps_add_location"))
         self.pin_button.setObjectName("MapPrimaryButton")
         self.pin_button.setFixedHeight(30)
         self.pin_button.setCursor(Qt.PointingHandCursor)
@@ -549,27 +588,25 @@ class MapsPage(QWidget):
         layout.setSpacing(18)
 
         header = QVBoxLayout()
-        title = QLabel("Locaties")
-        title.setObjectName("ContactPanelTitle")
-        header.addWidget(title)
-        subtitle = QLabel("Bekijk contactlocaties op de kaart")
-        subtitle.setObjectName("ContactPanelSubtitle")
-        header.addWidget(subtitle)
+        self._panel_title = QLabel(t("maps_locations"))
+        self._panel_title.setObjectName("ContactPanelTitle")
+        header.addWidget(self._panel_title)
+        self._panel_subtitle = QLabel(t("maps_view_contacts"))
+        self._panel_subtitle.setObjectName("ContactPanelSubtitle")
+        header.addWidget(self._panel_subtitle)
         layout.addLayout(header)
 
         filter_row = QHBoxLayout()
         filter_row.addStretch(1)
-        reload = QPushButton("Herlaad")
-        reload.setObjectName("ContactReloadButton")
-        reload.setFixedHeight(30)
-        reload.setToolTip("Herlaad contacten")
-        reload.clicked.connect(self._load_contacts_for_map)
-        filter_row.addWidget(reload)
+        self._reload_btn = QPushButton(t("maps_reload"))
+        self._reload_btn.setObjectName("ContactReloadButton")
+        self._reload_btn.setFixedHeight(30)
+        self._reload_btn.setToolTip(t("maps_reload_contacts"))
+        self._reload_btn.clicked.connect(self._load_contacts_for_map)
+        filter_row.addWidget(self._reload_btn)
         layout.addLayout(filter_row)
 
-        self.contacts_empty = QLabel(
-            "Nog geen contacten met GPS-coördinaten. Koppel een locatie om deze hier te tonen."
-        )
+        self.contacts_empty = QLabel(t("maps_no_contacts_with_gps"))
         self.contacts_empty.setWordWrap(True)
         self.contacts_empty.setObjectName("ContactEmptyState")
         layout.addWidget(self.contacts_empty)
@@ -595,10 +632,10 @@ class MapsPage(QWidget):
         actions.setVerticalSpacing(10)
         actions.setColumnStretch(0, 1)
         actions.setColumnStretch(1, 1)
-        self.edit_contact_btn = QPushButton("Bewerk contact")
-        self.pin_contact_btn = QPushButton("Voeg locatie toe")
-        self.clear_location_btn = QPushButton("Verwijder locatie")
-        self.delete_contact_btn = QPushButton("Verwijder contact")
+        self.edit_contact_btn = QPushButton(t("maps_edit_contact"))
+        self.pin_contact_btn = QPushButton(t("maps_add_location"))
+        self.clear_location_btn = QPushButton(t("maps_remove_location"))
+        self.delete_contact_btn = QPushButton(t("maps_delete_contact"))
         self.edit_contact_btn.setObjectName("ContactSecondaryButton")
         self.pin_contact_btn.setObjectName("ContactSecondaryButton")
         self.clear_location_btn.setObjectName("ContactSecondaryButton")
@@ -625,6 +662,47 @@ class MapsPage(QWidget):
         self.contacts_empty.hide()
 
         return panel
+
+    def _update_translations(self) -> None:
+        """Update UI elements when language changes."""
+        # Update panel labels
+        if hasattr(self, "_panel_title"):
+            self._panel_title.setText(t("maps_locations"))
+        if hasattr(self, "_panel_subtitle"):
+            self._panel_subtitle.setText(t("maps_view_contacts"))
+        if hasattr(self, "_reload_btn"):
+            self._reload_btn.setText(t("maps_reload"))
+            self._reload_btn.setToolTip(t("maps_reload_contacts"))
+        if hasattr(self, "contacts_empty"):
+            self.contacts_empty.setText(t("maps_no_contacts_with_gps"))
+        if hasattr(self, "pin_button"):
+            self.pin_button.setText(t("maps_add_location"))
+
+        # Update action buttons
+        if hasattr(self, "edit_contact_btn"):
+            self.edit_contact_btn.setText(t("maps_edit_contact"))
+        if hasattr(self, "pin_contact_btn"):
+            self.pin_contact_btn.setText(t("maps_add_location"))
+        if hasattr(self, "clear_location_btn"):
+            self.clear_location_btn.setText(t("maps_remove_location"))
+        if hasattr(self, "delete_contact_btn"):
+            self.delete_contact_btn.setText(t("maps_delete_contact"))
+
+        self._sync_map_language()
+
+    def _sync_map_language(self) -> None:
+        if not hasattr(self, "webview"):
+            return
+        translations_payload = json.dumps(
+            {
+                "loading": t("maps_loading"),
+                "labeledLocation": t("maps_labeled_location"),
+                "clickToPin": t("maps_click_to_pin"),
+            }
+        )
+        self.webview.page().runJavaScript(
+            f"if (window.updateMapTranslations) {{ window.updateMapTranslations({translations_payload}); }}"
+        )
 
     def zoom_in(self):
         if hasattr(self, "webview"):
@@ -693,7 +771,7 @@ class MapsPage(QWidget):
         contacts = self._fetch_contacts()
 
         dialog = OverlayDialog(self)
-        dialog.setWindowTitle("Locatie koppelen aan contact")
+        dialog.setWindowTitle(t("maps_link_location_to_contact"))
         form_host = QWidget()
         form = QFormLayout(form_host)
         form.setRowWrapPolicy(QFormLayout.WrapAllRows)
@@ -703,7 +781,7 @@ class MapsPage(QWidget):
         dialog.card_layout.setContentsMargins(0, 0, 0, 0)
         dialog.card_layout.addWidget(form_host)
 
-        label = location.get("label") or location.get("street") or "Onbekende locatie"
+        label = location.get("label") or location.get("street") or t("maps_unknown_location")
         city = location.get("city")
         country = location.get("country")
         summary_text = label
@@ -711,22 +789,22 @@ class MapsPage(QWidget):
             summary_text = f"{label} — {', '.join([bit for bit in [city, country] if bit])}"
         summary = QLabel(summary_text)
         summary.setWordWrap(True)
-        form.addRow("Locatie", summary)
+        form.addRow(t("maps_location"), summary)
 
         lat = location.get("lat")
         lon = location.get("lon")
         if lat is not None and lon is not None:
             coords_value = f"{lat:.5f}, {lon:.5f}"
         else:
-            coords_value = "Onbekend"
+            coords_value = t("maps_unknown")
         coords = QLabel(coords_value)
-        form.addRow("GPS", coords)
+        form.addRow(t("maps_gps"), coords)
 
         combo = QComboBox()
-        combo.addItem("Selecteer contact", None)
+        combo.addItem(t("maps_select_contact"), None)
         for person in contacts:
-            combo.addItem(person.get("name", "Onbekend"), person)
-        form.addRow("Contact", combo)
+            combo.addItem(person.get("name", t("maps_unknown")), person)
+        form.addRow(t("maps_contact"), combo)
 
         preferred_contact_id = self._pending_contact_id_for_pin
         if preferred_contact_id is not None:
@@ -739,7 +817,7 @@ class MapsPage(QWidget):
                     combo.setCurrentIndex(index)
                     break
 
-        new_btn = QPushButton("Nieuw contact…")
+        new_btn = QPushButton(t("maps_new_contact"))
         new_btn.setCursor(Qt.PointingHandCursor)
         new_btn.setFixedSize(140, 36)
         form.addRow(new_btn)
@@ -747,10 +825,10 @@ class MapsPage(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(16)
         btn_row.addStretch(1)
-        cancel_btn = QPushButton("Annuleren")
+        cancel_btn = QPushButton(t("cancel"))
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.setFixedSize(120, 36)
-        save_btn = QPushButton("Opslaan")
+        save_btn = QPushButton(t("save"))
         save_btn.setCursor(Qt.PointingHandCursor)
         save_btn.setFixedSize(120, 36)
         btn_row.addWidget(cancel_btn)
@@ -761,13 +839,13 @@ class MapsPage(QWidget):
         def create_new_contact() -> None:
             contact = self._create_contact_with_location(location)
             if contact:
-                combo.addItem(contact.get("name", "Onbekend"), contact)
+                combo.addItem(contact.get("name", t("maps_unknown")), contact)
                 combo.setCurrentIndex(combo.count() - 1)
 
         def save_location() -> None:
             selected = combo.currentData()
             if selected is None:
-                show_warning_dialog(dialog, "Geen contact", "Selecteer een contact.")
+                show_warning_dialog(dialog, t("maps_no_contact_selected"), t("maps_select_a_contact"))
                 return
             dialog.done(1)
             self._update_contact_location(selected, location)
@@ -790,8 +868,8 @@ class MapsPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Kon contacten niet laden:\n{exc}",
+                t("error"),
+                f"{t('maps_could_not_load_contacts')}\n{exc}",
             )
             return []
 
@@ -845,7 +923,7 @@ class MapsPage(QWidget):
         self._update_contact_action_state()
 
     def _contact_list_label(self, contact: dict) -> str:
-        name = contact.get("name") or "Onbekend"
+        name = contact.get("name") or t("maps_unknown")
         context_bits = [
             contact.get("location_label") or contact.get("location_street"),
             contact.get("location_city"),
@@ -872,7 +950,7 @@ class MapsPage(QWidget):
             lon = float(contact.get("location_lon"))
         except (TypeError, ValueError):
             return None
-        name = contact.get("name") or "Contact"
+        name = contact.get("name") or t("maps_contact")
         location_bits = [
             contact.get("location_label") or contact.get("location_street"),
             contact.get("location_city"),
@@ -920,7 +998,7 @@ class MapsPage(QWidget):
         contact_id = contact.get("id")
         if contact_id is None:
             return
-        dialog = ContactFormDialog(self, title="Contact bewerken", initial=contact)
+        dialog = ContactFormDialog(self, title=t("maps_edit_contact"), initial=contact)
         if dialog.exec() != QDialog.Accepted:
             return
         payload = dialog.payload()
@@ -936,8 +1014,8 @@ class MapsPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Contact kon niet worden bijgewerkt:\n{exc}",
+                t("error"),
+                f"{t('maps_could_not_update_contact')}\n{exc}",
             )
             return
         contact_key = str(contact_id)
@@ -961,8 +1039,8 @@ class MapsPage(QWidget):
             return
         confirm = ask_yes_no_dialog(
             self,
-            "Locatie verwijderen",
-            "Weet je zeker dat je de locatie voor dit contact wilt verwijderen?",
+            t("maps_remove_location_title"),
+            t("maps_remove_location_confirm"),
         )
         if not confirm:
             return
@@ -986,8 +1064,8 @@ class MapsPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Locatie kon niet worden verwijderd:\n{exc}",
+                t("error"),
+                f"{t('maps_could_not_remove_location')}\n{exc}",
             )
             return
         contact_key = str(contact_id)
@@ -1003,8 +1081,8 @@ class MapsPage(QWidget):
             return
         confirm = ask_yes_no_dialog(
             self,
-            "Contact verwijderen",
-            f"Weet je zeker dat je {contact.get('name', 'dit contact')} wilt verwijderen?",
+            t("maps_delete_contact_title"),
+            t("maps_delete_contact_confirm", name=contact.get("name", t("maps_contact"))),
         )
         if not confirm:
             return
@@ -1017,8 +1095,8 @@ class MapsPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Contact kon niet worden verwijderd:\n{exc}",
+                t("error"),
+                f"{t('maps_could_not_delete_contact')}\n{exc}",
             )
             return
         self.contact_changed.emit(str(contact_id))
@@ -1097,8 +1175,8 @@ class MapsPage(QWidget):
         if contact.get("location_lat") is None or contact.get("location_lon") is None:
             show_info_dialog(
                 self,
-                "Geen locatie",
-                "Dit contact heeft geen GPS-locatie om te tonen.",
+                t("contacts_no_location"),
+                t("maps_no_gps_location"),
             )
             return
         self._load_contacts_for_map()
@@ -1117,8 +1195,8 @@ class MapsPage(QWidget):
         if contact_id_value is None:
             show_warning_dialog(
                 self,
-                "Contact onbekend",
-                "Dit contact kan niet gekoppeld worden omdat het geen ID heeft.",
+                t("maps_contact_unknown"),
+                t("maps_contact_no_id"),
             )
             return
         contact_id = str(contact_id_value)
@@ -1128,12 +1206,12 @@ class MapsPage(QWidget):
             self.focus_on_contact(contact)
             return
         self._pending_contact_id_for_pin = contact_id
-        name = contact.get("name") or "dit contact"
+        name = contact.get("name") or t("maps_contact")
         if force_pin:
-            message = f"Selecteer op de kaart een nieuwe locatie voor {name}."
+            message = t("maps_select_new_location", name=name)
         else:
-            message = f"Selecteer op de kaart een locatie voor {name}."
-        show_info_dialog(self, "Locatie koppelen", message)
+            message = t("maps_select_location", name=name)
+        show_info_dialog(self, t("maps_link_location"), message)
         self._start_pin_mode()
 
     def _location_payload(self, location: Dict[str, Any]) -> Dict[str, Any]:
@@ -1160,15 +1238,15 @@ class MapsPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Locatie kon niet opgeslagen worden:\n{exc}",
+                t("error"),
+                f"{t('maps_could_not_save_location')}\n{exc}",
             )
             return
 
         show_info_dialog(
             self,
-            "Locatie opgeslagen",
-            f"Locatie is gekoppeld aan {contact.get('name', 'contact')}.",
+            t("maps_location_saved"),
+            t("maps_location_linked_to", name=contact.get("name", t("maps_contact"))),
         )
         contact_id = contact.get("id")
         if contact_id is not None:
@@ -1208,7 +1286,7 @@ class MapsPage(QWidget):
         except Exception as exc:
             show_error_dialog(
                 self,
-                "Fout",
-                f"Contact kon niet aangemaakt worden:\n{exc}",
+                t("error"),
+                f"{t('maps_could_not_create_contact')}\n{exc}",
             )
             return None

@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..translations import t
+
 DIALOG_WIDTH = 500
 DIALOG_HEIGHT = 550
 
@@ -207,7 +209,7 @@ def _base_dialog(parent, title: str, text: str) -> tuple[OverlayDialog, QVBoxLay
 
 def show_info_dialog(parent, title: str, text: str) -> None:
     dialog, layout = _base_dialog(parent, title, text)
-    btn = _styled_button("Oké")
+    btn = _styled_button(t("ok"))
     btn.clicked.connect(dialog.accept)
     layout.addStretch(1)
     layout.addWidget(btn, 0, Qt.AlignCenter)
@@ -233,8 +235,8 @@ def ask_yes_no_dialog(
     layout.addStretch(1)
     buttons = QHBoxLayout()
     buttons.setSpacing(12)
-    no_btn = _styled_button("Nee")
-    yes_btn = _styled_button("Ja")
+    no_btn = _styled_button(t("no"))
+    yes_btn = _styled_button(t("yes"))
     if default_to_no:
         no_btn.setDefault(True)
     else:

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP
+from ..translations import t, register_language_change_callback
 
 API_BASE = BACKEND_HTTP
 
@@ -22,16 +23,18 @@ class NetworkStatusPage(QWidget):
         layout.setSpacing(20)
 
         self.stats_cards = {}
+        self._stat_headings = {}
         stats_row = QHBoxLayout()
         stats_row.setSpacing(16)
-        for key, heading, caption in [
-            ("requests_today", "TOTAAL VANDAAG", "Hoe vaak de API is gebruikt."),
-            ("active_users", "ACTIEVE GEBRUIKERS", "Aantal klanten of apps vandaag."),
-            ("avg_response", "GEM. REACTIETIJD", "Gemiddelde wachttijd."),
+        for key, heading_key, caption_key in [
+            ("requests_today", "network_total_today", "network_api_usage"),
+            ("active_users", "network_active_users", "network_customers_apps"),
+            ("avg_response", "network_avg_response_time", "network_avg_wait_time"),
         ]:
-            card, metric_label, caption_label = self._build_stat_card(
-                heading, "n.v.t.", caption
+            card, metric_label, caption_label, heading_label = self._build_stat_card(
+                t(heading_key), t("network_na"), t(caption_key)
             )
+            self._stat_headings[key] = {"heading_key": heading_key, "caption_key": caption_key, "heading_label": heading_label}
             self.stats_cards[key] = {
                 "metric": metric_label,
                 "caption": caption_label,
@@ -41,9 +44,9 @@ class NetworkStatusPage(QWidget):
 
         layout.addStretch(1)
 
-        wifi_button = QPushButton("Open WiFi configuratie")
-        wifi_button.setFixedHeight(56)
-        wifi_button.setStyleSheet(
+        self._wifi_button = QPushButton(t("network_open_wifi_config"))
+        self._wifi_button.setFixedHeight(56)
+        self._wifi_button.setStyleSheet(
             "QPushButton {"
             "  background:#facc15;"
             "  color:#050505;"
@@ -54,10 +57,19 @@ class NetworkStatusPage(QWidget):
             "}"
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
-        wifi_button.clicked.connect(self._open_wifi_settings)
-        layout.addWidget(wifi_button, 0, Qt.AlignCenter)
+        self._wifi_button.clicked.connect(self._open_wifi_settings)
+        layout.addWidget(self._wifi_button, 0, Qt.AlignCenter)
         layout.addStretch(1)
         self._reload()
+
+        register_language_change_callback(self._update_translations)
+
+    def _update_translations(self) -> None:
+        """Update UI elements when language changes."""
+        self._wifi_button.setText(t("network_open_wifi_config"))
+        for key, data in self._stat_headings.items():
+            data["heading_label"].setText(t(data["heading_key"]))
+        self._update_stats([])
 
     def _build_stat_card(self, title: str, value: str, caption: str):
         card = self._card()
@@ -73,7 +85,7 @@ class NetworkStatusPage(QWidget):
         card_layout.addWidget(heading)
         card_layout.addWidget(metric)
         card_layout.addWidget(detail)
-        return card, metric, detail
+        return card, metric, detail, heading
 
     @staticmethod
     def _card():
@@ -129,23 +141,23 @@ class NetworkStatusPage(QWidget):
             active_users = len(set(active_ids))
 
         if avg_response_ms is None:
-            avg_label = "n.v.t."
-            avg_caption = "Nog geen metingen."
+            avg_label = t("network_na")
+            avg_caption = t("network_no_measurements")
         elif avg_response_ms >= 1000:
             avg_label = f"{avg_response_ms / 1000:.1f}s".replace(".", ",")
-            avg_caption = "Gemiddelde wachttijd."
+            avg_caption = t("network_avg_wait_time")
         else:
             avg_label = f"{int(avg_response_ms)} ms"
-            avg_caption = "Gemiddelde wachttijd."
+            avg_caption = t("network_avg_wait_time")
 
         if total_requests is None:
-            req_label = "n.v.t."
-            req_caption = "Nog geen metingen."
+            req_label = t("network_na")
+            req_caption = t("network_no_measurements")
         else:
             req_label = fmt_int(total_requests)
-            req_caption = "Hoe vaak de API is gebruikt."
+            req_caption = t("network_api_usage")
 
-        active_caption = "Aantal klanten of apps vandaag."
+        active_caption = t("network_customers_apps")
 
         self.stats_cards["requests_today"]["metric"].setText(req_label)
         self.stats_cards["requests_today"]["caption"].setText(req_caption)
