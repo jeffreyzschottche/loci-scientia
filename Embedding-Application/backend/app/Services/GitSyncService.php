@@ -2,32 +2,44 @@
 
 namespace App\Services;
 
+use App\Models\Document;
 use App\Models\GitConfiguration;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class GitSyncService
 {
-    private string $repoPath;
+    private string $basePath;
 
-    private string $sqliteFile = 'kennisbank.db';
+    private string $exportRoot = 'knowledge_base';
 
-    public function __construct()
-    {
-        $this->repoPath = storage_path('app/git-repo');
+    public function __construct(
+        private readonly JsonLdGenerator $jsonLdGenerator
+    ) {
+        $this->basePath = storage_path('app/git-repos');
+        if (! is_dir($this->basePath)) {
+            mkdir($this->basePath, 0755, true);
+        }
     }
 
     /**
-     * Export embeddings to SQLite, commit, and push to remote.
+     * Sync the authenticated user's knowledge base to their configured Git repo.
      */
-    public function syncToGit(): array
+    public function syncUser(User $user): array
     {
-        $config = GitConfiguration::firstOrFail();
+        $config = GitConfiguration::where('user_id', $user->id)->firstOrFail();
+        $repoPath = $this->repoPathFor($user->id, $config->repo_url);
 
-        $this->ensureRepoCloned($config);
-        $this->exportToSqlite();
-        $pushed = $this->commitAndPush($config);
+        $this->ensureRepoCloned($config, $repoPath);
+
+        $documents = $this->fetchDocuments($user);
+        $this->exportStructuredFiles($documents, $repoPath);
+
+        $pushed = $this->commitAndPush($config, $repoPath);
 
         if ($pushed) {
             $config->update(['last_pushed_at' => now()]);
@@ -39,126 +51,92 @@ class GitSyncService
         ];
     }
 
-    /**
-     * Export all embeddings to a SQLite file in the git repo.
-     */
-    private function exportToSqlite(): void
+    private function fetchDocuments(User $user): Collection
     {
-        $dbPath = "{$this->repoPath}/{$this->sqliteFile}";
-
-        // Remove old file
-        if (file_exists($dbPath)) {
-            unlink($dbPath);
-        }
-
-        // Create SQLite database
-        $pdo = new \PDO("sqlite:{$dbPath}");
-        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-
-        $pdo->exec('
-            CREATE TABLE documents (
-                id INTEGER PRIMARY KEY,
-                original_filename TEXT NOT NULL,
-                chunk_count INTEGER DEFAULT 0,
-                created_at TEXT
-            )
-        ');
-
-        $pdo->exec('
-            CREATE TABLE embeddings (
-                id INTEGER PRIMARY KEY,
-                document_id INTEGER NOT NULL,
-                chunk_index INTEGER NOT NULL,
-                text_content TEXT NOT NULL,
-                vector TEXT NOT NULL,
-                FOREIGN KEY (document_id) REFERENCES documents(id)
-            )
-        ');
-
-        // Export documents that have embeddings
-        $documents = DB::table('documents')
-            ->where('status', 'embedded')
+        return Document::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('status', 'formatted')
+            ->with([
+                'sections.chunks',
+                'sections.outgoingRelations.targetSection.document',
+                'outgoingRelations.targetDocument',
+                'children',
+            ])
+            ->orderBy('position')
             ->get();
-
-        $docStmt = $pdo->prepare(
-            'INSERT INTO documents (id, original_filename, chunk_count, created_at) VALUES (?, ?, ?, ?)'
-        );
-
-        $embStmt = $pdo->prepare(
-            'INSERT INTO embeddings (id, document_id, chunk_index, text_content, vector) VALUES (?, ?, ?, ?, ?)'
-        );
-
-        $pdo->beginTransaction();
-
-        foreach ($documents as $doc) {
-            $docStmt->execute([
-                $doc->id,
-                $doc->original_filename,
-                $doc->chunk_count,
-                $doc->created_at,
-            ]);
-
-            $embeddings = DB::table('embeddings')
-                ->where('document_id', $doc->id)
-                ->orderBy('chunk_index')
-                ->get();
-
-            foreach ($embeddings as $emb) {
-                $embStmt->execute([
-                    $emb->id,
-                    $emb->document_id,
-                    $emb->chunk_index,
-                    $emb->text_content,
-                    $emb->vector, // Already JSON string from DB
-                ]);
-            }
-        }
-
-        $pdo->commit();
     }
 
-    /**
-     * Ensure the git repo is cloned locally.
-     */
-    private function ensureRepoCloned(GitConfiguration $config): void
+    private function exportStructuredFiles(Collection $documents, string $repoPath): void
     {
-        if (! is_dir($this->repoPath)) {
+        $files = $this->jsonLdGenerator->generateStructuredFileMap($documents);
+        $exportPath = $repoPath.DIRECTORY_SEPARATOR.$this->exportRoot;
+
+        if (is_dir($exportPath)) {
+            File::cleanDirectory($exportPath);
+        } else {
+            mkdir($exportPath, 0755, true);
+        }
+
+        foreach ($files as $relativePath => $payload) {
+            $absolutePath = $exportPath.DIRECTORY_SEPARATOR.$relativePath;
+            $directory = dirname($absolutePath);
+            if (! is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            file_put_contents(
+                $absolutePath,
+                json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            );
+        }
+    }
+
+    private function ensureRepoCloned(GitConfiguration $config, string $repoPath): void
+    {
+        if (! is_dir($repoPath)) {
             $url = $this->authenticatedUrl($config);
             $result = Process::run(
-                "git clone --branch {$config->branch} {$url} {$this->repoPath}"
+                sprintf(
+                    'git clone --branch %s %s %s',
+                    escapeshellarg($config->branch),
+                    escapeshellarg($url),
+                    escapeshellarg($repoPath)
+                )
             );
 
             if ($result->failed()) {
                 throw new RuntimeException('Git clone failed: '.$result->errorOutput());
             }
         } else {
-            // Pull latest
-            $result = Process::path($this->repoPath)->run("git pull origin {$config->branch}");
+            $result = Process::path($repoPath)->run(
+                sprintf('git pull origin %s', escapeshellarg($config->branch))
+            );
             if ($result->failed()) {
                 throw new RuntimeException('Git pull failed: '.$result->errorOutput());
             }
         }
     }
 
-    /**
-     * Commit the SQLite file and push.
-     */
-    private function commitAndPush(GitConfiguration $config): bool
+    private function commitAndPush(GitConfiguration $config, string $repoPath): bool
     {
-        $result = Process::path($this->repoPath)->run('git status --porcelain');
+        $status = Process::path($repoPath)->run('git status --porcelain');
 
-        if (empty(trim($result->output()))) {
-            return false; // Nothing to commit
+        if (empty(trim($status->output()))) {
+            return false;
         }
 
-        Process::path($this->repoPath)->run("git add {$this->sqliteFile}");
+        Process::path($repoPath)->run(
+            sprintf('git add %s', escapeshellarg($this->exportRoot))
+        );
 
-        $message = 'Update kennisbank embeddings - '.now()->format('Y-m-d H:i:s');
-        Process::path($this->repoPath)->run("git commit -m \"{$message}\"");
+        $message = 'Sync knowledge base export - '.now()->format('Y-m-d H:i:s');
+        Process::path($repoPath)->run(
+            sprintf('git commit -m %s', escapeshellarg($message))
+        );
 
         $url = $this->authenticatedUrl($config);
-        $result = Process::path($this->repoPath)->run(
-            "git push {$url} {$config->branch}"
+        $result = Process::path($repoPath)->run(
+            sprintf('git push %s %s', escapeshellarg($url), escapeshellarg($config->branch))
         );
 
         if ($result->failed()) {
@@ -168,19 +146,22 @@ class GitSyncService
         return true;
     }
 
-    /**
-     * Build authenticated git URL with token.
-     */
     private function authenticatedUrl(GitConfiguration $config): string
     {
         $parsed = parse_url($config->repo_url);
 
-        return sprintf(
-            '%s://%s@%s%s',
-            $parsed['scheme'] ?? 'https',
-            $config->access_token,
-            $parsed['host'],
-            $parsed['path']
-        );
+        $scheme = $parsed['scheme'] ?? 'https';
+        $host = $parsed['host'] ?? '';
+        $path = $parsed['path'] ?? '';
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+        $token = rawurlencode($config->access_token);
+
+        return sprintf('%s://%s@%s%s%s', $scheme, $token, $host, $port, $path);
+    }
+
+    private function repoPathFor(int $userId, string $repoUrl): string
+    {
+        $slug = Str::slug(parse_url($repoUrl, PHP_URL_HOST) ?? 'repo');
+        return $this->basePath.DIRECTORY_SEPARATOR."user-{$userId}-{$slug}";
     }
 }
