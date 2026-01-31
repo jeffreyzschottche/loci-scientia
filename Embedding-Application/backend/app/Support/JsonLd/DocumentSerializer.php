@@ -40,6 +40,10 @@ class DocumentSerializer
             $jsonLd['version'] = $document->version_tag;
         }
 
+        if ($document->content_date) {
+            $jsonLd['datePublished'] = $document->content_date->toDateString();
+        }
+
         if ($document->source_url) {
             $jsonLd['url'] = $document->source_url;
         }

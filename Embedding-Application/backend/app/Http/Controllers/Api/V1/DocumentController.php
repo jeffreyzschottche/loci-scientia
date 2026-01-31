@@ -6,6 +6,7 @@ use App\Enums\ProcessingStage;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Services\DocumentProcessingService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -57,6 +58,7 @@ class DocumentController extends Controller
             'title' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:100',
             'version_tag' => 'nullable|string|max:50',
+            'content_date' => 'nullable|date',
             'description' => 'nullable|string|max:1000',
             'parent_id' => 'nullable|exists:documents,id',
         ]);
@@ -86,6 +88,11 @@ class DocumentController extends Controller
             $docId = $baseDocId . '-' . $counter++;
         }
 
+        $contentDateInput = $request->input('content_date');
+        $contentDate = $contentDateInput
+            ? Carbon::parse($contentDateInput)->toDateString()
+            : now()->toDateString();
+
         $document = Document::create([
             'user_id' => $request->user()->id,
             'parent_id' => $request->input('parent_id'),
@@ -93,6 +100,7 @@ class DocumentController extends Controller
             'title' => $request->input('title', $originalName),
             'category' => $request->input('category'),
             'version_tag' => $request->input('version_tag'),
+            'content_date' => $contentDate,
             'description' => $request->input('description'),
             'filename' => $filename,
             'original_filename' => $file->getClientOriginalName(),
@@ -143,10 +151,17 @@ class DocumentController extends Controller
             'title' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:100',
             'version_tag' => 'nullable|string|max:50',
+            'content_date' => 'nullable|date',
             'description' => 'nullable|string|max:1000',
         ]);
 
-        $document->update($request->only(['title', 'category', 'version_tag', 'description']));
+        $updates = $request->only(['title', 'category', 'version_tag', 'description']);
+
+        if ($request->filled('content_date')) {
+            $updates['content_date'] = Carbon::parse($request->input('content_date'))->toDateString();
+        }
+
+        $document->update($updates);
 
         return response()->json(['document' => $document->fresh()]);
     }

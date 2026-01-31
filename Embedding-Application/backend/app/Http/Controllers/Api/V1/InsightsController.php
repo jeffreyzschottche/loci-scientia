@@ -10,7 +10,9 @@ use App\Models\Export;
 use App\Services\JsonLdGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use ZipArchive;
 
 class InsightsController extends Controller
 {
@@ -122,16 +124,24 @@ class InsightsController extends Controller
             'category' => 'nullable|string',
             'version_tag' => 'nullable|string',
             'include_chunks' => 'nullable|boolean',
+            'structure' => 'nullable|in:single,multi',
         ]);
 
         $category = $request->input('category');
         $versionTag = $request->input('version_tag');
+        $userId = $request->user()->id;
 
-        // Only export user's own documents
-        $manifest = $this->generateUserManifest(
-            $request->user()->id,
-            $category,
-            $versionTag
+        $documents = $this->fetchDocumentsForExport($userId, $category, $versionTag);
+
+        if ($request->boolean('split') || $request->input('structure') === 'multi') {
+            return response()->json([
+                'files' => $this->jsonLdGenerator->generateStructuredFileMap($documents),
+            ]);
+        }
+
+        $manifest = $this->jsonLdGenerator->generateManifestFromDocuments(
+            $documents,
+            "kennisbank:manifest:{$userId}"
         );
 
         return response()->json($manifest);
@@ -144,12 +154,14 @@ class InsightsController extends Controller
     {
         $request->validate([
             'category' => 'nullable|string',
+            'version_tag' => 'nullable|string',
         ]);
 
         $userId = $request->user()->id;
         $category = $request->input('category');
+        $versionTag = $request->input('version_tag');
 
-        $chunks = $this->generateUserChunkList($userId, $category);
+        $chunks = $this->generateUserChunkList($userId, $category, $versionTag);
 
         return response()->json($chunks);
     }
@@ -162,33 +174,52 @@ class InsightsController extends Controller
         $request->validate([
             'name' => 'nullable|string|max:100',
             'category' => 'nullable|string',
-            'format' => 'required|in:manifest,chunks',
+            'version_tag' => 'nullable|string',
+            'format' => 'required|in:manifest,chunks,structured',
         ]);
 
         $userId = $request->user()->id;
         $category = $request->input('category');
+        $versionTag = $request->input('version_tag');
         $format = $request->input('format');
 
-        // Generate export data
-        $data = $format === 'chunks'
-            ? $this->generateUserChunkList($userId, $category)
-            : $this->generateUserManifest($userId, $category);
+        $documents = $this->fetchDocumentsForExport($userId, $category, $versionTag);
+        $structuredFiles = null;
+        $extension = 'json';
+        $data = null;
 
-        // Generate version
-        $version = date('Y.m.d') . '-' . substr(md5(json_encode($data)), 0, 8);
+        if ($format === 'structured') {
+            $structuredFiles = $this->jsonLdGenerator->generateStructuredFileMap($documents);
+            $hashSeed = collect($structuredFiles)
+                ->map(fn ($payload, $path) => [$path, md5(json_encode($payload))])
+                ->values()
+                ->all();
+            $version = date('Y.m.d') . '-' . substr(md5(json_encode($hashSeed)), 0, 8);
+            $filename = "exports/{$userId}/{$version}-structured.zip";
+            $this->storeStructuredArchive($filename, $structuredFiles);
+            $extension = 'zip';
+        } else {
+            $data = $format === 'chunks'
+                ? $this->generateUserChunkList($userId, $category, $versionTag)
+                : $this->jsonLdGenerator->generateManifestFromDocuments(
+                    $documents,
+                    "kennisbank:manifest:{$userId}"
+                );
+
+            $version = date('Y.m.d') . '-' . substr(md5(json_encode($data)), 0, 8);
+            $filename = "exports/{$userId}/{$version}-{$format}.json";
+            Storage::put($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
 
         // Count documents and chunks
         $documentIds = Document::where('user_id', $userId)
             ->when($category, fn ($q) => $q->where('category', $category))
+            ->when($versionTag, fn ($q) => $q->where('version_tag', $versionTag))
             ->where('status', 'formatted')
             ->pluck('id');
 
         $documentCount = $documentIds->count();
         $chunkCount = DocumentChunk::whereIn('document_id', $documentIds)->count();
-
-        // Save to storage
-        $filename = "exports/{$userId}/{$version}-{$format}.json";
-        Storage::put($filename, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         // Record export
         $export = Export::create([
@@ -198,9 +229,13 @@ class InsightsController extends Controller
             'metadata' => [
                 'format' => $format,
                 'category' => $category,
+                'version_tag' => $versionTag,
                 'filename' => $filename,
                 'user_id' => $userId,
                 'created_at' => now()->toIso8601String(),
+                'extension' => $extension,
+                'structure' => $format === 'structured' ? 'multi-file' : 'single-json',
+                'files' => $structuredFiles ? array_keys($structuredFiles) : null,
             ],
         ]);
 
@@ -242,51 +277,61 @@ class InsightsController extends Controller
             return response()->json(['message' => 'Export bestand niet gevonden'], 404);
         }
 
-        return Storage::download($filename, "{$export->version}.json");
+        $extension = $export->metadata['extension'] ?? 'json';
+
+        return Storage::download($filename, "{$export->version}.{$extension}");
     }
 
-    /**
-     * Generate manifest for a specific user's documents.
-     */
-    private function generateUserManifest(int $userId, ?string $category = null, ?string $versionTag = null): array
+    private function storeStructuredArchive(string $path, array $files): void
     {
-        $query = Document::where('user_id', $userId)
+        Storage::makeDirectory(dirname($path));
+        $zip = new ZipArchive();
+        $zipPath = Storage::path($path);
+
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException('Kon de export-zip niet openen voor schrijven.');
+        }
+
+        foreach ($files as $fileName => $payload) {
+            $zip->addFromString(
+                $fileName,
+                json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            );
+        }
+
+        $zip->close();
+    }
+
+    private function fetchDocumentsForExport(int $userId, ?string $category = null, ?string $versionTag = null): Collection
+    {
+        return Document::where('user_id', $userId)
             ->whereNull('parent_id')
             ->where('status', 'formatted')
-            ->with(['sections.chunks', 'children']);
-
-        if ($category) {
-            $query->where('category', $category);
-        }
-
-        if ($versionTag) {
-            $query->where('version_tag', $versionTag);
-        }
-
-        $documents = $query->orderBy('position')->get();
-
-        return [
-            '@context' => 'https://schema.org',
-            '@type' => 'Dataset',
-            '@id' => "kennisbank:manifest:{$userId}",
-            'name' => 'Kennisbank Export',
-            'dateCreated' => now()->toIso8601String(),
-            'description' => 'Kennisbank export in JSON-LD formaat',
-            'hasPart' => $documents->map(fn ($doc) => $this->jsonLdGenerator->forDocument($doc, true, true))->all(),
-            'statistics' => $this->jsonLdGenerator->generateStatistics($documents),
-        ];
+            ->when($category, fn ($q) => $q->where('category', $category))
+            ->when($versionTag, fn ($q) => $q->where('version_tag', $versionTag))
+            ->with([
+                'sections.chunks',
+                'sections.outgoingRelations.targetSection.document',
+                'outgoingRelations.targetDocument',
+                'children',
+            ])
+            ->orderBy('position')
+            ->get();
     }
 
     /**
      * Generate chunk list for a specific user.
      */
-    private function generateUserChunkList(int $userId, ?string $category = null): array
+    private function generateUserChunkList(int $userId, ?string $category = null, ?string $versionTag = null): array
     {
-        $query = DocumentChunk::whereHas('document', function ($q) use ($userId, $category) {
+        $query = DocumentChunk::whereHas('document', function ($q) use ($userId, $category, $versionTag) {
             $q->where('user_id', $userId)
                 ->where('status', 'formatted');
             if ($category) {
                 $q->where('category', $category);
+            }
+            if ($versionTag) {
+                $q->where('version_tag', $versionTag);
             }
         })
             ->with(['document', 'section'])
@@ -294,12 +339,19 @@ class InsightsController extends Controller
             ->orderBy('chunk_index');
 
         $chunks = $query->get();
+        $modelMeta = [
+            'model' => config('embedding.model'),
+            'vectorDimension' => (int) config('embedding.vector_dimension', 768),
+            'chunkTokens' => (int) config('embedding.chunk_tokens', 448),
+            'chunkOverlapTokens' => (int) config('embedding.chunk_overlap_tokens', 96),
+        ];
 
         return [
             '@context' => 'https://schema.org',
             '@type' => 'ItemList',
             '@id' => "kennisbank:chunks:{$userId}",
             'name' => 'Kennisbank Chunks voor Embedding',
+            'model' => $modelMeta,
             'numberOfItems' => $chunks->count(),
             'itemListElement' => $chunks->map(fn ($chunk, $index) => [
                 '@type' => 'ListItem',

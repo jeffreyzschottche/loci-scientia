@@ -6,10 +6,12 @@ use App\Models\Document;
 use App\Models\DocumentSection;
 use App\Models\DocumentChunk;
 use App\Models\DocumentRelation;
+use App\Models\SectionRelation;
 use App\Support\JsonLd\DocumentSerializer;
 use App\Support\JsonLd\SectionSerializer;
 use App\Support\JsonLd\ChunkSerializer;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class JsonLdGenerator
 {
@@ -68,14 +70,20 @@ class JsonLdGenerator
             ->orderBy('position')
             ->get();
 
+        return $this->generateManifestFromDocuments($documents, 'kennisbank:manifest');
+    }
+
+    public function generateManifestFromDocuments(Collection $documents, string $identifier = 'kennisbank:manifest'): array
+    {
         return [
             '@context' => 'https://schema.org',
             '@type' => 'Dataset',
-            '@id' => 'kennisbank:manifest',
+            '@id' => $identifier,
             'name' => 'Kennisbank Export',
             'dateCreated' => now()->toIso8601String(),
-            'description' => 'Volledige kennisbank export in JSON-LD formaat',
+            'description' => 'Kennisbank export in JSON-LD formaat',
             'license' => 'Proprietary',
+            'model' => $this->modelMetadata(),
             'distribution' => [
                 '@type' => 'DataDownload',
                 'encodingFormat' => 'application/ld+json',
@@ -113,6 +121,34 @@ class JsonLdGenerator
         return $relations;
     }
 
+    private function generateSectionRelationsGraph(Collection $documents): array
+    {
+        $relations = [];
+
+        foreach ($documents as $document) {
+            foreach ($document->sections as $section) {
+                foreach ($section->outgoingRelations as $relation) {
+                    $targetSection = $relation->targetSection;
+                    $targetDocument = $targetSection?->document;
+
+                    if (! $targetSection || ! $targetDocument) {
+                        continue;
+                    }
+
+                    $relations[] = [
+                        '@type' => 'LinkRole',
+                        'source' => "sec:{$document->doc_id}#{$section->slug}",
+                        'target' => "sec:{$targetDocument->doc_id}#{$targetSection->slug}",
+                        'linkRelationship' => $relation->relation_type,
+                        'description' => SectionRelation::types()[$relation->relation_type] ?? $relation->relation_type,
+                    ];
+                }
+            }
+        }
+
+        return $relations;
+    }
+
     /**
      * Generate a flat list of all chunks (optimized for embedding).
      */
@@ -136,6 +172,7 @@ class JsonLdGenerator
             '@type' => 'ItemList',
             '@id' => 'kennisbank:chunks',
             'name' => 'Kennisbank Chunks voor Embedding',
+            'model' => $this->modelMetadata(),
             'numberOfItems' => $chunks->count(),
             'itemListElement' => $chunks->map(fn ($chunk, $index) => [
                 '@type' => 'ListItem',
@@ -143,6 +180,73 @@ class JsonLdGenerator
                 'item' => $this->forChunk($chunk),
             ])->all(),
         ];
+    }
+
+    /**
+     * Build an associative array of JSON files for structured exports.
+     *
+     * @return array<string, mixed>
+     */
+    public function generateStructuredFileMap(Collection $documents): array
+    {
+        $files = [];
+        $modelMeta = $this->modelMetadata();
+
+        $files['manifest.json'] = $this->generateManifestFromDocuments($documents);
+        $files['model.json'] = $modelMeta;
+        $files['statistics.json'] = $this->generateStatistics($documents);
+        $files['relations/documents.json'] = $this->generateRelationsGraph($documents);
+        $files['relations/sections.json'] = $this->generateSectionRelationsGraph($documents);
+
+        $documentsByCategory = $documents->groupBy(fn ($doc) => $doc->category ?? 'uncategorized');
+        foreach ($documentsByCategory as $category => $group) {
+            $slug = $this->sanitizePathSegment($category ?? 'uncategorized');
+            $files["categories/{$slug}.json"] = [
+                'category' => $category,
+                'documentCount' => $group->count(),
+                'documents' => $group->map(fn ($doc) => [
+                    '@id' => "doc:{$doc->doc_id}",
+                    'title' => $doc->title,
+                    'chunkCount' => $doc->chunk_count,
+                    'contentDate' => $doc->content_date?->toDateString(),
+                ])->values()->all(),
+            ];
+        }
+
+        foreach ($documents as $document) {
+            $docSlug = $this->sanitizePathSegment($document->doc_id ?? (string) $document->id);
+            $files["documents/{$docSlug}.json"] = $this->forDocument($document, true, true);
+
+            foreach ($document->sections as $section) {
+                $sectionSlug = $this->sanitizePathSegment($section->slug ?? (string) $section->id);
+                $files["sections/{$docSlug}/{$sectionSlug}.json"] = $this->sectionSerializer->serialize($section, true);
+            }
+
+            $chunks = $document->sections
+                ->flatMap(fn ($section) => $section->chunks)
+                ->values();
+
+            if ($chunks->isNotEmpty()) {
+                $files["chunks/{$docSlug}.json"] = [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'ItemList',
+                    '@id' => "kennisbank:chunks:doc:{$document->doc_id}",
+                    'name' => "Chunks voor {$document->title}",
+                    'document' => "doc:{$document->doc_id}",
+                    'model' => $modelMeta,
+                    'numberOfItems' => $chunks->count(),
+                    'itemListElement' => $chunks->map(function ($chunk, $index) {
+                        return [
+                            '@type' => 'ListItem',
+                            'position' => $index + 1,
+                            'item' => $this->forChunk($chunk),
+                        ];
+                    })->all(),
+                ];
+            }
+        }
+
+        return $files;
     }
 
     /**
@@ -195,6 +299,23 @@ class JsonLdGenerator
             'categories' => $categories->all(),
             'generatedAt' => now()->toIso8601String(),
         ];
+    }
+
+    private function modelMetadata(): array
+    {
+        return [
+            'model' => config('embedding.model'),
+            'vectorDimension' => (int) config('embedding.vector_dimension', 768),
+            'chunkTokens' => (int) config('embedding.chunk_tokens', 448),
+            'chunkOverlapTokens' => (int) config('embedding.chunk_overlap_tokens', 96),
+        ];
+    }
+
+    private function sanitizePathSegment(string $value): string
+    {
+        $slug = Str::slug($value, '-');
+
+        return $slug !== '' ? $slug : 'item';
     }
 
     /**

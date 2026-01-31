@@ -123,6 +123,16 @@
             >
           </div>
 
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Publicatiedatum</label>
+            <input
+              v-model="metadata.content_date"
+              type="date"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+            <p class="text-xs text-gray-500 mt-1">Gebruik deze datum in de JSON-LD export (default: vandaag).</p>
+          </div>
+
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700">Beschrijving</label>
             <textarea
@@ -195,6 +205,24 @@ definePageMeta({
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
 
+type UploadMetadata = {
+  title: string;
+  category: string;
+  version_tag: string;
+  description: string;
+  content_date: string;
+};
+
+function defaultMetadata(): UploadMetadata {
+  return {
+    title: '',
+    category: '',
+    version_tag: '',
+    description: '',
+    content_date: new Date().toISOString().slice(0, 10),
+  };
+}
+
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedFile = ref<File | null>(null);
 const isDragging = ref(false);
@@ -202,12 +230,7 @@ const isUploading = ref(false);
 const status = ref<{ type: 'info' | 'error' | 'success'; message: string } | null>(null);
 const recentUploads = ref<any[]>([]);
 
-const metadata = ref({
-  title: '',
-  category: '',
-  version_tag: '',
-  description: '',
-});
+const metadata = ref<UploadMetadata>(defaultMetadata());
 
 onMounted(async () => {
   await loadRecentUploads();
@@ -265,6 +288,7 @@ async function uploadAndProcess() {
     if (metadata.value.category) formData.append('category', metadata.value.category);
     if (metadata.value.version_tag) formData.append('version_tag', metadata.value.version_tag);
     if (metadata.value.description) formData.append('description', metadata.value.description);
+    if (metadata.value.content_date) formData.append('content_date', metadata.value.content_date);
 
     const uploadResponse = await fetch(`${baseUrl}/documents`, {
       method: 'POST',
@@ -304,7 +328,7 @@ async function uploadAndProcess() {
 
     // Reset form
     selectedFile.value = null;
-    metadata.value = { title: '', category: '', version_tag: '', description: '' };
+    metadata.value = defaultMetadata();
 
     // Refresh recent uploads
     await loadRecentUploads();

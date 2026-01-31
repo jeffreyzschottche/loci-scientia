@@ -13,6 +13,9 @@ class ChunkSerializer
     {
         $section = $chunk->section;
         $document = $chunk->document;
+        $wordCount = $chunk->metadata['word_count'] ?? str_word_count($chunk->text);
+        $contentDate = $document->content_date?->toDateString();
+        $embeddingMeta = $this->embeddingMetadata();
 
         return [
             '@type' => 'TextDigitalDocument',
@@ -20,7 +23,10 @@ class ChunkSerializer
             'identifier' => $chunk->content_hash,
             'text' => $chunk->text,
             'position' => $chunk->chunk_index,
-            'wordCount' => str_word_count($chunk->text),
+            'wordCount' => $wordCount,
+            'tokenCount' => $chunk->token_count,
+            'contentDate' => $contentDate,
+            'embedding' => $embeddingMeta,
             'isPartOf' => $section ? [
                 '@id' => "sec:{$document->doc_id}#{$section->slug}",
             ] : [
@@ -42,5 +48,13 @@ class ChunkSerializer
             $result[] = $this->serialize($chunk);
         }
         return $result;
+    }
+
+    private function embeddingMetadata(): array
+    {
+        return [
+            'model' => config('embedding.model'),
+            'vectorDimension' => (int) config('embedding.vector_dimension', 768),
+        ];
     }
 }

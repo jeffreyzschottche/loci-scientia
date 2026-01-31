@@ -53,6 +53,10 @@ class DocumentProcessingService
                 'processing_stage' => ProcessingStage::READY,
                 'processing_progress' => 100,
                 'parsed_at' => now(),
+                'metadata' => $this->mergeMetadata($document, [
+                    'embedding' => $this->embeddingMetadata(),
+                    'last_embedded_at' => now()->toIso8601String(),
+                ]),
             ]);
 
             Log::info("Document processed successfully", ['document_id' => $document->id]);
@@ -99,6 +103,7 @@ class DocumentProcessingService
             $document->sections()->delete();
 
             $totalChunks = 0;
+            $contentDate = $document->content_date?->toDateString();
 
             foreach ($parsedDocument->sections as $index => $sectionData) {
                 // Create section
@@ -114,7 +119,15 @@ class DocumentProcessingService
                 // Create chunks for this section
                 $chunks = $this->chunker->chunk($sectionData['text']);
 
-                foreach ($chunks as $chunkIndex => $chunkText) {
+                foreach ($chunks as $chunkIndex => $chunkData) {
+                    $chunkText = $chunkData['text'];
+                    $tokenCount = $chunkData['token_count'] ?? $this->chunker->estimateTokenCount($chunkText);
+                    $chunkMetadata = array_filter([
+                        'word_count' => $chunkData['word_count'] ?? null,
+                        'content_date' => $contentDate,
+                        'embedding_model' => config('embedding.model'),
+                    ]);
+
                     $chunkId = $this->idGenerator->generate(
                         $document->doc_id,
                         $section->slug,
@@ -127,8 +140,9 @@ class DocumentProcessingService
                         'chunk_id' => $chunkId,
                         'chunk_index' => $totalChunks,
                         'text' => $chunkText,
-                        'token_count' => $this->estimateTokenCount($chunkText),
+                        'token_count' => $tokenCount,
                         'content_hash' => $this->hasher->hash($chunkText),
+                        'metadata' => empty($chunkMetadata) ? null : $chunkMetadata,
                     ]);
 
                     $totalChunks++;
@@ -142,7 +156,7 @@ class DocumentProcessingService
             // Update document metadata
             $document->update([
                 'chunk_count' => $totalChunks,
-                'metadata' => array_merge($document->metadata ?? [], $parsedDocument->metadata),
+                'metadata' => $this->mergeMetadata($document, $parsedDocument->metadata ?? []),
             ]);
         });
     }
@@ -189,14 +203,25 @@ class DocumentProcessingService
         ]);
     }
 
-    /**
-     * Estimate token count (rough approximation).
-     * For accurate counting, use a tokenizer library.
-     */
-    private function estimateTokenCount(string $text): int
+    private function mergeMetadata(Document $document, array $payload): array
     {
-        // Rough estimate: ~4 characters per token for Dutch/English
-        return (int) ceil(mb_strlen($text) / 4);
+        $existing = $document->metadata;
+
+        if (! is_array($existing)) {
+            $existing = [];
+        }
+
+        return array_replace_recursive($existing, $payload);
+    }
+
+    private function embeddingMetadata(): array
+    {
+        return [
+            'model' => config('embedding.model'),
+            'vector_dimension' => (int) config('embedding.vector_dimension', 768),
+            'chunk_tokens' => (int) config('embedding.chunk_tokens', 448),
+            'chunk_overlap_tokens' => (int) config('embedding.chunk_overlap_tokens', 96),
+        ];
     }
 
     /**

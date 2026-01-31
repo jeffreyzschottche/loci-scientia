@@ -19,6 +19,7 @@ class Document extends Model
         'title',
         'category',
         'version_tag',
+        'content_date',
         'source_url',
         'description',
         'metadata',
@@ -38,6 +39,7 @@ class Document extends Model
         'metadata' => 'array',
         'json_ld' => 'array',
         'parsed_at' => 'datetime',
+        'content_date' => 'date',
         'processing_stage' => ProcessingStage::class,
     ];
 
