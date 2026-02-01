@@ -1,58 +1,58 @@
 <template>
   <NuxtLayout name="auth">
-    <div class="rounded-lg bg-white p-8 shadow">
-      <h2 class="mb-6 text-center text-2xl font-bold">Reset Password</h2>
+    <div class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
+      <h2 class="mb-6 text-center text-2xl font-bold text-loci-black">Wachtwoord resetten</h2>
 
-      <div v-if="success" class="mb-4 rounded bg-green-50 p-3 text-green-600">
+      <div v-if="success" class="mb-4 rounded-loci border border-green-200 bg-green-50 p-3 text-green-600">
         {{ success }}
-        <NuxtLink to="/" class="mt-2 block text-blue-600 hover:underline">
-          Go to login
+        <NuxtLink to="/" class="mt-2 block font-semibold text-loci-black hover:text-loci-yellow-hover">
+          Ga naar login
         </NuxtLink>
       </div>
 
       <form v-else @submit.prevent="handleSubmit" class="space-y-4">
-        <div v-if="error" class="rounded bg-red-50 p-3 text-red-600">
+        <div v-if="error" class="rounded-loci border border-red-200 bg-red-50 p-3 text-red-600">
           {{ error }}
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Email</label>
+          <label class="mb-1 block text-sm font-medium text-loci-black">Email</label>
           <input
             v-model="form.email"
             type="email"
             required
-            class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">New Password</label>
+          <label class="mb-1 block text-sm font-medium text-loci-black">Nieuw wachtwoord</label>
           <input
             v-model="form.password"
             type="password"
             required
-            class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">
-            Confirm Password
+          <label class="mb-1 block text-sm font-medium text-loci-black">
+            Bevestig wachtwoord
           </label>
           <input
             v-model="form.password_confirmation"
             type="password"
             required
-            class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
           />
         </div>
 
         <button
           type="submit"
           :disabled="loading"
-          class="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+          class="w-full rounded-loci-full bg-loci-yellow py-3 font-semibold text-loci-black-deep transition-all hover:bg-loci-yellow-hover disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
         >
-          {{ loading ? 'Resetting...' : 'Reset Password' }}
+          {{ loading ? 'Resetten...' : 'Wachtwoord resetten' }}
         </button>
       </form>
     </div>

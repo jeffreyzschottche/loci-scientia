@@ -4,6 +4,12 @@ export default defineNuxtConfig({
 
   modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt'],
 
+  tailwindcss: {
+    configPath: 'tailwind.config.ts',
+    cssPath: '~/assets/css/tailwind.css',
+    exposeConfig: true,
+  },
+
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1',

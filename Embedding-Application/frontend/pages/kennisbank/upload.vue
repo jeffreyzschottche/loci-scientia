@@ -1,55 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Tab Navigation -->
-    <div class="bg-white border-b">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav class="flex space-x-8">
-          <NuxtLink
-            to="/kennisbank/upload"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600"
-          >
-            Uploaden
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/library"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Bibliotheek
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/relations"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Relaties
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/priorities"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Prioriteiten
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/insights"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Inzicht
-          </NuxtLink>
-        </nav>
-      </div>
-    </div>
-
-    <!-- Content -->
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 class="text-2xl font-bold mb-6">Document Uploaden</h1>
+  <KennisbankTabLayout>
+    <div class="max-w-3xl w-full mx-auto">
+      <h1 class="text-2xl font-bold mb-6 text-loci-black">Document Uploaden</h1>
 
       <!-- Upload Form -->
-      <div class="bg-white rounded-lg shadow p-6 space-y-6">
+      <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6 space-y-6">
         <!-- File Input -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Bestand</label>
+          <label class="block text-sm font-medium text-loci-black mb-2">Bestand</label>
           <div
-            class="border-2 border-dashed rounded-lg p-8 text-center"
-            :class="isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'"
+            class="border-2 border-dashed rounded-loci-lg p-8 text-center transition-all"
+            :class="isDragging ? 'border-loci-yellow bg-loci-yellow/10' : 'border-loci-gray-300'"
             @dragover.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
             @drop.prevent="handleDrop"
@@ -63,26 +24,26 @@
             >
 
             <div v-if="!selectedFile">
-              <p class="text-gray-600 mb-2">Sleep een bestand hierheen of</p>
+              <p class="text-loci-gray-500 mb-2">Sleep een bestand hierheen of</p>
               <button
                 type="button"
-                class="text-blue-600 hover:text-blue-500 font-medium"
+                class="text-loci-black font-semibold hover:text-loci-yellow-hover"
                 @click="($refs.fileInput as HTMLInputElement).click()"
               >
                 kies een bestand
               </button>
-              <p class="text-sm text-gray-500 mt-2">PDF, DOCX, CSV, XML, TXT (max 50MB)</p>
+              <p class="text-sm text-loci-gray-400 mt-2">PDF, DOCX, CSV, XML, TXT (max 50MB)</p>
             </div>
 
             <div v-else class="flex items-center justify-center space-x-4">
               <span class="text-2xl">{{ getFileIcon(selectedFile.type) }}</span>
               <div class="text-left">
-                <p class="font-medium">{{ selectedFile.name }}</p>
-                <p class="text-sm text-gray-500">{{ formatFileSize(selectedFile.size) }}</p>
+                <p class="font-medium text-loci-black">{{ selectedFile.name }}</p>
+                <p class="text-sm text-loci-gray-500">{{ formatFileSize(selectedFile.size) }}</p>
               </div>
               <button
                 type="button"
-                class="text-red-600 hover:text-red-500"
+                class="text-red-500 hover:text-red-700"
                 @click="selectedFile = null"
               >
                 Verwijderen
@@ -94,58 +55,58 @@
         <!-- Metadata -->
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700">Titel</label>
+            <label class="block text-sm font-medium text-loci-black">Titel</label>
             <input
               v-model="metadata.title"
               type="text"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
               :placeholder="selectedFile?.name.replace(/\.[^/.]+$/, '') || 'Document titel'"
             >
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700">Categorie</label>
+            <label class="block text-sm font-medium text-loci-black">Categorie</label>
             <input
               v-model="metadata.category"
               type="text"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
               placeholder="bijv. Handleidingen"
             >
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700">Versie</label>
+            <label class="block text-sm font-medium text-loci-black">Versie</label>
             <input
               v-model="metadata.version_tag"
               type="text"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
               placeholder="bijv. v1.0"
             >
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700">Publicatiedatum</label>
+            <label class="block text-sm font-medium text-loci-black">Publicatiedatum</label>
             <input
               v-model="metadata.content_date"
               type="date"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             >
-            <p class="text-xs text-gray-500 mt-1">Gebruik deze datum in de JSON-LD export (default: vandaag).</p>
+            <p class="text-xs text-loci-gray-500 mt-1">Gebruik deze datum in de JSON-LD export (default: vandaag).</p>
           </div>
 
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700">Beschrijving</label>
+            <label class="block text-sm font-medium text-loci-black">Beschrijving</label>
             <textarea
               v-model="metadata.description"
               rows="2"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
               placeholder="Korte beschrijving..."
             />
           </div>
         </div>
 
         <!-- Status -->
-        <div v-if="status" class="p-4 rounded-lg" :class="status.type === 'error' ? 'bg-red-50 text-red-700' : status.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'">
+        <div v-if="status" class="p-4 rounded-loci border" :class="status.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : status.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-loci-yellow/10 border-loci-yellow text-loci-black'">
           {{ status.message }}
         </div>
 
@@ -153,7 +114,7 @@
         <div class="flex justify-end">
           <button
             type="button"
-            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            class="px-6 py-3 bg-loci-yellow text-loci-black-deep rounded-loci-full font-semibold hover:bg-loci-yellow-hover transition-all disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
             :disabled="!selectedFile || isUploading"
             @click="uploadAndProcess"
           >
@@ -163,25 +124,25 @@
       </div>
 
       <!-- Recent uploads -->
-      <div v-if="recentUploads.length > 0" class="mt-8 bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b">
-          <h2 class="text-lg font-medium">Recente uploads</h2>
+      <div v-if="recentUploads.length > 0" class="mt-8 bg-loci-white rounded-loci-lg border border-loci-gray-100">
+        <div class="px-6 py-4 border-b border-loci-gray-100">
+          <h2 class="text-lg font-medium text-loci-black">Recente uploads</h2>
         </div>
-        <ul class="divide-y">
+        <ul class="divide-y divide-loci-gray-100">
           <li v-for="doc in recentUploads" :key="doc.id" class="px-6 py-4 flex items-center justify-between">
             <div>
-              <p class="font-medium">{{ doc.title || doc.original_filename }}</p>
-              <p class="text-sm text-gray-500">{{ doc.category || 'Geen categorie' }}</p>
+              <p class="font-medium text-loci-black">{{ doc.title || doc.original_filename }}</p>
+              <p class="text-sm text-loci-gray-500">{{ doc.category || 'Geen categorie' }}</p>
             </div>
             <div class="flex items-center space-x-3">
               <span
-                class="px-2 py-1 text-xs rounded-full"
+                class="px-2 py-1 text-xs rounded-full font-semibold"
                 :class="getStatusClass(doc.status)"
               >
                 {{ doc.status }}
               </span>
               <button
-                class="text-red-600 hover:text-red-800"
+                class="text-red-500 hover:text-red-700"
                 @click="deleteDocument(doc.id)"
                 title="Verwijderen"
               >
@@ -194,7 +155,7 @@
         </ul>
       </div>
     </div>
-  </div>
+  </KennisbankTabLayout>
 </template>
 
 <script setup lang="ts">

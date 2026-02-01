@@ -3,8 +3,8 @@
     <div>
       <div class="flex justify-between items-center mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Prioriteitsmanager</h1>
-          <p class="text-sm text-gray-500 mt-1">
+          <h1 class="text-2xl font-bold text-loci-black">Prioriteitsmanager</h1>
+          <p class="text-sm text-loci-gray-500 mt-1">
             Bepaal de prioriteit van documenten per categorie. Sleep documenten of wijzig de nummers.
           </p>
         </div>
@@ -12,17 +12,17 @@
 
       <!-- Loading state -->
       <div v-if="isLoading" class="text-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p class="mt-4 text-gray-500">Laden...</p>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-loci-yellow mx-auto"></div>
+        <p class="mt-4 text-loci-gray-500">Laden...</p>
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="Object.keys(priorityCategories).length === 0" class="text-center py-12 bg-white rounded-lg shadow">
-        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div v-else-if="Object.keys(priorityCategories).length === 0" class="text-center py-12 bg-loci-white rounded-loci-lg border border-loci-gray-100">
+        <svg class="mx-auto h-12 w-12 text-loci-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">Geen documenten</h3>
-        <p class="mt-1 text-sm text-gray-500">Upload eerst documenten om prioriteiten te kunnen instellen.</p>
+        <h3 class="mt-2 text-sm font-medium text-loci-black">Geen documenten</h3>
+        <p class="mt-1 text-sm text-loci-gray-500">Upload eerst documenten om prioriteiten te kunnen instellen.</p>
       </div>
 
       <!-- Category columns -->
@@ -30,11 +30,11 @@
         <div
           v-for="(docs, category) in priorityCategories"
           :key="category"
-          class="bg-white rounded-lg shadow"
+          class="bg-loci-white rounded-loci-lg border border-loci-gray-100"
         >
-          <div class="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
-            <h2 class="font-medium text-gray-900">{{ category }}</h2>
-            <p class="text-sm text-gray-500">{{ docs.length }} documenten</p>
+          <div class="px-4 py-3 border-b border-loci-gray-100 bg-loci-gray-50 rounded-t-loci-lg">
+            <h2 class="font-medium text-loci-black">{{ category }}</h2>
+            <p class="text-sm text-loci-gray-500">{{ docs.length }} documenten</p>
           </div>
 
           <draggable
@@ -46,19 +46,19 @@
           >
             <template #item="{ element, index }">
               <div
-                class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border cursor-move hover:bg-gray-100 transition-colors"
+                class="flex items-center gap-3 p-3 bg-loci-gray-50 rounded-loci border border-loci-gray-100 cursor-move hover:bg-loci-yellow/10 transition-colors"
               >
                 <!-- Priority badge -->
                 <span
-                  class="w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full text-sm font-medium flex-shrink-0"
+                  class="w-8 h-8 flex items-center justify-center bg-loci-yellow text-loci-black-deep rounded-full text-sm font-semibold flex-shrink-0"
                 >
                   {{ index + 1 }}
                 </span>
 
                 <!-- Document info -->
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium text-gray-900 truncate">{{ element.title }}</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="font-medium text-loci-black truncate">{{ element.title }}</p>
+                  <p class="text-xs text-loci-gray-500">
                     Huidige prioriteit: {{ element.priority || 'niet ingesteld' }}
                   </p>
                 </div>
@@ -69,10 +69,10 @@
                     v-model.number="element.priority"
                     type="number"
                     min="0"
-                    class="w-16 px-2 py-1 border rounded text-center text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    class="w-16 px-2 py-1 border border-loci-gray-300 rounded-loci text-center text-sm focus:border-loci-yellow focus:outline-none bg-loci-cream"
                     @change="() => handlePriorityInput(element)"
                   >
-                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 text-loci-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
                   </svg>
                 </div>
@@ -92,11 +92,11 @@
         leave-to-class="opacity-0 translate-y-4"
       >
         <div v-if="hasChanges" class="fixed bottom-6 right-6 flex items-center gap-4">
-          <span class="text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow">
+          <span class="text-sm text-loci-gray-500 bg-loci-white px-3 py-2 rounded-full border border-loci-gray-100">
             {{ pendingChanges.size }} wijzigingen
           </span>
           <button
-            class="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            class="px-6 py-3 bg-loci-yellow text-loci-black-deep rounded-loci-full font-semibold shadow-lg hover:bg-loci-yellow-hover transition-all flex items-center gap-2 disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
             :disabled="isSaving"
             @click="saveAllChanges"
           >

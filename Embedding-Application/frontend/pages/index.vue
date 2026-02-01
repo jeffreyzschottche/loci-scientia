@@ -1,40 +1,40 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="min-h-screen bg-loci-gray-50">
     <AppNav />
     <div class="flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      <div class="w-full max-w-md rounded-lg bg-white p-8 shadow">
-        <h1 class="mb-6 text-center text-3xl font-bold">Login</h1>
-        <p class="mb-8 text-center text-sm text-gray-500">
+      <div class="w-full max-w-md rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
+        <h1 class="mb-6 text-center text-3xl font-bold text-loci-black">Login</h1>
+        <p class="mb-8 text-center text-sm text-loci-gray-500">
           Meld je aan om toegang te krijgen tot de kennisbank.
         </p>
 
         <form @submit.prevent="handleLogin" class="space-y-4">
-          <div v-if="error" class="rounded bg-red-50 p-3 text-red-600">
+          <div v-if="error" class="rounded-loci border border-red-200 bg-red-50 p-3 text-red-600">
             {{ error }}
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Email</label>
             <input
               v-model="form.email"
               type="email"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Wachtwoord</label>
             <input
               v-model="form.password"
               type="password"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
           </div>
 
           <div class="flex items-center justify-between text-sm">
-            <NuxtLink to="/account/forgot-password" class="text-blue-600 hover:underline">
+            <NuxtLink to="/account/forgot-password" class="text-loci-gray-500 hover:text-loci-black">
               Wachtwoord vergeten?
             </NuxtLink>
           </div>
@@ -42,15 +42,15 @@
           <button
             type="submit"
             :disabled="loading"
-            class="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            class="w-full rounded-loci-full bg-loci-yellow py-3 font-semibold text-loci-black-deep transition-all hover:bg-loci-yellow-hover disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
           >
             {{ loading ? 'Aan het inloggen...' : 'Login' }}
           </button>
         </form>
 
-        <p class="mt-4 text-center text-sm text-gray-600">
+        <p class="mt-6 text-center text-sm text-loci-gray-500">
           Nog geen account?
-          <NuxtLink to="/register" class="text-blue-600 hover:underline">
+          <NuxtLink to="/register" class="font-semibold text-loci-black hover:text-loci-yellow-hover">
             Registreer hier
           </NuxtLink>
         </p>

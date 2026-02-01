@@ -3,13 +3,13 @@
     <div class="flex flex-col h-[calc(100vh-200px)]">
       <div class="flex justify-between items-center mb-4">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Relatiemanager</h1>
-          <p class="text-sm text-gray-500 mt-1">
+          <h1 class="text-2xl font-bold text-loci-black">Relatiemanager</h1>
+          <p class="text-sm text-loci-gray-500 mt-1">
             Beheer relaties tussen documenten. Klik op een verbinding om deze te verwijderen.
           </p>
         </div>
         <button
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          class="px-6 py-3 bg-loci-yellow text-loci-black-deep rounded-loci-full font-semibold hover:bg-loci-yellow-hover transition-all flex items-center gap-2"
           @click="showAddRelationModal = true"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -20,26 +20,26 @@
       </div>
 
       <!-- Loading state -->
-      <div v-if="isLoading" class="flex-1 flex items-center justify-center bg-white rounded-lg shadow">
+      <div v-if="isLoading" class="flex-1 flex items-center justify-center bg-loci-white rounded-loci-lg border border-loci-gray-100">
         <div class="text-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p class="mt-4 text-gray-500">Laden...</p>
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-loci-yellow mx-auto"></div>
+          <p class="mt-4 text-loci-gray-500">Laden...</p>
         </div>
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="nodes.length === 0" class="flex-1 flex items-center justify-center bg-white rounded-lg shadow">
+      <div v-else-if="nodes.length === 0" class="flex-1 flex items-center justify-center bg-loci-white rounded-loci-lg border border-loci-gray-100">
         <div class="text-center">
-          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="mx-auto h-12 w-12 text-loci-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 class="mt-2 text-sm font-medium text-gray-900">Geen documenten</h3>
-          <p class="mt-1 text-sm text-gray-500">Upload eerst documenten om relaties te kunnen aanmaken.</p>
+          <h3 class="mt-2 text-sm font-medium text-loci-black">Geen documenten</h3>
+          <p class="mt-1 text-sm text-loci-gray-500">Upload eerst documenten om relaties te kunnen aanmaken.</p>
         </div>
       </div>
 
       <!-- Vue Flow Mindmap -->
-      <div v-else class="flex-1 bg-white rounded-lg shadow overflow-hidden">
+      <div v-else class="flex-1 bg-loci-white rounded-loci-lg border border-loci-gray-100 overflow-hidden">
         <VueFlow
           v-model:nodes="nodes"
           v-model:edges="edges"
@@ -61,12 +61,12 @@
       </div>
 
       <!-- Legend -->
-      <div class="mt-4 p-4 bg-white rounded-lg shadow">
-        <h3 class="text-sm font-medium text-gray-700 mb-2">Legenda relatietypes</h3>
+      <div class="mt-4 p-4 bg-loci-white rounded-loci-lg border border-loci-gray-100">
+        <h3 class="text-sm font-medium text-loci-black mb-2">Legenda relatietypes</h3>
         <div class="flex flex-wrap gap-4">
           <div v-for="(color, type) in edgeColors" :key="type" class="flex items-center gap-2">
             <div class="w-6 h-0.5" :style="{ backgroundColor: color }"></div>
-            <span class="text-xs text-gray-600">{{ documentRelationTypes[type] || type }}</span>
+            <span class="text-xs text-loci-gray-500">{{ documentRelationTypes[type] || type }}</span>
           </div>
         </div>
       </div>
@@ -82,21 +82,21 @@
     />
 
     <!-- Delete Confirmation -->
-    <div v-if="selectedEdge" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm">
-        <h3 class="text-lg font-semibold mb-2">Relatie verwijderen?</h3>
-        <p class="text-gray-600 mb-4">
+    <div v-if="selectedEdge" class="fixed inset-0 bg-loci-black/50 flex items-center justify-center z-50">
+      <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6 max-w-sm">
+        <h3 class="text-lg font-semibold mb-2 text-loci-black">Relatie verwijderen?</h3>
+        <p class="text-loci-gray-500 mb-4">
           Weet je zeker dat je deze relatie wilt verwijderen?
         </p>
         <div class="flex justify-end gap-3">
           <button
-            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+            class="px-4 py-2 rounded-full border border-loci-gray-200 text-loci-black font-semibold hover:bg-loci-gray-50 transition-all"
             @click="selectedEdge = null"
           >
             Annuleren
           </button>
           <button
-            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            class="px-4 py-2 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition-all"
             @click="handleDeleteRelation"
           >
             Verwijderen

@@ -1,55 +1,79 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-loci-gray-50">
     <!-- Tab Navigation -->
-    <div class="bg-white border-b">
+    <div class="bg-loci-white border-b border-loci-gray-100">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav class="flex space-x-8" aria-label="Tabs">
-          <NuxtLink
-            to="/kennisbank/upload"
-            class="py-4 px-1 border-b-2 font-medium text-sm"
-            :class="isActive('/kennisbank/upload')
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+        <nav class="flex items-center justify-between py-4" aria-label="Tabs">
+          <div class="flex items-center space-x-2">
+            <NuxtLink
+              to="/kennisbank/upload"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              :class="isActive('/kennisbank/upload')
+                ? 'bg-loci-yellow text-loci-black-deep'
+                : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
+            >
+              Uploaden
+            </NuxtLink>
+            <NuxtLink
+              to="/kennisbank/library"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              :class="isActive('/kennisbank/library')
+                ? 'bg-loci-yellow text-loci-black-deep'
+                : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
+            >
+              Bibliotheek
+            </NuxtLink>
+            <NuxtLink
+              to="/kennisbank/relations"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              :class="isActive('/kennisbank/relations')
+                ? 'bg-loci-yellow text-loci-black-deep'
+                : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
+            >
+              Relaties
+            </NuxtLink>
+            <NuxtLink
+              to="/kennisbank/priorities"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              :class="isActive('/kennisbank/priorities')
+                ? 'bg-loci-yellow text-loci-black-deep'
+                : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
+            >
+              Prioriteiten
+            </NuxtLink>
+            <NuxtLink
+              to="/kennisbank/insights"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              :class="isActive('/kennisbank/insights')
+                ? 'bg-loci-yellow text-loci-black-deep'
+                : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
+            >
+              Inzicht
+            </NuxtLink>
+          </div>
+
+          <button
+            @click="syncToGit"
+            :disabled="syncing"
+            class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all bg-loci-yellow text-loci-black-deep hover:bg-loci-black hover:text-loci-white disabled:opacity-50"
           >
-            Uploaden
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/library"
-            class="py-4 px-1 border-b-2 font-medium text-sm"
-            :class="isActive('/kennisbank/library')
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-          >
-            Bibliotheek
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/relations"
-            class="py-4 px-1 border-b-2 font-medium text-sm"
-            :class="isActive('/kennisbank/relations')
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-          >
-            Relaties
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/priorities"
-            class="py-4 px-1 border-b-2 font-medium text-sm"
-            :class="isActive('/kennisbank/priorities')
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-          >
-            Prioriteiten
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/insights"
-            class="py-4 px-1 border-b-2 font-medium text-sm"
-            :class="isActive('/kennisbank/insights')
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-          >
-            Inzicht
-          </NuxtLink>
+            {{ syncing ? 'Synchroniseren...' : 'Sync naar GitHub' }}
+          </button>
         </nav>
+      </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div v-if="syncStatus" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      <div
+        class="p-4 rounded-loci border"
+        :class="syncStatus.type === 'error'
+          ? 'bg-red-50 border-red-200 text-red-700'
+          : syncStatus.type === 'success'
+            ? 'bg-green-50 border-green-200 text-green-700'
+            : 'bg-loci-yellow/10 border-loci-yellow text-loci-black'"
+      >
+        {{ syncStatus.message }}
       </div>
     </div>
 
@@ -62,8 +86,34 @@
 
 <script setup lang="ts">
 const route = useRoute();
+const api = useApi();
+
+const syncing = ref(false);
+const syncStatus = ref<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
 function isActive(path: string) {
   return route.path.startsWith(path);
+}
+
+async function syncToGit() {
+  try {
+    syncing.value = true;
+    syncStatus.value = { type: 'info', message: 'Synchroniseren...' };
+    const response = await api.post<{ message: string }>('/kennisbank/push');
+    syncStatus.value = {
+      type: 'success',
+      message: response.message || 'Sync voltooid',
+    };
+    setTimeout(() => {
+      syncStatus.value = null;
+    }, 5000);
+  } catch (e: any) {
+    syncStatus.value = {
+      type: 'error',
+      message: e?.data?.message || e?.message || 'Sync mislukt. Controleer je Git configuratie in Mijn Account.',
+    };
+  } finally {
+    syncing.value = false;
+  }
 }
 </script>

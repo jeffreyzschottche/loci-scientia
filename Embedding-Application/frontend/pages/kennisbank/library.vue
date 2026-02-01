@@ -1,69 +1,30 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Tab Navigation -->
-    <div class="bg-white border-b">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav class="flex space-x-8">
-          <NuxtLink
-            to="/kennisbank/upload"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Uploaden
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/library"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600"
-          >
-            Bibliotheek
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/relations"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Relaties
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/priorities"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Prioriteiten
-          </NuxtLink>
-          <NuxtLink
-            to="/kennisbank/insights"
-            class="py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-          >
-            Inzicht
-          </NuxtLink>
-        </nav>
-      </div>
-    </div>
-
-    <!-- Content -->
+  <KennisbankTabLayout>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex gap-4" style="height: calc(100vh - 200px);">
         <!-- Left Panel: Tree -->
-        <div class="w-80 bg-white rounded-lg shadow flex flex-col">
-          <div class="p-4 border-b">
+        <div class="w-80 bg-loci-white rounded-loci-lg border border-loci-gray-100 flex flex-col">
+          <div class="p-4 border-b border-loci-gray-100">
             <input
               v-model="searchQuery"
               type="text"
               placeholder="Zoeken..."
-              class="w-full px-4 py-2 border rounded-lg"
+              class="w-full px-4 py-2 border border-loci-gray-300 rounded-loci bg-loci-cream text-loci-black focus:border-loci-yellow focus:outline-none"
             >
           </div>
 
           <div class="flex-1 overflow-auto p-4">
             <div v-if="isLoading" class="text-center py-8">
-              <p class="text-gray-500">Laden...</p>
+              <p class="text-loci-gray-500">Laden...</p>
             </div>
 
             <div v-else-if="error" class="text-center py-8">
               <p class="text-red-500">{{ error }}</p>
             </div>
 
-            <div v-else-if="tree.length === 0" class="text-center py-8 text-gray-500">
+            <div v-else-if="tree.length === 0" class="text-center py-8 text-loci-gray-500">
               <p>Geen documenten gevonden</p>
-              <NuxtLink to="/kennisbank/upload" class="text-blue-600 hover:underline mt-2 block">
+              <NuxtLink to="/kennisbank/upload" class="text-loci-black font-semibold hover:text-loci-yellow-hover mt-2 block">
                 Upload je eerste document
               </NuxtLink>
             </div>
@@ -72,18 +33,18 @@
               <div
                 v-for="node in tree"
                 :key="node.id"
-                class="p-2 hover:bg-gray-100 rounded cursor-pointer"
-                :class="{ 'bg-blue-100': selectedId === node.id }"
+                class="p-2 hover:bg-loci-yellow/10 rounded-loci cursor-pointer transition-all"
+                :class="{ 'bg-loci-yellow/20': selectedId === node.id }"
                 @click="selectDocument(node)"
               >
                 <div class="flex items-start justify-between gap-2">
                   <div class="flex-1 min-w-0">
-                    <p class="font-medium truncate" :title="node.title">{{ node.title }}</p>
-                    <p class="text-sm text-gray-500">{{ node.category || 'Geen categorie' }}</p>
+                    <p class="font-medium truncate text-loci-black" :title="node.title">{{ node.title }}</p>
+                    <p class="text-sm text-loci-gray-500">{{ node.category || 'Geen categorie' }}</p>
                   </div>
                   <button
                     type="button"
-                    class="text-red-600 hover:text-red-800 disabled:opacity-50"
+                    class="text-red-500 hover:text-red-700 disabled:opacity-50"
                     title="Verwijderen uit kennisbank"
                     :disabled="deletingId === node.id"
                     @click.stop="deleteFromLibrary(node)"
@@ -114,25 +75,25 @@
         </div>
 
         <!-- Right Panel: Preview -->
-        <div class="flex-1 bg-white rounded-lg shadow flex flex-col">
-          <div v-if="!selectedDocument" class="flex-1 flex items-center justify-center text-gray-500">
+        <div class="flex-1 bg-loci-white rounded-loci-lg border border-loci-gray-100 flex flex-col">
+          <div v-if="!selectedDocument" class="flex-1 flex items-center justify-center text-loci-gray-500">
             <p>Selecteer een document</p>
           </div>
 
           <template v-else>
-            <div class="p-4 border-b">
-              <h2 class="text-lg font-medium">{{ selectedDocument.title }}</h2>
-              <p class="text-sm text-gray-500">{{ selectedDocument.category || 'Geen categorie' }}</p>
+            <div class="p-4 border-b border-loci-gray-100">
+              <h2 class="text-lg font-medium text-loci-black">{{ selectedDocument.title }}</h2>
+              <p class="text-sm text-loci-gray-500">{{ selectedDocument.category || 'Geen categorie' }}</p>
             </div>
 
             <div class="flex-1 overflow-auto p-4">
               <div v-if="selectedDocument.sections" class="space-y-6">
                 <div v-for="section in selectedDocument.sections" :key="section.id">
-                  <h3 class="font-semibold border-b pb-2">{{ section.title }}</h3>
-                  <p class="mt-2 whitespace-pre-wrap text-gray-700">{{ section.text }}</p>
+                  <h3 class="font-semibold border-b border-loci-gray-100 pb-2 text-loci-black">{{ section.title }}</h3>
+                  <p class="mt-2 whitespace-pre-wrap text-loci-gray-500">{{ section.text }}</p>
                 </div>
               </div>
-              <div v-else class="text-gray-500">
+              <div v-else class="text-loci-gray-500">
                 <p>Geen secties gevonden</p>
               </div>
             </div>
@@ -140,7 +101,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </KennisbankTabLayout>
 </template>
 
 <script setup lang="ts">

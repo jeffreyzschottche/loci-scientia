@@ -741,6 +741,106 @@ TRANSLATIONS = {
         "nl": "Verwerken…",
         "en": "Processing…",
     },
+    "kb_sync_button": {
+        "nl": "Sync kennisbank",
+        "en": "Sync knowledge base",
+    },
+    "kb_syncing": {
+        "nl": "Sync bezig…",
+        "en": "Sync in progress…",
+    },
+    "kb_sync_last": {
+        "nl": "Laatst gesynct",
+        "en": "Last synced",
+    },
+    "kb_sync_never": {
+        "nl": "Nog nooit gesynct",
+        "en": "Never synced",
+    },
+    "kb_sync_error": {
+        "nl": "Sync mislukt",
+        "en": "Sync failed",
+    },
+    "kb_sync_success": {
+        "nl": "Sync voltooid",
+        "en": "Sync completed",
+    },
+    "kb_sync_starting": {
+        "nl": "Sync wordt gestart...",
+        "en": "Starting sync...",
+    },
+    "kb_sync_need_token": {
+        "nl": "Backend token vereist voor sync.",
+        "en": "Backend token required for sync.",
+    },
+    "kb_sync_pending": {
+        "nl": "In afwachting",
+        "en": "Pending",
+    },
+    "kb_stat_documents": {
+        "nl": "Documenten",
+        "en": "Documents",
+    },
+    "kb_stat_chunks": {
+        "nl": "Chunks",
+        "en": "Chunks",
+    },
+    "kb_stat_vectors": {
+        "nl": "Vectors",
+        "en": "Vectors",
+    },
+    "kb_stat_documents_detail": {
+        "nl": "{count} documenten geladen",
+        "en": "{count} documents loaded",
+    },
+    "kb_stat_chunks_detail": {
+        "nl": "{count} chunks geïndexeerd",
+        "en": "{count} chunks indexed",
+    },
+    "kb_stat_vectors_detail": {
+        "nl": "{count} vectors in database",
+        "en": "{count} vectors in database",
+    },
+    "kb_table_category": {
+        "nl": "Categorie",
+        "en": "Category",
+    },
+    "kb_table_priority": {
+        "nl": "Prioriteit",
+        "en": "Priority",
+    },
+    "kb_table_chunks": {
+        "nl": "Chunks",
+        "en": "Chunks",
+    },
+    "kb_table_content_date": {
+        "nl": "Datum",
+        "en": "Date",
+    },
+    "kb_table_relations": {
+        "nl": "Relaties",
+        "en": "Relations",
+    },
+    "kb_relations_title": {
+        "nl": "Document relaties",
+        "en": "Document relations",
+    },
+    "kb_relations_for": {
+        "nl": "Relaties voor {document}",
+        "en": "Relations for {document}",
+    },
+    "kb_relations_target": {
+        "nl": "Doel",
+        "en": "Target",
+    },
+    "kb_relations_type": {
+        "nl": "Type",
+        "en": "Type",
+    },
+    "kb_relations_none": {
+        "nl": "Geen relaties gevonden",
+        "en": "No relations found",
+    },
 
     # ============================================
     # VUE KENNISBANK PAGE

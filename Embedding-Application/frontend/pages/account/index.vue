@@ -1,39 +1,39 @@
 <template>
   <div class="mx-auto max-w-5xl px-4 py-12">
     <div class="space-y-6">
-      <section class="rounded-lg bg-white p-8 shadow">
-        <div class="mb-6 border-b pb-4">
-          <h1 class="text-2xl font-semibold">Mijn account</h1>
-          <p class="text-sm text-gray-500">Werk je profielgegevens bij en beheer je beveiliging.</p>
+      <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
+        <div class="mb-6 border-b border-loci-gray-100 pb-4">
+          <h1 class="text-2xl font-semibold text-loci-black">Mijn account</h1>
+          <p class="text-sm text-loci-gray-500">Werk je profielgegevens bij en beheer je beveiliging.</p>
         </div>
 
         <form @submit.prevent="handleProfileSave" class="space-y-4">
-          <div v-if="profileSuccess" class="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+          <div v-if="profileSuccess" class="rounded-loci border border-green-200 bg-green-50 p-3 text-sm text-green-700">
             {{ profileSuccess }}
           </div>
-          <div v-if="profileError" class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div v-if="profileError" class="rounded-loci border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {{ profileError }}
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Naam</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Naam</label>
             <input
               v-model="profileForm.name"
               type="text"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Email</label>
             <input
               v-model="profileForm.email"
               type="email"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-loci-gray-500">
               Bij het wijzigen van je email moet je deze opnieuw verifiëren via de knop hieronder.
             </p>
           </div>
@@ -41,21 +41,21 @@
           <button
             type="submit"
             :disabled="profileSaving"
-            class="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            class="w-full rounded-loci-full bg-loci-yellow py-3 font-semibold text-loci-black-deep transition-all hover:bg-loci-yellow-hover disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
           >
             {{ profileSaving ? 'Opslaan...' : 'Wijzigingen opslaan' }}
           </button>
         </form>
       </section>
 
-      <section class="rounded-lg bg-white p-6 shadow">
+      <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-700">Email verificatie</p>
-            <p class="text-sm" :class="emailVerified ? 'text-green-600' : 'text-yellow-600'">
+            <p class="text-sm font-semibold text-loci-black">Email verificatie</p>
+            <p class="text-sm" :class="emailVerified ? 'text-green-600' : 'text-loci-yellow-hover'">
               {{ emailVerified ? 'Je email is geverifieerd' : 'Nog niet geverifieerd' }}
             </p>
-            <p class="mt-2 text-xs text-gray-500">
+            <p class="mt-2 text-xs text-loci-gray-500">
               Verificatie e-mails worden alleen vanaf hier opnieuw verstuurd. Klik op de link in de mail om de verificatie
               af te ronden.
             </p>
@@ -65,7 +65,7 @@
               type="button"
               @click="handleResendVerification"
               :disabled="resendLoading || emailVerified"
-              class="w-full rounded bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700 disabled:opacity-50 md:w-auto"
+              class="w-full rounded-full border border-loci-gray-200 bg-loci-white px-4 py-2 font-semibold text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow hover:text-loci-black-deep disabled:bg-loci-gray-50 disabled:text-loci-gray-400 md:w-auto"
             >
               {{ emailVerified ? 'Alles up-to-date' : resendLoading ? 'Versturen...' : 'Verzend verificatie' }}
             </button>
@@ -75,61 +75,61 @@
         <p v-if="resendError" class="mt-2 text-sm text-red-600">{{ resendError }}</p>
       </section>
 
-      <section class="rounded-lg bg-white p-8 shadow">
-        <h2 class="mb-4 text-xl font-semibold">Wachtwoord wijzigen</h2>
+      <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
+        <h2 class="mb-4 text-xl font-semibold text-loci-black">Wachtwoord wijzigen</h2>
         <form @submit.prevent="handlePasswordChange" class="space-y-4">
-          <div v-if="passwordSuccess" class="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+          <div v-if="passwordSuccess" class="rounded-loci border border-green-200 bg-green-50 p-3 text-sm text-green-700">
             {{ passwordSuccess }}
           </div>
-          <div v-if="passwordError" class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div v-if="passwordError" class="rounded-loci border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {{ passwordError }}
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Huidig wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Huidig wachtwoord</label>
             <input
               v-model="passwordForm.current_password"
               type="password"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Nieuw wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Nieuw wachtwoord</label>
             <input
               v-model="passwordForm.password"
               type="password"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Bevestig wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">Bevestig wachtwoord</label>
             <input
               v-model="passwordForm.password_confirmation"
               type="password"
               required
-              class="w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
             :disabled="passwordSaving"
-            class="w-full rounded bg-slate-800 py-2 text-white hover:bg-slate-900 disabled:opacity-50"
+            class="w-full rounded-loci-full bg-loci-black py-3 font-semibold text-loci-white transition-all hover:bg-loci-black-deep disabled:bg-loci-gray-400 disabled:text-loci-gray-200"
           >
             {{ passwordSaving ? 'Bijwerken...' : 'Wachtwoord wijzigen' }}
           </button>
         </form>
       </section>
 
-      <section class="rounded-lg bg-white p-6 shadow">
+      <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 class="text-lg font-semibold">Wachtwoord vergeten</h3>
-            <p class="text-sm text-gray-600">
+            <h3 class="text-lg font-semibold text-loci-black">Wachtwoord vergeten</h3>
+            <p class="text-sm text-loci-gray-500">
               Verstuur een resetlink naar je huidige emailadres. Deze link verloopt binnen 60 minuten.
             </p>
           </div>
@@ -138,7 +138,7 @@
               type="button"
               @click="handleForgotPassword"
               :disabled="forgotSending"
-              class="w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50 md:w-auto"
+              class="w-full rounded-full border border-loci-gray-200 bg-loci-white px-4 py-2 font-semibold text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow hover:text-loci-black-deep disabled:bg-loci-gray-50 disabled:text-loci-gray-400 md:w-auto"
             >
               {{ forgotSending ? 'Wordt verstuurd...' : 'Stuur resetlink' }}
             </button>
@@ -146,6 +146,86 @@
         </div>
         <p v-if="forgotMessage" class="mt-2 text-sm text-green-600">{{ forgotMessage }}</p>
         <p v-if="forgotError" class="mt-2 text-sm text-red-600">{{ forgotError }}</p>
+      </section>
+
+      <!-- Git Configuration -->
+      <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
+        <div class="flex flex-col md:flex-row md:items-start md:justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-semibold text-loci-black">Git Configuratie</h2>
+            <p class="text-sm text-loci-gray-500">Stel de GitHub repo in voor de Sync to OS actie.</p>
+          </div>
+          <div class="text-sm text-loci-gray-500 mt-2 md:mt-0">
+            Laatst gesynchroniseerd:
+            <span class="font-medium text-loci-black">
+              {{ gitConfig.last_pushed_at ? formatDateTime(gitConfig.last_pushed_at) : 'Nooit' }}
+            </span>
+          </div>
+        </div>
+
+        <div
+          v-if="gitStatus"
+          class="mb-6 p-4 rounded-loci border"
+          :class="gitStatus.type === 'error'
+            ? 'bg-red-50 border-red-200 text-red-700'
+            : gitStatus.type === 'success'
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : 'bg-loci-yellow/10 border-loci-yellow text-loci-black'"
+        >
+          {{ gitStatus.message }}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-loci-black">Repository URL</label>
+            <input
+              v-model="gitConfig.repo_url"
+              type="text"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+              placeholder="https://github.com/naam/kennisbank.git"
+            >
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-loci-black">Branch</label>
+            <input
+              v-model="gitConfig.branch"
+              type="text"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+              placeholder="main"
+            >
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-loci-black">Access Token</label>
+            <input
+              v-model="gitConfig.access_token"
+              type="password"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+              placeholder="ghp_xxxxxxxxx"
+            >
+            <p class="text-xs text-loci-gray-500 mt-1">Personal Access Token met repo permissions. Wordt versleuteld opgeslagen.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+          <button
+            type="button"
+            class="px-6 py-3 bg-loci-black text-loci-white rounded-loci-full font-semibold hover:bg-loci-black-deep transition-all disabled:bg-loci-gray-400 disabled:text-loci-gray-200"
+            :disabled="savingGitConfig || !gitConfig.repo_url || !gitConfig.branch"
+            @click="saveGitConfig"
+          >
+            {{ savingGitConfig ? 'Opslaan...' : 'Configuratie opslaan' }}
+          </button>
+          <button
+            type="button"
+            class="px-6 py-3 bg-loci-yellow text-loci-black-deep rounded-loci-full font-semibold hover:bg-loci-yellow-hover transition-all disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
+            :disabled="syncing || !hasGitConfig"
+            @click="syncToGit"
+          >
+            {{ syncing ? 'Synchroniseren...' : 'Sync naar Git' }}
+          </button>
+        </div>
       </section>
     </div>
   </div>
@@ -159,6 +239,20 @@ definePageMeta({
 });
 
 const authStore = useAuthStore();
+const api = useApi();
+
+type GitConfigState = {
+  repo_url: string;
+  branch: string;
+  access_token: string;
+  has_access_token: boolean;
+  last_pushed_at: string | null;
+};
+
+type StatusState = {
+  type: 'success' | 'error' | 'info';
+  message: string;
+};
 
 const profileForm = reactive({
   name: authStore.user?.name || '',
@@ -281,5 +375,101 @@ function extractError(error: any): string | undefined {
   }
 
   return error?.data?.message || error?.message;
+}
+
+// Git Configuration
+const gitConfig = ref<GitConfigState>({
+  repo_url: '',
+  branch: 'main',
+  access_token: '',
+  has_access_token: false,
+  last_pushed_at: null,
+});
+const savingGitConfig = ref(false);
+const syncing = ref(false);
+const gitStatus = ref<StatusState | null>(null);
+
+const hasGitConfig = computed(() => {
+  return Boolean(
+    gitConfig.value.repo_url &&
+      gitConfig.value.branch &&
+      (gitConfig.value.has_access_token || gitConfig.value.access_token)
+  );
+});
+
+onMounted(async () => {
+  await loadGitConfig();
+});
+
+async function loadGitConfig() {
+  try {
+    const response = await api.get<{ config: (GitConfigState & { has_access_token: boolean }) | null }>('/kennisbank/git-config');
+
+    if (response.config) {
+      gitConfig.value = {
+        repo_url: response.config.repo_url || '',
+        branch: response.config.branch || 'main',
+        access_token: '',
+        has_access_token: Boolean(response.config.has_access_token),
+        last_pushed_at: response.config.last_pushed_at || null,
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load git config:', e);
+  }
+}
+
+async function saveGitConfig() {
+  try {
+    savingGitConfig.value = true;
+    gitStatus.value = null;
+
+    const payload: Record<string, string> = {
+      repo_url: gitConfig.value.repo_url,
+      branch: gitConfig.value.branch || 'main',
+    };
+
+    if (gitConfig.value.access_token) {
+      payload.access_token = gitConfig.value.access_token;
+    }
+
+    const response = await api.post<{ config: GitConfigState; message: string }>('/kennisbank/git-config', payload);
+    gitConfig.value.has_access_token = response.config.has_access_token ?? Boolean(payload.access_token);
+    gitConfig.value.last_pushed_at = response.config.last_pushed_at || gitConfig.value.last_pushed_at;
+    gitConfig.value.access_token = '';
+
+    gitStatus.value = { type: 'success', message: 'Configuratie opgeslagen' };
+  } catch (e: any) {
+    gitStatus.value = { type: 'error', message: extractError(e) || 'Opslaan mislukt' };
+  } finally {
+    savingGitConfig.value = false;
+  }
+}
+
+async function syncToGit() {
+  if (!hasGitConfig.value) {
+    gitStatus.value = { type: 'error', message: 'Configureer eerst de git instellingen' };
+    return;
+  }
+
+  try {
+    syncing.value = true;
+    gitStatus.value = { type: 'info', message: 'Synchroniseren...' };
+    const response = await api.post<{ message: string; last_pushed_at: string | null }>('/kennisbank/push');
+    gitConfig.value.last_pushed_at = response.last_pushed_at;
+    gitStatus.value = {
+      type: 'success',
+      message: response.message || 'Sync voltooid',
+    };
+  } catch (e: any) {
+    gitStatus.value = { type: 'error', message: extractError(e) || 'Sync mislukt' };
+  } finally {
+    syncing.value = false;
+  }
+}
+
+function formatDateTime(dateStr: string) {
+  const date = new Date(dateStr);
+  return `${date.toLocaleDateString('nl-NL')} ${date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
 }
 </script>
