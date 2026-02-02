@@ -229,6 +229,16 @@ function setLanguage(lang: "nl" | "en") {
 }
 
 /**
+ * Quick inline translation helper for components
+ */
+function translate(nl: string, en?: string) {
+  if (currentLanguage.value === "nl") {
+    return nl;
+  }
+  return en ?? nl;
+}
+
+/**
  * Get translated text
  */
 function t(key: string, replacements?: Record<string, string>): string {
@@ -257,6 +267,7 @@ export function useTranslations() {
 
   return {
     t,
+    translate,
     currentLanguage: readonly(currentLanguage),
     setLanguage,
     isEnglish: computed(() => currentLanguage.value === "en"),

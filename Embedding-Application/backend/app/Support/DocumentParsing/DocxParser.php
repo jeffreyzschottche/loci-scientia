@@ -3,7 +3,6 @@
 namespace App\Support\DocumentParsing;
 
 use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\Element\TextRun;
 use PhpOffice\PhpWord\Element\Text;
 use PhpOffice\PhpWord\Element\Title;
@@ -224,4 +223,6 @@ class DocxParser implements DocumentParserInterface
 
         return trim($text);
     }
+
+    // Image extraction intentionally removed; DOCX parser now focuses solely on text content.
 }

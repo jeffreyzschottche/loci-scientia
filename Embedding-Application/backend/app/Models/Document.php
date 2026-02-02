@@ -20,6 +20,7 @@ class Document extends Model
         'category',
         'version_tag',
         'content_date',
+        'language',
         'source_url',
         'description',
         'metadata',

@@ -1,13 +1,17 @@
 <template>
   <KennisbankTabLayout>
     <div class="max-w-3xl w-full mx-auto">
-      <h1 class="text-2xl font-bold mb-6 text-loci-black">Document Uploaden</h1>
+      <h1 class="text-2xl font-bold mb-6 text-loci-black">
+        {{ translate('Document Uploaden', 'Upload Document') }}
+      </h1>
 
       <!-- Upload Form -->
       <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6 space-y-6">
         <!-- File Input -->
         <div>
-          <label class="block text-sm font-medium text-loci-black mb-2">Bestand</label>
+          <label class="block text-sm font-medium text-loci-black mb-2">
+            {{ translate('Bestand', 'File') }}
+          </label>
           <div
             class="border-2 border-dashed rounded-loci-lg p-8 text-center transition-all"
             :class="isDragging ? 'border-loci-yellow bg-loci-yellow/10' : 'border-loci-gray-300'"
@@ -24,15 +28,19 @@
             >
 
             <div v-if="!selectedFile">
-              <p class="text-loci-gray-500 mb-2">Sleep een bestand hierheen of</p>
+              <p class="text-loci-gray-500 mb-2">
+                {{ translate('Sleep een bestand hierheen of', 'Drag a file here or') }}
+              </p>
               <button
                 type="button"
                 class="text-loci-black font-semibold hover:text-loci-yellow-hover"
                 @click="($refs.fileInput as HTMLInputElement).click()"
               >
-                kies een bestand
+                {{ translate('kies een bestand', 'choose a file') }}
               </button>
-              <p class="text-sm text-loci-gray-400 mt-2">PDF, DOCX, CSV, XML, TXT (max 50MB)</p>
+              <p class="text-sm text-loci-gray-400 mt-2">
+                {{ translate('PDF, DOCX, CSV, XML, TXT (max 50MB)', 'PDF, DOCX, CSV, XML, TXT (max 50MB)') }}
+              </p>
             </div>
 
             <div v-else class="flex items-center justify-center space-x-4">
@@ -46,7 +54,7 @@
                 class="text-red-500 hover:text-red-700"
                 @click="selectedFile = null"
               >
-                Verwijderen
+                {{ translate('Verwijderen', 'Remove') }}
               </button>
             </div>
           </div>
@@ -55,52 +63,78 @@
         <!-- Metadata -->
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-loci-black">Titel</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Titel', 'Title') }}
+            </label>
             <input
               v-model="metadata.title"
               type="text"
               class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-              :placeholder="selectedFile?.name.replace(/\.[^/.]+$/, '') || 'Document titel'"
+              :placeholder="selectedFile?.name.replace(/\.[^/.]+$/, '') || translate('Document titel', 'Document title')"
             >
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-loci-black">Categorie</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Categorie', 'Category') }}
+            </label>
             <input
               v-model="metadata.category"
               type="text"
               class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-              placeholder="bijv. Handleidingen"
+              :placeholder="translate('bijv. Handleidingen', 'e.g. Manuals')"
             >
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-loci-black">Versie</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Versie', 'Version') }}
+            </label>
             <input
               v-model="metadata.version_tag"
               type="text"
               class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-              placeholder="bijv. v1.0"
+              :placeholder="translate('bijv. v1.0', 'e.g. v1.0')"
             >
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-loci-black">Publicatiedatum</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Publicatiedatum', 'Publication date') }}
+            </label>
             <input
               v-model="metadata.content_date"
               type="date"
               class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             >
-            <p class="text-xs text-loci-gray-500 mt-1">Gebruik deze datum in de JSON-LD export (default: vandaag).</p>
+            <p class="text-xs text-loci-gray-500 mt-1">
+              {{ translate('Gebruik deze datum in de JSON-LD export (default: vandaag).', 'Use this date in the JSON-LD export (default: today).') }}
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Taal', 'Language') }}
+            </label>
+            <select
+              v-model="metadata.language"
+              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+            >
+              <option v-for="lang in languageOptions" :key="lang.code" :value="lang.code">
+                {{ lang.flag }} {{ lang.label }}
+              </option>
+            </select>
           </div>
 
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-loci-black">Beschrijving</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Beschrijving', 'Description') }}
+            </label>
             <textarea
               v-model="metadata.description"
               rows="2"
               class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-              placeholder="Korte beschrijving..."
+              :placeholder="translate('Korte beschrijving...', 'Short description...')"
             />
           </div>
         </div>
@@ -118,41 +152,9 @@
             :disabled="!selectedFile || isUploading"
             @click="uploadAndProcess"
           >
-            {{ isUploading ? 'Bezig...' : 'Uploaden en verwerken' }}
+            {{ isUploading ? translate('Bezig...', 'Processing...') : translate('Uploaden en verwerken', 'Upload and process') }}
           </button>
         </div>
-      </div>
-
-      <!-- Recent uploads -->
-      <div v-if="recentUploads.length > 0" class="mt-8 bg-loci-white rounded-loci-lg border border-loci-gray-100">
-        <div class="px-6 py-4 border-b border-loci-gray-100">
-          <h2 class="text-lg font-medium text-loci-black">Recente uploads</h2>
-        </div>
-        <ul class="divide-y divide-loci-gray-100">
-          <li v-for="doc in recentUploads" :key="doc.id" class="px-6 py-4 flex items-center justify-between">
-            <div>
-              <p class="font-medium text-loci-black">{{ doc.title || doc.original_filename }}</p>
-              <p class="text-sm text-loci-gray-500">{{ doc.category || 'Geen categorie' }}</p>
-            </div>
-            <div class="flex items-center space-x-3">
-              <span
-                class="px-2 py-1 text-xs rounded-full font-semibold"
-                :class="getStatusClass(doc.status)"
-              >
-                {{ doc.status }}
-              </span>
-              <button
-                class="text-red-500 hover:text-red-700"
-                @click="deleteDocument(doc.id)"
-                title="Verwijderen"
-              >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          </li>
-        </ul>
       </div>
     </div>
   </KennisbankTabLayout>
@@ -165,6 +167,7 @@ definePageMeta({
 
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
+const { translate } = useTranslations();
 
 type UploadMetadata = {
   title: string;
@@ -172,7 +175,20 @@ type UploadMetadata = {
   version_tag: string;
   description: string;
   content_date: string;
+  language: string;
 };
+
+const languageOptions = [
+  { code: 'nl', label: 'Nederlands', flag: '\u{1F1F3}\u{1F1F1}' },
+  { code: 'en', label: 'English', flag: '\u{1F1EC}\u{1F1E7}' },
+  { code: 'de', label: 'Deutsch', flag: '\u{1F1E9}\u{1F1EA}' },
+  { code: 'es', label: 'Espanol', flag: '\u{1F1EA}\u{1F1F8}' },
+  { code: 'it', label: 'Italiano', flag: '\u{1F1EE}\u{1F1F9}' },
+  { code: 'pl', label: 'Polski', flag: '\u{1F1F5}\u{1F1F1}' },
+  { code: 'sv', label: 'Svenska', flag: '\u{1F1F8}\u{1F1EA}' },
+  { code: 'da', label: 'Dansk', flag: '\u{1F1E9}\u{1F1F0}' },
+  { code: 'fi', label: 'Suomi', flag: '\u{1F1EB}\u{1F1EE}' },
+];
 
 function defaultMetadata(): UploadMetadata {
   return {
@@ -181,6 +197,7 @@ function defaultMetadata(): UploadMetadata {
     version_tag: '',
     description: '',
     content_date: new Date().toISOString().slice(0, 10),
+    language: 'nl',
   };
 }
 
@@ -189,29 +206,8 @@ const selectedFile = ref<File | null>(null);
 const isDragging = ref(false);
 const isUploading = ref(false);
 const status = ref<{ type: 'info' | 'error' | 'success'; message: string } | null>(null);
-const recentUploads = ref<any[]>([]);
 
 const metadata = ref<UploadMetadata>(defaultMetadata());
-
-onMounted(async () => {
-  await loadRecentUploads();
-});
-
-async function loadRecentUploads() {
-  try {
-    const baseUrl = config.public.apiBaseUrl as string;
-    const response = await fetch(`${baseUrl}/documents`, {
-      headers: {
-        Authorization: `Bearer ${authStore.token}`,
-        Accept: 'application/json',
-      },
-    });
-    const data = await response.json();
-    recentUploads.value = data.documents?.slice(0, 5) || [];
-  } catch (e) {
-    console.error('Failed to load recent uploads:', e);
-  }
-}
 
 function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -237,7 +233,7 @@ async function uploadAndProcess() {
   if (!selectedFile.value) return;
 
   isUploading.value = true;
-  status.value = { type: 'info', message: 'Uploaden...' };
+  status.value = { type: 'info', message: translate('Uploaden...', 'Uploading...') };
 
   try {
     const baseUrl = config.public.apiBaseUrl as string;
@@ -250,6 +246,7 @@ async function uploadAndProcess() {
     if (metadata.value.version_tag) formData.append('version_tag', metadata.value.version_tag);
     if (metadata.value.description) formData.append('description', metadata.value.description);
     if (metadata.value.content_date) formData.append('content_date', metadata.value.content_date);
+    if (metadata.value.language) formData.append('language', metadata.value.language);
 
     const uploadResponse = await fetch(`${baseUrl}/documents`, {
       method: 'POST',
@@ -262,13 +259,13 @@ async function uploadAndProcess() {
 
     if (!uploadResponse.ok) {
       const error = await uploadResponse.json();
-      throw new Error(error.message || 'Upload mislukt');
+      throw new Error(error.message || translate('Upload mislukt', 'Upload failed'));
     }
 
     const uploadData = await uploadResponse.json();
     const document = uploadData.document;
 
-    status.value = { type: 'info', message: 'Verwerken...' };
+    status.value = { type: 'info', message: translate('Verwerken...', 'Processing...') };
 
     // Step 2: Process
     const processResponse = await fetch(`${baseUrl}/documents/${document.id}/process`, {
@@ -282,20 +279,17 @@ async function uploadAndProcess() {
 
     if (!processResponse.ok) {
       const error = await processResponse.json();
-      throw new Error(error.message || 'Verwerking mislukt');
+      throw new Error(error.message || translate('Verwerking mislukt', 'Processing failed'));
     }
 
-    status.value = { type: 'success', message: 'Document succesvol geupload en verwerkt!' };
+    status.value = { type: 'success', message: translate('Document succesvol geüpload en verwerkt!', 'Document uploaded and processed successfully!') };
 
     // Reset form
     selectedFile.value = null;
     metadata.value = defaultMetadata();
 
-    // Refresh recent uploads
-    await loadRecentUploads();
-
   } catch (e: any) {
-    status.value = { type: 'error', message: e.message || 'Er is een fout opgetreden' };
+    status.value = { type: 'error', message: e.message || translate('Er is een fout opgetreden', 'Something went wrong') };
   } finally {
     isUploading.value = false;
   }
@@ -313,42 +307,5 @@ function formatFileSize(bytes: number) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-function getStatusClass(status: string) {
-  switch (status) {
-    case 'formatted':
-      return 'bg-green-100 text-green-800';
-    case 'processing':
-      return 'bg-blue-100 text-blue-800';
-    case 'failed':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
-
-async function deleteDocument(id: number) {
-  if (!confirm('Weet je zeker dat je dit document wilt verwijderen?')) return;
-
-  try {
-    const baseUrl = config.public.apiBaseUrl as string;
-    const response = await fetch(`${baseUrl}/documents/${id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${authStore.token}`,
-        Accept: 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Verwijderen mislukt');
-    }
-
-    await loadRecentUploads();
-  } catch (e: any) {
-    alert(e.message || 'Er is een fout opgetreden');
-  }
 }
 </script>

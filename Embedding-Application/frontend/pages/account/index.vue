@@ -3,8 +3,12 @@
     <div class="space-y-6">
       <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
         <div class="mb-6 border-b border-loci-gray-100 pb-4">
-          <h1 class="text-2xl font-semibold text-loci-black">Mijn account</h1>
-          <p class="text-sm text-loci-gray-500">Werk je profielgegevens bij en beheer je beveiliging.</p>
+          <h1 class="text-2xl font-semibold text-loci-black">
+            {{ translate('Mijn account', 'My Account') }}
+          </h1>
+          <p class="text-sm text-loci-gray-500">
+            {{ translate('Werk je profielgegevens bij en beheer je beveiliging.', 'Update your profile details and manage your security settings.') }}
+          </p>
         </div>
 
         <form @submit.prevent="handleProfileSave" class="space-y-4">
@@ -16,7 +20,9 @@
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-loci-black">Naam</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">
+              {{ translate('Naam', 'Name') }}
+            </label>
             <input
               v-model="profileForm.name"
               type="text"
@@ -26,7 +32,9 @@
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-loci-black">Email</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">
+              {{ translate('Email', 'Email') }}
+            </label>
             <input
               v-model="profileForm.email"
               type="email"
@@ -34,7 +42,7 @@
               class="w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
             />
             <p class="mt-1 text-xs text-loci-gray-500">
-              Bij het wijzigen van je email moet je deze opnieuw verifiëren via de knop hieronder.
+              {{ translate('Bij het wijzigen van je email moet je deze opnieuw verifiëren via de knop hieronder.', 'Changing your email requires re-verification via the button below.') }}
             </p>
           </div>
 
@@ -43,7 +51,7 @@
             :disabled="profileSaving"
             class="w-full rounded-loci-full bg-loci-yellow py-3 font-semibold text-loci-black-deep transition-all hover:bg-loci-yellow-hover disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
           >
-            {{ profileSaving ? 'Opslaan...' : 'Wijzigingen opslaan' }}
+            {{ profileSaving ? translate('Opslaan...', 'Saving...') : translate('Wijzigingen opslaan', 'Save changes') }}
           </button>
         </form>
       </section>
@@ -51,13 +59,14 @@
       <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="text-sm font-semibold text-loci-black">Email verificatie</p>
+            <p class="text-sm font-semibold text-loci-black">
+              {{ translate('Email verificatie', 'Email verification') }}
+            </p>
             <p class="text-sm" :class="emailVerified ? 'text-green-600' : 'text-loci-yellow-hover'">
-              {{ emailVerified ? 'Je email is geverifieerd' : 'Nog niet geverifieerd' }}
+              {{ emailVerified ? translate('Je email is geverifieerd', 'Your email is verified') : translate('Nog niet geverifieerd', 'Not verified yet') }}
             </p>
             <p class="mt-2 text-xs text-loci-gray-500">
-              Verificatie e-mails worden alleen vanaf hier opnieuw verstuurd. Klik op de link in de mail om de verificatie
-              af te ronden.
+              {{ translate('Verificatie e-mails worden alleen vanaf hier opnieuw verstuurd. Klik op de link in de mail om de verificatie af te ronden.', 'Verification emails can only be resent from here. Click the link in the message to finish verification.') }}
             </p>
           </div>
           <div class="w-full md:w-auto">
@@ -67,7 +76,7 @@
               :disabled="resendLoading || emailVerified"
               class="w-full rounded-full border border-loci-gray-200 bg-loci-white px-4 py-2 font-semibold text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow hover:text-loci-black-deep disabled:bg-loci-gray-50 disabled:text-loci-gray-400 md:w-auto"
             >
-              {{ emailVerified ? 'Alles up-to-date' : resendLoading ? 'Versturen...' : 'Verzend verificatie' }}
+              {{ emailVerified ? translate('Alles up-to-date', 'All set') : resendLoading ? translate('Versturen...', 'Sending...') : translate('Verzend verificatie', 'Send verification') }}
             </button>
           </div>
         </div>
@@ -76,7 +85,9 @@
       </section>
 
       <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
-        <h2 class="mb-4 text-xl font-semibold text-loci-black">Wachtwoord wijzigen</h2>
+        <h2 class="mb-4 text-xl font-semibold text-loci-black">
+          {{ translate('Wachtwoord wijzigen', 'Change password') }}
+        </h2>
         <form @submit.prevent="handlePasswordChange" class="space-y-4">
           <div v-if="passwordSuccess" class="rounded-loci border border-green-200 bg-green-50 p-3 text-sm text-green-700">
             {{ passwordSuccess }}
@@ -86,7 +97,9 @@
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-loci-black">Huidig wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">
+              {{ translate('Huidig wachtwoord', 'Current password') }}
+            </label>
             <input
               v-model="passwordForm.current_password"
               type="password"
@@ -96,7 +109,9 @@
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-loci-black">Nieuw wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">
+              {{ translate('Nieuw wachtwoord', 'New password') }}
+            </label>
             <input
               v-model="passwordForm.password"
               type="password"
@@ -106,7 +121,9 @@
           </div>
 
           <div>
-            <label class="mb-1 block text-sm font-medium text-loci-black">Bevestig wachtwoord</label>
+            <label class="mb-1 block text-sm font-medium text-loci-black">
+              {{ translate('Bevestig wachtwoord', 'Confirm password') }}
+            </label>
             <input
               v-model="passwordForm.password_confirmation"
               type="password"
@@ -120,7 +137,7 @@
             :disabled="passwordSaving"
             class="w-full rounded-loci-full bg-loci-black py-3 font-semibold text-loci-white transition-all hover:bg-loci-black-deep disabled:bg-loci-gray-400 disabled:text-loci-gray-200"
           >
-            {{ passwordSaving ? 'Bijwerken...' : 'Wachtwoord wijzigen' }}
+            {{ passwordSaving ? translate('Bijwerken...', 'Updating...') : translate('Wachtwoord wijzigen', 'Update password') }}
           </button>
         </form>
       </section>
@@ -128,9 +145,11 @@
       <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 class="text-lg font-semibold text-loci-black">Wachtwoord vergeten</h3>
+            <h3 class="text-lg font-semibold text-loci-black">
+              {{ translate('Wachtwoord vergeten', 'Forgot password') }}
+            </h3>
             <p class="text-sm text-loci-gray-500">
-              Verstuur een resetlink naar je huidige emailadres. Deze link verloopt binnen 60 minuten.
+              {{ translate('Verstuur een resetlink naar je huidige emailadres. Deze link verloopt binnen 60 minuten.', 'Send a reset link to your current email address. The link expires after 60 minutes.') }}
             </p>
           </div>
           <div class="w-full md:w-auto">
@@ -140,7 +159,7 @@
               :disabled="forgotSending"
               class="w-full rounded-full border border-loci-gray-200 bg-loci-white px-4 py-2 font-semibold text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow hover:text-loci-black-deep disabled:bg-loci-gray-50 disabled:text-loci-gray-400 md:w-auto"
             >
-              {{ forgotSending ? 'Wordt verstuurd...' : 'Stuur resetlink' }}
+              {{ forgotSending ? translate('Wordt verstuurd...', 'Sending...') : translate('Stuur resetlink', 'Send reset link') }}
             </button>
           </div>
         </div>
@@ -152,13 +171,17 @@
       <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
         <div class="flex flex-col md:flex-row md:items-start md:justify-between mb-6">
           <div>
-            <h2 class="text-xl font-semibold text-loci-black">Git Configuratie</h2>
-            <p class="text-sm text-loci-gray-500">Stel de GitHub repo in voor de Sync to OS actie.</p>
+            <h2 class="text-xl font-semibold text-loci-black">
+              {{ translate('Git Configuratie', 'Git configuration') }}
+            </h2>
+            <p class="text-sm text-loci-gray-500">
+              {{ translate('Stel de GitHub repo in voor de Sync to OS actie.', 'Configure the GitHub repo for the Sync to OS action.') }}
+            </p>
           </div>
           <div class="text-sm text-loci-gray-500 mt-2 md:mt-0">
-            Laatst gesynchroniseerd:
+            {{ translate('Laatst gesynchroniseerd:', 'Last synced:') }}
             <span class="font-medium text-loci-black">
-              {{ gitConfig.last_pushed_at ? formatDateTime(gitConfig.last_pushed_at) : 'Nooit' }}
+              {{ gitConfig.last_pushed_at ? formatDateTime(gitConfig.last_pushed_at) : translate('Nooit', 'Never') }}
             </span>
           </div>
         </div>
@@ -177,7 +200,9 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-loci-black">Repository URL</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Repository URL', 'Repository URL') }}
+            </label>
             <input
               v-model="gitConfig.repo_url"
               type="text"
@@ -187,7 +212,9 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-loci-black">Branch</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Branch', 'Branch') }}
+            </label>
             <input
               v-model="gitConfig.branch"
               type="text"
@@ -197,14 +224,18 @@
           </div>
 
           <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-loci-black">Access Token</label>
+            <label class="block text-sm font-medium text-loci-black">
+              {{ translate('Access Token', 'Access token') }}
+            </label>
             <input
               v-model="gitConfig.access_token"
               type="password"
               class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
               placeholder="ghp_xxxxxxxxx"
             >
-            <p class="text-xs text-loci-gray-500 mt-1">Personal Access Token met repo permissions. Wordt versleuteld opgeslagen.</p>
+            <p class="text-xs text-loci-gray-500 mt-1">
+              {{ translate('Personal Access Token met repo permissions. Wordt versleuteld opgeslagen.', 'Personal Access Token with repo permissions. Stored encrypted.') }}
+            </p>
           </div>
         </div>
 
@@ -215,7 +246,7 @@
             :disabled="savingGitConfig || !gitConfig.repo_url || !gitConfig.branch"
             @click="saveGitConfig"
           >
-            {{ savingGitConfig ? 'Opslaan...' : 'Configuratie opslaan' }}
+            {{ savingGitConfig ? translate('Opslaan...', 'Saving...') : translate('Configuratie opslaan', 'Save configuration') }}
           </button>
           <button
             type="button"
@@ -223,7 +254,7 @@
             :disabled="syncing || !hasGitConfig"
             @click="syncToGit"
           >
-            {{ syncing ? 'Synchroniseren...' : 'Sync naar Git' }}
+            {{ syncing ? translate('Synchroniseren...', 'Syncing...') : translate('Sync naar Git', 'Sync to Git') }}
           </button>
         </div>
       </section>
@@ -240,6 +271,7 @@ definePageMeta({
 
 const authStore = useAuthStore();
 const api = useApi();
+const { translate, currentLanguage } = useTranslations();
 
 type GitConfigState = {
   repo_url: string;
@@ -286,7 +318,7 @@ async function handleProfileSave() {
     });
     profileSuccess.value = response.message;
   } catch (error: any) {
-    profileError.value = extractError(error) || 'Opslaan van profiel mislukt';
+    profileError.value = extractError(error) || translate('Opslaan van profiel mislukt', 'Failed to save profile');
   } finally {
     profileSaving.value = false;
   }
@@ -299,7 +331,7 @@ const resendError = ref('');
 
 async function handleResendVerification() {
   if (emailVerified.value) {
-    resendMessage.value = 'Je emailadres is al geverifieerd.';
+    resendMessage.value = translate('Je emailadres is al geverifieerd.', 'Your email address is already verified.');
     resendError.value = '';
     return;
   }
@@ -312,7 +344,7 @@ async function handleResendVerification() {
     const response = await authStore.resendVerification();
     resendMessage.value = response.message;
   } catch (error: any) {
-    resendError.value = extractError(error) || 'Verificatie email versturen mislukt';
+    resendError.value = extractError(error) || translate('Verificatie email versturen mislukt', 'Failed to send verification email');
   } finally {
     resendLoading.value = false;
   }
@@ -339,7 +371,7 @@ async function handlePasswordChange() {
     passwordForm.password = '';
     passwordForm.password_confirmation = '';
   } catch (error: any) {
-    passwordError.value = extractError(error) || 'Wijzigen van wachtwoord mislukt';
+    passwordError.value = extractError(error) || translate('Wijzigen van wachtwoord mislukt', 'Failed to change password');
   } finally {
     passwordSaving.value = false;
   }
@@ -351,7 +383,7 @@ const forgotError = ref('');
 
 async function handleForgotPassword() {
   if (!authStore.user?.email) {
-    forgotError.value = 'Geen emailadres gevonden voor dit account.';
+    forgotError.value = translate('Geen emailadres gevonden voor dit account.', 'No email address found for this account.');
     return;
   }
 
@@ -363,7 +395,7 @@ async function handleForgotPassword() {
     const response = await authStore.forgotPassword(authStore.user.email);
     forgotMessage.value = response.message;
   } catch (error: any) {
-    forgotError.value = extractError(error) || 'Resetlink versturen mislukt';
+    forgotError.value = extractError(error) || translate('Resetlink versturen mislukt', 'Failed to send reset link');
   } finally {
     forgotSending.value = false;
   }
@@ -438,9 +470,9 @@ async function saveGitConfig() {
     gitConfig.value.last_pushed_at = response.config.last_pushed_at || gitConfig.value.last_pushed_at;
     gitConfig.value.access_token = '';
 
-    gitStatus.value = { type: 'success', message: 'Configuratie opgeslagen' };
+    gitStatus.value = { type: 'success', message: translate('Configuratie opgeslagen', 'Configuration saved') };
   } catch (e: any) {
-    gitStatus.value = { type: 'error', message: extractError(e) || 'Opslaan mislukt' };
+    gitStatus.value = { type: 'error', message: extractError(e) || translate('Opslaan mislukt', 'Save failed') };
   } finally {
     savingGitConfig.value = false;
   }
@@ -448,21 +480,21 @@ async function saveGitConfig() {
 
 async function syncToGit() {
   if (!hasGitConfig.value) {
-    gitStatus.value = { type: 'error', message: 'Configureer eerst de git instellingen' };
+    gitStatus.value = { type: 'error', message: translate('Configureer eerst de git instellingen', 'Configure your Git settings first') };
     return;
   }
 
   try {
     syncing.value = true;
-    gitStatus.value = { type: 'info', message: 'Synchroniseren...' };
+    gitStatus.value = { type: 'info', message: translate('Synchroniseren...', 'Syncing...') };
     const response = await api.post<{ message: string; last_pushed_at: string | null }>('/kennisbank/push');
     gitConfig.value.last_pushed_at = response.last_pushed_at;
     gitStatus.value = {
       type: 'success',
-      message: response.message || 'Sync voltooid',
+      message: response.message || translate('Sync voltooid', 'Sync completed'),
     };
   } catch (e: any) {
-    gitStatus.value = { type: 'error', message: extractError(e) || 'Sync mislukt' };
+    gitStatus.value = { type: 'error', message: extractError(e) || translate('Sync mislukt', 'Sync failed') };
   } finally {
     syncing.value = false;
   }
@@ -470,6 +502,7 @@ async function syncToGit() {
 
 function formatDateTime(dateStr: string) {
   const date = new Date(dateStr);
-  return `${date.toLocaleDateString('nl-NL')} ${date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'nl-NL';
+  return `${date.toLocaleDateString(locale)} ${date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`;
 }
 </script>

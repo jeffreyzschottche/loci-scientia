@@ -2,17 +2,19 @@
   <KennisbankTabLayout>
     <div>
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-loci-black">Kennisbank Inzicht</h1>
+        <h1 class="text-2xl font-bold text-loci-black">
+          {{ translate('Kennisbank Inzicht', 'Knowledge base insights') }}
+        </h1>
       </div>
 
       <!-- Stats -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6">
-          <p class="text-sm text-loci-gray-500">Documenten</p>
+          <p class="text-sm text-loci-gray-500">{{ translate('Documenten', 'Documents') }}</p>
           <p class="text-3xl font-bold text-loci-black">{{ stats.total_documents }}</p>
         </div>
         <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6">
-          <p class="text-sm text-loci-gray-500">Secties</p>
+          <p class="text-sm text-loci-gray-500">{{ translate('Secties', 'Sections') }}</p>
           <p class="text-3xl font-bold text-loci-black">{{ stats.total_sections }}</p>
         </div>
         <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6">
@@ -20,7 +22,7 @@
           <p class="text-3xl font-bold text-loci-black">{{ stats.total_chunks }}</p>
         </div>
         <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6">
-          <p class="text-sm text-loci-gray-500">Woorden (est.)</p>
+          <p class="text-sm text-loci-gray-500">{{ translate('Woorden (est.)', 'Words (est.)') }}</p>
           <p class="text-3xl font-bold text-loci-black">{{ formatNumber(stats.estimated_words) }}</p>
         </div>
       </div>
@@ -29,16 +31,18 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100">
           <div class="px-6 py-4 border-b border-loci-gray-100">
-            <h2 class="text-lg font-medium text-loci-black">Categorieen</h2>
+            <h2 class="text-lg font-medium text-loci-black">
+              {{ translate('Categorieën', 'Categories') }}
+            </h2>
           </div>
           <div class="p-6">
             <div v-if="Object.keys(categories).length === 0" class="text-loci-gray-500">
-              Nog geen categorieen
+              {{ translate('Nog geen categorieën', 'No categories yet') }}
             </div>
             <div v-else class="space-y-3">
               <div v-for="(count, category) in categories" :key="category" class="flex justify-between">
                 <span class="text-loci-black">{{ category }}</span>
-                <span class="text-loci-gray-500">{{ count }} documenten</span>
+                <span class="text-loci-gray-500">{{ count }} {{ translate('documenten', 'documents') }}</span>
               </div>
             </div>
           </div>
@@ -46,11 +50,13 @@
 
         <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100">
           <div class="px-6 py-4 border-b border-loci-gray-100">
-            <h2 class="text-lg font-medium text-loci-black">Recent verwerkt</h2>
+            <h2 class="text-lg font-medium text-loci-black">
+              {{ translate('Recent verwerkt', 'Recently processed') }}
+            </h2>
           </div>
           <div class="divide-y divide-loci-gray-100">
             <div v-if="recentDocuments.length === 0" class="p-6 text-loci-gray-500">
-              Nog geen documenten
+              {{ translate('Nog geen documenten', 'No documents yet') }}
             </div>
             <div
               v-for="doc in recentDocuments"
@@ -73,6 +79,7 @@ definePageMeta({
 });
 
 const api = useApi();
+const { translate, currentLanguage } = useTranslations();
 
 const stats = ref({
   total_documents: 0,
@@ -111,6 +118,7 @@ function formatNumber(num: number) {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('nl-NL');
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'nl-NL';
+  return new Date(dateStr).toLocaleDateString(locale);
 }
 </script>

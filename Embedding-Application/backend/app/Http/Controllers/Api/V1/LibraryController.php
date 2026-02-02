@@ -29,9 +29,12 @@ class LibraryController extends Controller
             }, 'sections' => function ($q) {
                 $q->orderBy('order_index');
             }])
-            ->orderBy('position')
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->sortBy([
+                ['position', 'asc'],
+                ['created_at', 'desc'],
+            ])
+            ->values();
 
         $tree = $documents->map(fn ($doc) => $this->buildTreeNode($doc));
 

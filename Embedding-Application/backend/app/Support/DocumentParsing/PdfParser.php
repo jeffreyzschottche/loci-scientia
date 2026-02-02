@@ -2,8 +2,8 @@
 
 namespace App\Support\DocumentParsing;
 
-use Smalot\PdfParser\Parser as PdfTextParser;
 use Illuminate\Support\Str;
+use Smalot\PdfParser\Parser as PdfTextParser;
 
 class PdfParser implements DocumentParserInterface
 {
@@ -101,4 +101,6 @@ class PdfParser implements DocumentParserInterface
 
         return trim($text);
     }
+
+    // Image extraction intentionally removed; parser focuses on text only.
 }

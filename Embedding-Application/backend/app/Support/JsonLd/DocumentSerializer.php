@@ -48,6 +48,10 @@ class DocumentSerializer
             $jsonLd['url'] = $document->source_url;
         }
 
+        if ($document->language) {
+            $jsonLd['inLanguage'] = $document->language;
+        }
+
         // Add hierarchy info
         if ($document->parent_id) {
             $jsonLd['isPartOf'] = [
@@ -175,4 +179,5 @@ class DocumentSerializer
         }
         return $properties;
     }
+
 }

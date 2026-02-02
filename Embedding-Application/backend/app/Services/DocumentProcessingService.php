@@ -59,7 +59,9 @@ class DocumentProcessingService
                 ]),
             ]);
 
-            Log::info("Document processed successfully", ['document_id' => $document->id]);
+            Log::info("Document processed successfully", [
+                'document_id' => $document->id,
+            ]);
 
         } catch (\Throwable $e) {
             $this->handleError($document, $e);

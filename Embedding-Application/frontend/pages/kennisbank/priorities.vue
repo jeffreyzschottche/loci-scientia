@@ -3,9 +3,11 @@
     <div>
       <div class="flex justify-between items-center mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-loci-black">Prioriteitsmanager</h1>
+          <h1 class="text-2xl font-bold text-loci-black">
+            {{ translate('Prioriteitsmanager', 'Priority manager') }}
+          </h1>
           <p class="text-sm text-loci-gray-500 mt-1">
-            Bepaal de prioriteit van documenten per categorie. Sleep documenten of wijzig de nummers.
+            {{ translate('Bepaal de prioriteit van documenten per categorie. Sleep documenten of wijzig de nummers.', 'Set document priorities per category. Drag items or edit the numbers.') }}
           </p>
         </div>
       </div>
@@ -13,7 +15,7 @@
       <!-- Loading state -->
       <div v-if="isLoading" class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-loci-yellow mx-auto"></div>
-        <p class="mt-4 text-loci-gray-500">Laden...</p>
+        <p class="mt-4 text-loci-gray-500">{{ translate('Laden...', 'Loading...') }}</p>
       </div>
 
       <!-- Empty state -->
@@ -21,8 +23,10 @@
         <svg class="mx-auto h-12 w-12 text-loci-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-loci-black">Geen documenten</h3>
-        <p class="mt-1 text-sm text-loci-gray-500">Upload eerst documenten om prioriteiten te kunnen instellen.</p>
+        <h3 class="mt-2 text-sm font-medium text-loci-black">{{ translate('Geen documenten', 'No documents') }}</h3>
+        <p class="mt-1 text-sm text-loci-gray-500">
+          {{ translate('Upload eerst documenten om prioriteiten te kunnen instellen.', 'Upload documents before setting priorities.') }}
+        </p>
       </div>
 
       <!-- Category columns -->
@@ -34,7 +38,9 @@
         >
           <div class="px-4 py-3 border-b border-loci-gray-100 bg-loci-gray-50 rounded-t-loci-lg">
             <h2 class="font-medium text-loci-black">{{ category }}</h2>
-            <p class="text-sm text-loci-gray-500">{{ docs.length }} documenten</p>
+            <p class="text-sm text-loci-gray-500">
+              {{ docs.length }} {{ translate('documenten', 'documents') }}
+            </p>
           </div>
 
           <draggable
@@ -59,7 +65,8 @@
                 <div class="flex-1 min-w-0">
                   <p class="font-medium text-loci-black truncate">{{ element.title }}</p>
                   <p class="text-xs text-loci-gray-500">
-                    Huidige prioriteit: {{ element.priority || 'niet ingesteld' }}
+                    {{ translate('Huidige prioriteit', 'Current priority') }}:
+                    {{ element.priority || translate('niet ingesteld', 'not set') }}
                   </p>
                 </div>
 
@@ -93,7 +100,7 @@
       >
         <div v-if="hasChanges" class="fixed bottom-6 right-6 flex items-center gap-4">
           <span class="text-sm text-loci-gray-500 bg-loci-white px-3 py-2 rounded-full border border-loci-gray-100">
-            {{ pendingChanges.size }} wijzigingen
+            {{ pendingChanges.size }} {{ translate('wijzigingen', 'changes') }}
           </span>
           <button
             class="px-6 py-3 bg-loci-yellow text-loci-black-deep rounded-loci-full font-semibold shadow-lg hover:bg-loci-yellow-hover transition-all flex items-center gap-2 disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
@@ -104,7 +111,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>{{ isSaving ? 'Opslaan...' : 'Wijzigingen Opslaan' }}</span>
+            <span>{{ isSaving ? translate('Opslaan...', 'Saving...') : translate('Wijzigingen Opslaan', 'Save changes') }}</span>
           </button>
         </div>
       </Transition>
@@ -122,6 +129,7 @@ definePageMeta({
 
 const store = useKennisbankStore();
 const { priorityCategories, isLoading } = storeToRefs(store);
+const { translate } = useTranslations();
 
 const hasChanges = ref(false);
 const isSaving = ref(false);
@@ -172,7 +180,12 @@ async function saveAllChanges() {
 // Warn before leaving with unsaved changes
 onBeforeRouteLeave((to, from, next) => {
   if (hasChanges.value) {
-    const answer = window.confirm('Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vertrekken?');
+    const answer = window.confirm(
+      translate(
+        'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vertrekken?',
+        'You have unsaved changes. Are you sure you want to leave?',
+      ),
+    );
     if (!answer) {
       next(false);
       return;

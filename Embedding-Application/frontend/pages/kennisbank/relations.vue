@@ -3,9 +3,11 @@
     <div class="flex flex-col h-[calc(100vh-200px)]">
       <div class="flex justify-between items-center mb-4">
         <div>
-          <h1 class="text-2xl font-bold text-loci-black">Relatiemanager</h1>
+          <h1 class="text-2xl font-bold text-loci-black">
+            {{ translate('Relatiemanager', 'Relationship manager') }}
+          </h1>
           <p class="text-sm text-loci-gray-500 mt-1">
-            Beheer relaties tussen documenten. Klik op een verbinding om deze te verwijderen.
+            {{ translate('Beheer relaties tussen documenten. Klik op een verbinding om deze te verwijderen.', 'Manage relations between documents. Click a connection to remove it.') }}
           </p>
         </div>
         <button
@@ -15,7 +17,7 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
-          Nieuwe Relatie
+          {{ translate('Nieuwe Relatie', 'New relation') }}
         </button>
       </div>
 
@@ -23,7 +25,7 @@
       <div v-if="isLoading" class="flex-1 flex items-center justify-center bg-loci-white rounded-loci-lg border border-loci-gray-100">
         <div class="text-center">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-loci-yellow mx-auto"></div>
-          <p class="mt-4 text-loci-gray-500">Laden...</p>
+          <p class="mt-4 text-loci-gray-500">{{ translate('Laden...', 'Loading...') }}</p>
         </div>
       </div>
 
@@ -33,8 +35,10 @@
           <svg class="mx-auto h-12 w-12 text-loci-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 class="mt-2 text-sm font-medium text-loci-black">Geen documenten</h3>
-          <p class="mt-1 text-sm text-loci-gray-500">Upload eerst documenten om relaties te kunnen aanmaken.</p>
+          <h3 class="mt-2 text-sm font-medium text-loci-black">{{ translate('Geen documenten', 'No documents') }}</h3>
+          <p class="mt-1 text-sm text-loci-gray-500">
+            {{ translate('Upload eerst documenten om relaties te kunnen aanmaken.', 'Upload documents before creating relations.') }}
+          </p>
         </div>
       </div>
 
@@ -62,11 +66,13 @@
 
       <!-- Legend -->
       <div class="mt-4 p-4 bg-loci-white rounded-loci-lg border border-loci-gray-100">
-        <h3 class="text-sm font-medium text-loci-black mb-2">Legenda relatietypes</h3>
+        <h3 class="text-sm font-medium text-loci-black mb-2">
+          {{ translate('Legenda relatietypes', 'Relation type legend') }}
+        </h3>
         <div class="flex flex-wrap gap-4">
           <div v-for="(color, type) in edgeColors" :key="type" class="flex items-center gap-2">
             <div class="w-6 h-0.5" :style="{ backgroundColor: color }"></div>
-            <span class="text-xs text-loci-gray-500">{{ documentRelationTypes[type] || type }}</span>
+            <span class="text-xs text-loci-gray-500">{{ getRelationLabel(type) }}</span>
           </div>
         </div>
       </div>
@@ -76,7 +82,7 @@
     <KennisbankRelationModal
       v-if="showAddRelationModal"
       :documents="allDocuments"
-      :relation-types="documentRelationTypes"
+      :relation-types="translatedRelationTypes"
       @close="showAddRelationModal = false"
       @create="handleCreateRelation"
     />
@@ -84,22 +90,24 @@
     <!-- Delete Confirmation -->
     <div v-if="selectedEdge" class="fixed inset-0 bg-loci-black/50 flex items-center justify-center z-50">
       <div class="bg-loci-white rounded-loci-lg border border-loci-gray-100 p-6 max-w-sm">
-        <h3 class="text-lg font-semibold mb-2 text-loci-black">Relatie verwijderen?</h3>
+        <h3 class="text-lg font-semibold mb-2 text-loci-black">
+          {{ translate('Relatie verwijderen?', 'Remove relation?') }}
+        </h3>
         <p class="text-loci-gray-500 mb-4">
-          Weet je zeker dat je deze relatie wilt verwijderen?
+          {{ translate('Weet je zeker dat je deze relatie wilt verwijderen?', 'Are you sure you want to delete this relation?') }}
         </p>
         <div class="flex justify-end gap-3">
           <button
             class="px-4 py-2 rounded-full border border-loci-gray-200 text-loci-black font-semibold hover:bg-loci-gray-50 transition-all"
             @click="selectedEdge = null"
           >
-            Annuleren
+            {{ translate('Annuleren', 'Cancel') }}
           </button>
           <button
             class="px-4 py-2 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition-all"
             @click="handleDeleteRelation"
           >
-            Verwijderen
+            {{ translate('Verwijderen', 'Delete') }}
           </button>
         </div>
       </div>
@@ -127,6 +135,7 @@ definePageMeta({
 
 const store = useKennisbankStore();
 const { graphNodes, graphEdges, graphCategories, documentRelationTypes, isLoading } = storeToRefs(store);
+const { translate } = useTranslations();
 
 const showAddRelationModal = ref(false);
 const selectedEdge = ref<Edge | null>(null);
@@ -141,6 +150,23 @@ const edgeColors: Record<string, string> = {
   parent_of: '#f59e0b',     // amber
   related_to: '#6b7280',    // gray
 };
+
+const relationLabelMap: Record<string, { nl: string; en: string }> = {
+  references: { nl: 'Verwijst naar', en: 'References' },
+  extends: { nl: 'Breidt uit', en: 'Extends' },
+  contradicts: { nl: 'Tegenspreekt', en: 'Contradicts' },
+  supplements: { nl: 'Vult aan', en: 'Supplements' },
+  parent_of: { nl: 'Is ouder van', en: 'Parent of' },
+  related_to: { nl: 'Gerelateerd aan', en: 'Related to' },
+};
+
+const translatedRelationTypes = computed(() => {
+  const result: Record<string, string> = {};
+  Object.keys(documentRelationTypes.value).forEach((key) => {
+    result[key] = getRelationLabel(key);
+  });
+  return result;
+});
 
 // Convert graph data to Vue Flow format
 const nodes = computed<Node[]>(() => {
@@ -177,7 +203,7 @@ const edges = computed<Edge[]>(() => {
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    label: edge.label,
+    label: getRelationLabel(edge.relation_type),
     type: 'smoothstep',
     animated: edge.relation_type === 'contradicts',
     style: {
@@ -196,6 +222,15 @@ const edges = computed<Edge[]>(() => {
     },
   }));
 });
+
+function getRelationLabel(type: string) {
+  const mapping = relationLabelMap[type];
+  if (mapping) {
+    return translate(mapping.nl, mapping.en);
+  }
+  const fallback = documentRelationTypes.value[type] || type;
+  return translate(fallback, fallback);
+}
 
 function onEdgeClick(event: EdgeMouseEvent) {
   selectedEdge.value = event.edge;

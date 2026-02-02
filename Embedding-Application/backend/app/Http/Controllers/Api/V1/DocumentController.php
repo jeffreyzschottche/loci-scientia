@@ -59,6 +59,7 @@ class DocumentController extends Controller
             'category' => 'nullable|string|max:100',
             'version_tag' => 'nullable|string|max:50',
             'content_date' => 'nullable|date',
+            'language' => 'nullable|string|max:10',
             'description' => 'nullable|string|max:1000',
             'parent_id' => 'nullable|exists:documents,id',
         ]);
@@ -101,6 +102,7 @@ class DocumentController extends Controller
             'category' => $request->input('category'),
             'version_tag' => $request->input('version_tag'),
             'content_date' => $contentDate,
+            'language' => $request->input('language'),
             'description' => $request->input('description'),
             'filename' => $filename,
             'original_filename' => $file->getClientOriginalName(),
@@ -152,10 +154,11 @@ class DocumentController extends Controller
             'category' => 'nullable|string|max:100',
             'version_tag' => 'nullable|string|max:50',
             'content_date' => 'nullable|date',
+            'language' => 'nullable|string|max:10',
             'description' => 'nullable|string|max:1000',
         ]);
 
-        $updates = $request->only(['title', 'category', 'version_tag', 'description']);
+        $updates = $request->only(['title', 'category', 'version_tag', 'language', 'description']);
 
         if ($request->filled('content_date')) {
             $updates['content_date'] = Carbon::parse($request->input('content_date'))->toDateString();
