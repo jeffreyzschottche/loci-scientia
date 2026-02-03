@@ -909,6 +909,10 @@ TRANSLATIONS = {
         "nl": "401 Unauthorized: backend verwacht een Bearer token. Vraag een token op via /api/v1/signon en zet AITJE_BEARER_TOKEN in de omgeving.",
         "en": "401 Unauthorized: backend expects a Bearer token. Request a token via /api/v1/signon and set AITJE_BEARER_TOKEN in the environment.",
     },
+    "chat_error_tokens": {
+        "nl": "geschatte tokens: {estimated} / limiet: {max}",
+        "en": "estimated tokens: {estimated} / limit: {max}",
+    },
     "chat_empty_response": {
         "nl": "<leeg antwoord>",
         "en": "<empty response>",

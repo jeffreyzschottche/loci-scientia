@@ -1,4 +1,6 @@
 import logging
+import math
+import re
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -17,6 +19,7 @@ MAX_CONTEXT_ITEMS = 3
 MIN_CONTEXT_SCORE = 0.35
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
+_TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
 
 contacts_repo = ContactsRepository()
@@ -158,6 +161,30 @@ def build_augmented_prompt(
     return "\n".join(base_lines).strip()
 
 
+def prepare_prompt(
+    req: ChatRequest,
+    history: Optional[Sequence[ChatMessage]] = None,
+) -> tuple[str, list[str]]:
+    history_to_use = req.history if history is None else history
+    images = normalize_images(req.images)
+    final_prompt = build_augmented_prompt(
+        req.prompt,
+        history_to_use,
+        images_count=len(images),
+    )
+    return final_prompt, images
+
+
+def estimate_prompt_tokens(text: str) -> int:
+    if not text:
+        return 0
+    wordish = len(_TOKEN_PATTERN.findall(text))
+    char_est = math.ceil(len(text) / 4)
+    byte_est = math.ceil(len(text.encode("utf-8")) / 4)
+    # Heuristic: use the largest estimate to avoid undercounting.
+    return max(wordish, char_est, byte_est)
+
+
 def log_prompt(final_prompt: str) -> None:
     try:
         PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -271,14 +298,18 @@ def _fallback_response(original_prompt: str) -> str:
 async def handle_ask(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
+    final_prompt: Optional[str] = None,
+    images: Optional[Sequence[str]] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
-    images = normalize_images(req.images)
-    final_prompt = build_augmented_prompt(
-        req.prompt,
-        history_to_use,
-        images_count=len(images),
-    )
+    if images is None:
+        images = normalize_images(req.images)
+    if final_prompt is None:
+        final_prompt = build_augmented_prompt(
+            req.prompt,
+            history_to_use,
+            images_count=len(images),
+        )
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt, images=images)

@@ -26,9 +26,11 @@ from fastapi.staticfiles import StaticFiles
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import (
     build_augmented_prompt,
+    estimate_prompt_tokens,
     handle_ask,
     log_prompt,
     normalize_images,
+    prepare_prompt,
     summarize_history,
 )
 from .chat_history import ChatHistoryStore
@@ -210,6 +212,24 @@ def _format_prompt_for_history(prompt: str, images_count: int) -> str:
     if images_count > 0:
         return f"{clean}\n[Afbeeldingen: {images_count}]"
     return clean
+
+
+def _ensure_prompt_within_context(final_prompt: str) -> None:
+    max_context = settings.ollama_max_context.get(settings.ollama_model)
+    if not isinstance(max_context, int) or max_context <= 0:
+        return
+    estimated_tokens = estimate_prompt_tokens(final_prompt)
+    if estimated_tokens > max_context:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": (
+                    "Context limit reached. Start a new session or delete some context from this prompt."
+                ),
+                "estimated_tokens": estimated_tokens,
+                "max_context": max_context,
+            },
+        )
 
 
 async def _run_summary_cycle() -> None:
@@ -489,13 +509,19 @@ def api_signon(req: SignOnRequest):
 async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     _mark_prompt_activity()
     history = chat_history.get(record.token)
-    images = normalize_images(req.images)
+    final_prompt, images = prepare_prompt(req, history=history)
+    _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
         "user",
         _format_prompt_for_history(req.prompt, len(images)),
     )
-    response = await handle_ask(req, history=history)
+    response = await handle_ask(
+        req,
+        history=history,
+        final_prompt=final_prompt,
+        images=images,
+    )
     chat_history.append(record.token, "assistant", response.get("message", ""))
     return response
 
@@ -506,15 +532,23 @@ def api_ask_reset(record: TokenRecord = Depends(require_token)):
     return {"ok": True}
 
 
-async def sse_stream_generator(req: ChatRequest, history: list, history_key: str):
+async def sse_stream_generator(
+    req: ChatRequest,
+    history: list,
+    history_key: str,
+    final_prompt: Optional[str] = None,
+    images: Optional[list[str]] = None,
+):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
-    images = normalize_images(req.images)
-    final_prompt = build_augmented_prompt(
-        req.prompt,
-        history,
-        images_count=len(images),
-    )
+    if images is None:
+        images = normalize_images(req.images)
+    if final_prompt is None:
+        final_prompt = build_augmented_prompt(
+            req.prompt,
+            history,
+            images_count=len(images),
+        )
     log_prompt(final_prompt)
     assistant_chunks: list[str] = []
 
@@ -611,14 +645,21 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     """Stream SSE response with queue position and token-by-token LLM output."""
     _mark_prompt_activity()
     history = chat_history.get(record.token)
-    images = normalize_images(req.images)
+    final_prompt, images = prepare_prompt(req, history=history)
+    _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
         "user",
         _format_prompt_for_history(req.prompt, len(images)),
     )
     return StreamingResponse(
-        sse_stream_generator(req, history, record.token),
+        sse_stream_generator(
+            req,
+            history,
+            record.token,
+            final_prompt=final_prompt,
+            images=images,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
