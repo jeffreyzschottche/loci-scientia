@@ -75,12 +75,60 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-loci-black mb-2">
+            <label class="block text-sm font-medium text-loci-black">
               {{ translate('Categorie', 'Category') }}
             </label>
 
-            <!-- Toggle between existing and new -->
-            <div class="flex gap-4 mb-2">
+            <div class="mt-1">
+              <!-- Existing category dropdown with search -->
+              <div v-if="categoryMode === 'existing'" class="relative" data-category-dropdown>
+                <input
+                  v-model="categorySearch"
+                  type="text"
+                  class="block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+                  :placeholder="translate('Zoek of selecteer categorie...', 'Search or select category...')"
+                  @focus="showCategoryDropdown = true"
+                  @input="showCategoryDropdown = true"
+                >
+
+                <!-- Dropdown -->
+                <div
+                  v-if="showCategoryDropdown && filteredCategories.length > 0"
+                  class="absolute z-10 mt-1 w-full bg-loci-white border border-loci-gray-200 rounded-loci shadow-lg max-h-48 overflow-auto"
+                >
+                  <button
+                    v-for="cat in filteredCategories"
+                    :key="cat"
+                    type="button"
+                    class="w-full text-left px-4 py-2 hover:bg-loci-yellow/20 text-loci-black transition-colors"
+                    :class="{ 'bg-loci-yellow/10': metadata.category === cat }"
+                    @click="selectCategory(cat)"
+                  >
+                    {{ cat }}
+                  </button>
+                </div>
+
+                <!-- Selected category badge -->
+                <div v-if="metadata.category && categoryMode === 'existing'" class="mt-2">
+                  <span class="inline-flex items-center gap-2 px-3 py-1 bg-loci-yellow/20 rounded-full text-sm text-loci-black">
+                    {{ metadata.category }}
+                    <button type="button" class="hover:text-red-500" @click="clearCategory">×</button>
+                  </span>
+                </div>
+              </div>
+
+              <!-- New category input -->
+              <input
+                v-else
+                v-model="metadata.category"
+                type="text"
+                class="block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+                :placeholder="translate('Nieuwe categorie naam...', 'New category name...')"
+              >
+            </div>
+
+            <!-- Toggle between existing and new (below input) -->
+            <div class="flex gap-4 mt-3">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
                   v-model="categoryMode"
@@ -100,52 +148,6 @@
                 <span class="text-sm text-loci-black">{{ translate('Nieuwe categorie', 'New category') }}</span>
               </label>
             </div>
-
-            <!-- Existing category dropdown with search -->
-            <div v-if="categoryMode === 'existing'" class="relative" data-category-dropdown>
-              <input
-                v-model="categorySearch"
-                type="text"
-                class="block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-                :placeholder="translate('Zoek of selecteer categorie...', 'Search or select category...')"
-                @focus="showCategoryDropdown = true"
-                @input="showCategoryDropdown = true"
-              >
-
-              <!-- Dropdown -->
-              <div
-                v-if="showCategoryDropdown && filteredCategories.length > 0"
-                class="absolute z-10 mt-1 w-full bg-loci-white border border-loci-gray-200 rounded-loci shadow-lg max-h-48 overflow-auto"
-              >
-                <button
-                  v-for="cat in filteredCategories"
-                  :key="cat"
-                  type="button"
-                  class="w-full text-left px-4 py-2 hover:bg-loci-yellow/20 text-loci-black transition-colors"
-                  :class="{ 'bg-loci-yellow/10': metadata.category === cat }"
-                  @click="selectCategory(cat)"
-                >
-                  {{ cat }}
-                </button>
-              </div>
-
-              <!-- Selected category badge -->
-              <div v-if="metadata.category && categoryMode === 'existing'" class="mt-2">
-                <span class="inline-flex items-center gap-2 px-3 py-1 bg-loci-yellow/20 rounded-full text-sm text-loci-black">
-                  {{ metadata.category }}
-                  <button type="button" class="hover:text-red-500" @click="clearCategory">×</button>
-                </span>
-              </div>
-            </div>
-
-            <!-- New category input -->
-            <input
-              v-else
-              v-model="metadata.category"
-              type="text"
-              class="block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-              :placeholder="translate('Nieuwe categorie naam...', 'New category name...')"
-            >
           </div>
 
           <div>
