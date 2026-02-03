@@ -7,11 +7,12 @@ use RuntimeException;
 
 class CsvParser implements DocumentParserInterface
 {
+    use TextNormalizer;
+
     public function supports(string $mimeType): bool
     {
         return in_array($mimeType, [
             'text/csv',
-            'text/plain', // Sometimes CSV files are detected as plain text
             'application/csv',
             'application/vnd.ms-excel',
         ]);
@@ -133,7 +134,7 @@ class CsvParser implements DocumentParserInterface
                     'title' => 'Data',
                     'slug' => 'data',
                     'order_index' => 0,
-                    'text' => $text,
+                    'text' => $this->normalizeText($text),
                     'metadata' => ['row_count' => count($rows)],
                 ],
             ];
@@ -170,7 +171,7 @@ class CsvParser implements DocumentParserInterface
                     'title' => $groupName,
                     'slug' => Str::slug($groupName) ?: "groep-{$index}",
                     'order_index' => $index++,
-                    'text' => trim($text),
+                    'text' => $this->normalizeText($text),
                     'metadata' => ['row_count' => count($groupRows)],
                 ];
             }
@@ -187,7 +188,7 @@ class CsvParser implements DocumentParserInterface
                         'title' => $rowTitle,
                         'slug' => Str::slug($rowTitle) ?: "rij-{$index}",
                         'order_index' => $index,
-                        'text' => $content,
+                        'text' => $this->normalizeText($content),
                         'metadata' => ['row_data' => $row],
                     ];
                 }
@@ -198,7 +199,7 @@ class CsvParser implements DocumentParserInterface
                     'title' => 'Data',
                     'slug' => 'data',
                     'order_index' => 0,
-                    'text' => $text,
+                    'text' => $this->normalizeText($text),
                     'metadata' => ['row_count' => count($rows)],
                 ];
             }

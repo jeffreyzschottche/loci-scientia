@@ -7,6 +7,8 @@ use Smalot\PdfParser\Parser as PdfTextParser;
 
 class PdfParser implements DocumentParserInterface
 {
+    use TextNormalizer;
+
     public function __construct(
         private readonly PdfTextParser $parser
     ) {}
@@ -69,7 +71,7 @@ class PdfParser implements DocumentParserInterface
             $fullText .= $page->getText() . "\n\n";
         }
 
-        $fullText = $this->cleanText($fullText);
+        $fullText = $this->normalizeText($fullText);
 
         return [
             [
@@ -83,23 +85,6 @@ class PdfParser implements DocumentParserInterface
                 ],
             ],
         ];
-    }
-
-    /**
-     * Clean extracted text.
-     */
-    private function cleanText(string $text): string
-    {
-        // Remove excessive whitespace
-        $text = preg_replace('/\n{3,}/', "\n\n", $text);
-        $text = preg_replace('/[ \t]+/', ' ', $text);
-
-        // Trim lines
-        $lines = explode("\n", $text);
-        $lines = array_map('trim', $lines);
-        $text = implode("\n", $lines);
-
-        return trim($text);
     }
 
     // Image extraction intentionally removed; parser focuses on text only.

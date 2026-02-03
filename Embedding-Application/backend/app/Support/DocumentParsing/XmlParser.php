@@ -8,6 +8,8 @@ use SimpleXMLElement;
 
 class XmlParser implements DocumentParserInterface
 {
+    use TextNormalizer;
+
     public function supports(string $mimeType): bool
     {
         return in_array($mimeType, [
@@ -127,7 +129,8 @@ class XmlParser implements DocumentParserInterface
 
         $elements = $xml->xpath($sectionXPath);
 
-        foreach ($elements as $index => $element) {
+        $index = 0;
+        foreach ($elements as $element) {
             $sectionTitle = 'Sectie ' . ($index + 1);
             if ($titleXPath) {
                 $titleResult = $element->xpath($titleXPath);
@@ -150,9 +153,10 @@ class XmlParser implements DocumentParserInterface
                 'title' => $sectionTitle,
                 'slug' => Str::slug($sectionTitle) ?: "sectie-{$index}",
                 'order_index' => $index,
-                'text' => trim($content),
+                'text' => $this->normalizeText($content),
                 'metadata' => ['xpath' => $sectionXPath . '[' . ($index + 1) . ']'],
             ];
+            $index++;
         }
 
         // If no sections found, create one with all content
@@ -161,7 +165,7 @@ class XmlParser implements DocumentParserInterface
                 'title' => 'Inhoud',
                 'slug' => 'inhoud',
                 'order_index' => 0,
-                'text' => $this->elementToText($xml),
+                'text' => $this->normalizeText($this->elementToText($xml)),
                 'metadata' => [],
             ];
         }
@@ -187,15 +191,17 @@ class XmlParser implements DocumentParserInterface
 
         // If most children have the same name, treat each as a section
         if (count($uniqueNames) === 1 && count($children) > 1) {
-            foreach ($children as $index => $child) {
+            $index = 0;
+            foreach ($children as $child) {
                 $title = $this->extractTitle($child) ?? $child->getName() . ' ' . ($index + 1);
                 $sections[] = [
                     'title' => $title,
                     'slug' => Str::slug($title) ?: "{$child->getName()}-{$index}",
                     'order_index' => $index,
-                    'text' => $this->elementToText($child),
+                    'text' => $this->normalizeText($this->elementToText($child)),
                     'metadata' => ['element' => $child->getName()],
                 ];
+                $index++;
             }
         } else {
             // Treat each unique child as a section
@@ -206,7 +212,7 @@ class XmlParser implements DocumentParserInterface
                     'title' => $title,
                     'slug' => Str::slug($title) ?: $child->getName(),
                     'order_index' => $index++,
-                    'text' => $this->elementToText($child),
+                    'text' => $this->normalizeText($this->elementToText($child)),
                     'metadata' => ['element' => $child->getName()],
                 ];
             }
@@ -218,7 +224,7 @@ class XmlParser implements DocumentParserInterface
                 'title' => 'Inhoud',
                 'slug' => 'inhoud',
                 'order_index' => 0,
-                'text' => $this->elementToText($xml),
+                'text' => $this->normalizeText($this->elementToText($xml)),
                 'metadata' => [],
             ];
         }
@@ -260,7 +266,6 @@ class XmlParser implements DocumentParserInterface
     private function elementToText(SimpleXMLElement $element, int $depth = 0): string
     {
         $text = '';
-        $indent = str_repeat('  ', $depth);
 
         // Get direct text content
         $directText = trim((string) $element);
@@ -272,6 +277,16 @@ class XmlParser implements DocumentParserInterface
         foreach ($element->children() as $child) {
             $childName = $child->getName();
             $childText = trim((string) $child);
+            $attributes = $child->attributes();
+
+            // Check if this element has meaningful attributes (self-closing tags with data)
+            if ($attributes && count($attributes) > 0) {
+                $attrParts = [];
+                foreach ($attributes as $attrName => $attrValue) {
+                    $attrParts[] = "{$attrName}: {$attrValue}";
+                }
+                $text .= "{$childName}: " . implode(', ', $attrParts) . "\n";
+            }
 
             if ($childText && !$child->count()) {
                 // Leaf node with text

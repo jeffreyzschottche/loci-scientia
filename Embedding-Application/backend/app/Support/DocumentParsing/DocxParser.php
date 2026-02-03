@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 
 class DocxParser implements DocumentParserInterface
 {
+    use TextNormalizer;
+
     public function supports(string $mimeType): bool
     {
         return in_array($mimeType, [
@@ -80,7 +82,7 @@ class DocxParser implements DocumentParserInterface
                             'title' => $currentSection['title'],
                             'slug' => $currentSection['slug'],
                             'order_index' => $sectionIndex++,
-                            'text' => $this->cleanText($currentText),
+                            'text' => $this->normalizeText($currentText),
                             'metadata' => ['level' => $currentSection['level']],
                         ];
                     }
@@ -113,7 +115,7 @@ class DocxParser implements DocumentParserInterface
                 'title' => $currentSection['title'],
                 'slug' => $currentSection['slug'],
                 'order_index' => $sectionIndex,
-                'text' => $this->cleanText($currentText),
+                'text' => $this->normalizeText($currentText),
                 'metadata' => ['level' => $currentSection['level']],
             ];
         }
@@ -131,7 +133,7 @@ class DocxParser implements DocumentParserInterface
                 'title' => 'Inhoud',
                 'slug' => 'inhoud',
                 'order_index' => 0,
-                'text' => $this->cleanText($fullText),
+                'text' => $this->normalizeText($fullText),
                 'metadata' => [],
             ];
         }
@@ -207,21 +209,6 @@ class DocxParser implements DocumentParserInterface
             $text .= implode(' | ', $cells) . "\n";
         }
         return $text . "\n";
-    }
-
-    /**
-     * Clean extracted text.
-     */
-    private function cleanText(string $text): string
-    {
-        $text = preg_replace('/\n{3,}/', "\n\n", $text);
-        $text = preg_replace('/[ \t]+/', ' ', $text);
-
-        $lines = explode("\n", $text);
-        $lines = array_map('trim', $lines);
-        $text = implode("\n", $lines);
-
-        return trim($text);
     }
 
     // Image extraction intentionally removed; DOCX parser now focuses solely on text content.

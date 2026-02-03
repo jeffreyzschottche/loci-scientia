@@ -75,14 +75,76 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-loci-black">
+            <label class="block text-sm font-medium text-loci-black mb-2">
               {{ translate('Categorie', 'Category') }}
             </label>
+
+            <!-- Toggle between existing and new -->
+            <div class="flex gap-4 mb-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  v-model="categoryMode"
+                  type="radio"
+                  value="existing"
+                  class="text-loci-yellow focus:ring-loci-yellow"
+                >
+                <span class="text-sm text-loci-black">{{ translate('Bestaande categorie', 'Existing category') }}</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  v-model="categoryMode"
+                  type="radio"
+                  value="new"
+                  class="text-loci-yellow focus:ring-loci-yellow"
+                >
+                <span class="text-sm text-loci-black">{{ translate('Nieuwe categorie', 'New category') }}</span>
+              </label>
+            </div>
+
+            <!-- Existing category dropdown with search -->
+            <div v-if="categoryMode === 'existing'" class="relative" data-category-dropdown>
+              <input
+                v-model="categorySearch"
+                type="text"
+                class="block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+                :placeholder="translate('Zoek of selecteer categorie...', 'Search or select category...')"
+                @focus="showCategoryDropdown = true"
+                @input="showCategoryDropdown = true"
+              >
+
+              <!-- Dropdown -->
+              <div
+                v-if="showCategoryDropdown && filteredCategories.length > 0"
+                class="absolute z-10 mt-1 w-full bg-loci-white border border-loci-gray-200 rounded-loci shadow-lg max-h-48 overflow-auto"
+              >
+                <button
+                  v-for="cat in filteredCategories"
+                  :key="cat"
+                  type="button"
+                  class="w-full text-left px-4 py-2 hover:bg-loci-yellow/20 text-loci-black transition-colors"
+                  :class="{ 'bg-loci-yellow/10': metadata.category === cat }"
+                  @click="selectCategory(cat)"
+                >
+                  {{ cat }}
+                </button>
+              </div>
+
+              <!-- Selected category badge -->
+              <div v-if="metadata.category && categoryMode === 'existing'" class="mt-2">
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-loci-yellow/20 rounded-full text-sm text-loci-black">
+                  {{ metadata.category }}
+                  <button type="button" class="hover:text-red-500" @click="clearCategory">×</button>
+                </span>
+              </div>
+            </div>
+
+            <!-- New category input -->
             <input
+              v-else
               v-model="metadata.category"
               type="text"
-              class="mt-1 block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
-              :placeholder="translate('bijv. Handleidingen', 'e.g. Manuals')"
+              class="block w-full rounded-loci border border-loci-gray-300 bg-loci-cream px-4 py-3 text-loci-black focus:border-loci-yellow focus:outline-none"
+              :placeholder="translate('Nieuwe categorie naam...', 'New category name...')"
             >
           </div>
 
@@ -167,7 +229,57 @@ definePageMeta({
 
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
+const api = useApi();
 const { translate } = useTranslations();
+
+// Category selection
+const categoryMode = ref<'existing' | 'new'>('existing');
+const categorySearch = ref('');
+const showCategoryDropdown = ref(false);
+const existingCategories = ref<string[]>([]);
+
+const filteredCategories = computed(() => {
+  if (!categorySearch.value.trim()) {
+    return existingCategories.value;
+  }
+  const query = categorySearch.value.toLowerCase();
+  return existingCategories.value.filter(cat => cat.toLowerCase().includes(query));
+});
+
+function selectCategory(cat: string) {
+  metadata.value.category = cat;
+  categorySearch.value = cat;
+  showCategoryDropdown.value = false;
+}
+
+function clearCategory() {
+  metadata.value.category = '';
+  categorySearch.value = '';
+}
+
+// Close dropdown when clicking outside
+onMounted(async () => {
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('[data-category-dropdown]')) {
+      showCategoryDropdown.value = false;
+    }
+  });
+
+  // Load existing categories
+  try {
+    const response = await api.get<{ tree: any[] }>('/library/tree');
+    const categories = new Set<string>();
+    for (const doc of response.tree) {
+      if (doc.category) {
+        categories.add(doc.category);
+      }
+    }
+    existingCategories.value = Array.from(categories).sort();
+  } catch (e) {
+    console.error('Failed to load categories:', e);
+  }
+});
 
 type UploadMetadata = {
   title: string;
@@ -287,6 +399,8 @@ async function uploadAndProcess() {
     // Reset form
     selectedFile.value = null;
     metadata.value = defaultMetadata();
+    categorySearch.value = '';
+    categoryMode.value = 'existing';
 
   } catch (e: any) {
     status.value = { type: 'error', message: e.message || translate('Er is een fout opgetreden', 'Something went wrong') };

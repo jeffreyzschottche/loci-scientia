@@ -6,6 +6,8 @@ use Illuminate\Support\Str;
 
 class TextParser implements DocumentParserInterface
 {
+    use TextNormalizer;
+
     public function supports(string $mimeType): bool
     {
         return in_array($mimeType, ['text/plain', 'text/markdown']);
@@ -69,7 +71,7 @@ class TextParser implements DocumentParserInterface
                         'title' => $currentSection['title'],
                         'slug' => $currentSection['slug'],
                         'order_index' => $sectionIndex++,
-                        'text' => trim($currentContent),
+                        'text' => $this->normalizeText($currentContent),
                         'metadata' => ['level' => $currentSection['level']],
                     ];
                 }
@@ -102,7 +104,7 @@ class TextParser implements DocumentParserInterface
                 'title' => $currentSection['title'],
                 'slug' => $currentSection['slug'],
                 'order_index' => $sectionIndex,
-                'text' => trim($currentContent),
+                'text' => $this->normalizeText($currentContent),
                 'metadata' => ['level' => $currentSection['level']],
             ];
         }
@@ -113,7 +115,7 @@ class TextParser implements DocumentParserInterface
                 'title' => 'Inhoud',
                 'slug' => 'inhoud',
                 'order_index' => 0,
-                'text' => trim($text),
+                'text' => $this->normalizeText($text),
                 'metadata' => [],
             ];
         }
@@ -131,7 +133,7 @@ class TextParser implements DocumentParserInterface
                 'title' => 'Inhoud',
                 'slug' => 'inhoud',
                 'order_index' => 0,
-                'text' => trim($text),
+                'text' => $this->normalizeText($text),
                 'metadata' => [],
             ],
         ];
