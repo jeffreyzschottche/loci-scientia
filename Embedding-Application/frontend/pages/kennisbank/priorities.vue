@@ -117,6 +117,66 @@
       </Transition>
     </div>
   </KennisbankTabLayout>
+  <teleport to="body">
+    <div
+      v-if="showUnsavedModal"
+      class="fixed inset-0 z-50 flex items-center justify-center px-4"
+    >
+      <div
+        class="absolute inset-0 bg-loci-black/60"
+        aria-hidden="true"
+        @click="stayOnPage"
+      />
+
+      <div
+        class="relative w-full max-w-lg bg-loci-white border border-loci-gray-100 rounded-loci-lg shadow-2xl p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unsaved-modal-title"
+        aria-describedby="unsaved-modal-desc"
+        tabindex="-1"
+      >
+        <div class="flex items-start gap-4">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-loci-yellow text-loci-black text-xl font-semibold">
+            !
+          </div>
+          <div class="flex-1">
+            <h3 id="unsaved-modal-title" class="text-lg font-semibold text-loci-black">
+              {{ translate('Onopgeslagen wijzigingen', 'Unsaved changes') }}
+            </h3>
+            <p id="unsaved-modal-desc" class="mt-2 text-sm text-loci-gray-500">
+              {{ translate('Je hebt onopgeslagen wijzigingen. Wil je deze pagina verlaten zonder op te slaan?', 'You have unsaved changes. Leave this page without saving?') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="text-loci-gray-400 hover:text-loci-black"
+            :aria-label="translate('Sluiten', 'Close')"
+            @click="stayOnPage"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            class="px-5 py-2 rounded-loci-full border border-loci-gray-200 text-loci-gray-500 hover:text-loci-black hover:border-loci-gray-400 transition"
+            @click="stayOnPage"
+          >
+            {{ translate('Blijven', 'Stay') }}
+          </button>
+          <button
+            type="button"
+            class="px-5 py-2 rounded-loci-full bg-loci-black text-loci-white font-semibold hover:bg-loci-black-deep transition"
+            @click="leaveWithoutSaving"
+          >
+            {{ translate('Toch verlaten', 'Leave anyway') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>
 
 <script setup lang="ts">
@@ -127,6 +187,7 @@ definePageMeta({
   middleware: 'auth',
 });
 
+const router = useRouter();
 const store = useKennisbankStore();
 const { priorityCategories, isLoading } = storeToRefs(store);
 const { translate } = useTranslations();
@@ -134,6 +195,9 @@ const { translate } = useTranslations();
 const hasChanges = ref(false);
 const isSaving = ref(false);
 const pendingChanges = ref<Map<number, number>>(new Map());
+const showUnsavedModal = ref(false);
+const pendingRoutePath = ref<string | null>(null);
+const allowRouteLeave = ref(false);
 
 function handleDragEnd(category: string) {
   // Update priorities based on new order
@@ -179,24 +243,35 @@ async function saveAllChanges() {
 
 // Warn before leaving with unsaved changes
 onBeforeRouteLeave((to, from, next) => {
-  if (hasChanges.value) {
-    const answer = window.confirm(
-      translate(
-        'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vertrekken?',
-        'You have unsaved changes. Are you sure you want to leave?',
-      ),
-    );
-    if (!answer) {
-      next(false);
-      return;
-    }
+  if (!hasChanges.value || allowRouteLeave.value) {
+    allowRouteLeave.value = false;
+    next();
+    return;
   }
-  next();
+
+  pendingRoutePath.value = to.fullPath;
+  showUnsavedModal.value = true;
+  next(false);
 });
 
 onMounted(async () => {
   await store.fetchPriorities();
 });
+
+function stayOnPage() {
+  showUnsavedModal.value = false;
+  pendingRoutePath.value = null;
+}
+
+function leaveWithoutSaving() {
+  const destination = pendingRoutePath.value;
+  showUnsavedModal.value = false;
+  pendingRoutePath.value = null;
+
+  if (!destination) return;
+  allowRouteLeave.value = true;
+  router.push(destination);
+}
 </script>
 
 <style scoped>

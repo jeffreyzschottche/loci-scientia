@@ -77,7 +77,7 @@
                       class="text-red-400 hover:text-red-600 disabled:opacity-50 flex-shrink-0"
                       :title="translate('Verwijderen', 'Delete')"
                       :disabled="deletingId === doc.id"
-                      @click.stop="deleteFromLibrary(doc)"
+                      @click.stop="requestDelete(doc)"
                     >
                       <svg
                         v-if="deletingId !== doc.id"
@@ -134,6 +134,130 @@
       </div>
     </div>
   </KennisbankTabLayout>
+  <teleport to="body">
+    <div
+      v-if="deleteCandidate"
+      class="fixed inset-0 z-50 flex items-center justify-center px-4"
+    >
+      <div
+        class="absolute inset-0 bg-loci-black/60"
+        aria-hidden="true"
+        @click="cancelDelete"
+      />
+
+      <div
+        class="relative w-full max-w-md bg-loci-white border border-loci-gray-100 rounded-loci-lg shadow-2xl p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-confirm-title"
+        aria-describedby="delete-confirm-message"
+        tabindex="-1"
+      >
+        <div class="flex items-start gap-4">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-loci-yellow text-loci-black text-xl font-semibold">
+            ?
+          </div>
+          <div class="flex-1">
+            <h3 id="delete-confirm-title" class="text-lg font-semibold text-loci-black">
+              {{ translate('Verwijderen bevestigen', 'Confirm deletion') }}
+            </h3>
+            <p id="delete-confirm-message" class="mt-2 text-sm text-loci-gray-500">
+              {{ translate('Weet je zeker dat je dit document wilt verwijderen?', 'Are you sure you want to remove this document?') }}
+              <span class="mt-1 block font-medium text-loci-black">"{{ deleteCandidate.title }}"</span>
+            </p>
+            <p class="mt-4 text-xs text-loci-gray-400">
+              {{ translate('Deze actie kan niet ongedaan worden gemaakt.', 'This action cannot be undone.') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="text-loci-gray-400 hover:text-loci-black disabled:opacity-40"
+            :aria-label="translate('Sluiten', 'Close')"
+            :disabled="isDeleteInProgress"
+            @click="cancelDelete"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            class="px-5 py-2 rounded-loci-full border border-loci-gray-200 text-loci-gray-500 hover:text-loci-black hover:border-loci-gray-400 transition disabled:opacity-50"
+            :disabled="isDeleteInProgress"
+            @click="cancelDelete"
+          >
+            {{ translate('Annuleren', 'Cancel') }}
+          </button>
+          <button
+            type="button"
+            class="px-5 py-2 rounded-loci-full bg-loci-yellow text-loci-black font-semibold hover:bg-loci-yellow-hover transition disabled:opacity-50"
+            :disabled="isDeleteInProgress"
+            @click="deleteFromLibrary"
+          >
+            <span v-if="isDeleteInProgress">
+              {{ translate('Verwijderen...', 'Deleting...') }}
+            </span>
+            <span v-else>
+              {{ translate('Verwijderen', 'Delete') }}
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="deleteError"
+      class="fixed inset-0 z-50 flex items-center justify-center px-4"
+    >
+      <div
+        class="absolute inset-0 bg-loci-black/60"
+        aria-hidden="true"
+        @click="closeDeleteError"
+      />
+
+      <div
+        class="relative w-full max-w-md bg-loci-white border border-loci-gray-100 rounded-loci-lg shadow-2xl p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-error-title"
+        aria-describedby="delete-error-message"
+        tabindex="-1"
+      >
+        <div class="flex items-start gap-4">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-loci-yellow text-loci-black text-xl font-semibold">
+            !
+          </div>
+          <div class="flex-1">
+            <h3 id="delete-error-title" class="text-lg font-semibold text-loci-black">
+              {{ deleteError.title }}
+            </h3>
+            <p id="delete-error-message" class="mt-2 text-sm text-loci-gray-500">
+              {{ deleteError.message }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="text-loci-gray-400 hover:text-loci-black"
+            :aria-label="translate('Sluiten', 'Close')"
+            @click="closeDeleteError"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button
+            type="button"
+            class="px-5 py-2 rounded-loci-full bg-loci-black text-loci-white hover:bg-loci-black-deep transition"
+            @click="closeDeleteError"
+          >
+            {{ translate('Begrepen', 'Got it') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>
 
 <script setup lang="ts">
@@ -152,6 +276,8 @@ const selectedId = ref<number | null>(null);
 const selectedDocument = ref<any | null>(null);
 const deletingId = ref<number | null>(null);
 const expandedCategories = ref<Set<string>>(new Set());
+const deleteError = ref<{ title: string; message: string } | null>(null);
+const deleteCandidate = ref<any | null>(null);
 
 type CategoryGroup = {
   name: string;
@@ -190,6 +316,11 @@ const filteredCategories = computed<CategoryGroup[]>(() => {
       ),
     }))
     .filter((category) => category.documents.length > 0);
+});
+
+const isDeleteInProgress = computed(() => {
+  if (!deleteCandidate.value) return false;
+  return deletingId.value === deleteCandidate.value.id;
 });
 
 function toggleCategory(categoryName: string) {
@@ -231,17 +362,22 @@ async function selectDocument(node: any) {
   }
 }
 
-async function deleteFromLibrary(node: any) {
+function requestDelete(node: any) {
   if (deletingId.value) return;
+  deleteCandidate.value = node;
+}
 
-  const confirmed = confirm(
-    translate(
-      `Weet je zeker dat je "${node.title}" wilt verwijderen uit de kennisbank?`,
-      `Are you sure you want to remove "${node.title}" from the knowledge base?`,
-    ),
-  );
-  if (!confirmed) return;
+function cancelDelete() {
+  if (isDeleteInProgress.value) return;
+  deleteCandidate.value = null;
+}
 
+async function deleteFromLibrary() {
+  if (!deleteCandidate.value || isDeleteInProgress.value) {
+    return;
+  }
+
+  const node = deleteCandidate.value;
   deletingId.value = node.id;
 
   try {
@@ -254,9 +390,26 @@ async function deleteFromLibrary(node: any) {
 
     await loadTree();
   } catch (e: any) {
-    alert(e.message || translate('Verwijderen mislukt', 'Delete failed'));
+    showDeleteError(typeof e?.message === 'string' ? e.message : undefined);
   } finally {
+    deleteCandidate.value = null;
     deletingId.value = null;
   }
+}
+
+function showDeleteError(message?: string) {
+  deleteError.value = {
+    title: translate('Verwijderen mislukt', 'Delete failed'),
+    message:
+      (message && message.trim()) ||
+      translate(
+        'Er ging iets mis bij het verwijderen. Probeer het later opnieuw.',
+        'Something went wrong while deleting. Please try again later.',
+      ),
+  };
+}
+
+function closeDeleteError() {
+  deleteError.value = null;
 }
 </script>
