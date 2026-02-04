@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia';
 import type { User } from '~/types/User';
-import type { LoginResponse, RegisterResponse, MessageResponse } from '~/types/ApiResponse';
+import type {
+  LoginResponse,
+  RegisterResponse,
+  MessageResponse,
+  ProfileResponse,
+} from '~/types/ApiResponse';
+import type { ProfileUpdatePayload, ChangePasswordPayload } from '~/types/Account';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null);
@@ -87,6 +93,25 @@ export const useAuthStore = defineStore('auth', () => {
     return await api.post<MessageResponse>('/email/resend');
   }
 
+  async function updateProfile(data: ProfileUpdatePayload) {
+    const api = useApi();
+    const response = await api.patch<ProfileResponse>('/profile', data);
+    user.value = response.user;
+    if (import.meta.client) {
+      localStorage.setItem('auth_user', JSON.stringify(response.user));
+    }
+    return response;
+  }
+
+  async function changePassword(data: ChangePasswordPayload) {
+    const api = useApi();
+    return await api.patch<MessageResponse>('/password', {
+      current_password: data.current_password,
+      password: data.password,
+      password_confirmation: data.password_confirmation,
+    });
+  }
+
   return {
     token,
     user,
@@ -100,5 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
     resetPassword,
     resendVerification,
     isPremium,
+    updateProfile,
+    changePassword,
   };
 });

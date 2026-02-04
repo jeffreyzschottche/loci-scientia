@@ -1,31 +1,31 @@
 <template>
   <div class="mx-auto max-w-7xl px-4 py-12">
-    <div class="rounded-lg bg-white p-6 shadow">
-      <h1 class="mb-4 text-3xl font-bold">Dashboard</h1>
+    <div class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-6">
+      <h1 class="mb-4 text-3xl font-bold text-loci-black">Dashboard</h1>
 
       <div v-if="authStore.user" class="space-y-4">
         <div>
-          <p class="text-gray-600">Welcome back,</p>
-          <p class="text-xl font-semibold">{{ authStore.user.name }}</p>
+          <p class="text-loci-gray-500">Welkom terug,</p>
+          <p class="text-xl font-semibold text-loci-black">{{ authStore.user.name }}</p>
         </div>
 
         <div>
-          <p class="text-sm text-gray-600">Email</p>
-          <p>{{ authStore.user.email }}</p>
+          <p class="text-sm text-loci-gray-500">Email</p>
+          <p class="text-loci-black">{{ authStore.user.email }}</p>
         </div>
 
-        <div v-if="!authStore.user.email_verified_at" class="border-l-4 border-yellow-400 bg-yellow-50 p-4">
+        <div v-if="!authStore.user.email_verified_at" class="rounded-loci border border-loci-yellow bg-loci-yellow/10 p-4">
           <div class="flex items-center justify-between">
             <div>
-              <p class="font-medium text-yellow-800">Please verify your email</p>
-              <p class="text-sm text-yellow-700">Check your inbox for a verification link</p>
+              <p class="font-medium text-loci-black">Verifieer je email</p>
+              <p class="text-sm text-loci-gray-500">Controleer je inbox voor een verificatielink</p>
             </div>
             <button
               @click="resendVerification"
               :disabled="resending"
-              class="rounded bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700 disabled:opacity-50"
+              class="rounded-full bg-loci-yellow px-4 py-2 font-semibold text-loci-black-deep transition-all hover:bg-loci-yellow-hover disabled:bg-loci-yellow-light disabled:text-loci-gray-400"
             >
-              {{ resending ? 'Sending...' : 'Resend' }}
+              {{ resending ? 'Verzenden...' : 'Opnieuw versturen' }}
             </button>
           </div>
           <p v-if="resendMessage" class="mt-2 text-sm text-green-700">{{ resendMessage }}</p>
@@ -39,7 +39,7 @@
               clip-rule="evenodd"
             />
           </svg>
-          <span>Email verified</span>
+          <span>Email geverifieerd</span>
         </div>
       </div>
     </div>

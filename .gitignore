@@ -27,3 +27,7 @@ promptlog.log
 
 ollama.pid
 support_access.json
+
+kennisbank_repo/
+kennisbank_cache.db
+kennis_chunk_hashes.json

@@ -29,7 +29,7 @@
         </div>
 
         <div class="flex items-center justify-between">
-          <NuxtLink to="/forgot-password" class="text-sm text-blue-600 hover:underline">
+          <NuxtLink to="/account/forgot-password" class="text-sm text-blue-600 hover:underline">
             Forgot password?
           </NuxtLink>
         </div>
@@ -77,7 +77,7 @@ async function handleLogin() {
 
   try {
     await authStore.login(form.email, form.password);
-    const redirect = (route.query.redirect as string) || '/dashboard';
+    const redirect = (route.query.redirect as string) || '/kennisbank';
     router.push(redirect);
   } catch (err: any) {
     if (err.data?.errors) {

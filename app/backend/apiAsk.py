@@ -7,6 +7,7 @@ import httpx
 
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
+from .knowledge_repository import KnowledgeRepository
 from .schemas import ChatMessage, ChatRequest, Contact, Device
 from .settings import settings
 from .translations import t, get_current_language
@@ -14,13 +15,14 @@ from .translations import t, get_current_language
 logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_ITEMS = 3
-MIN_CONTEXT_SCORE = 0.35
+MIN_CONTEXT_SCORE = 0.25
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 
 
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
+knowledge_repo = KnowledgeRepository()
 
 
 def describe_contact(contact: Contact) -> str:
@@ -85,6 +87,17 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
                 float(score or 0.0),
             )
         )
+
+    knowledge_hits = knowledge_repo.search_chunks(prompt_text, limit=5)
+    for payload, score in knowledge_hits:
+        text = _flatten_multiline(str(payload.get("text") or ""))
+        if not text:
+            continue
+        title = payload.get("document_title") or payload.get("doc_id") or "doc"
+        prefix = f"{title}"
+        snippet = text[:240] + ("…" if len(text) > 240 else "")
+        desc = f"{prefix}: {snippet}"
+        scored.append(("knowledge", desc, float(score or 0.0)))
 
     if not scored:
         return []
