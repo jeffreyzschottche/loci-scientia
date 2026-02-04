@@ -1,8 +1,10 @@
 import logging
+import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 import httpx
 
 from .contacts_repo import ContactsRepository
@@ -16,8 +18,122 @@ logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_ITEMS = 3
 MIN_CONTEXT_SCORE = 0.25
+KNOWLEDGE_SNIPPET_LENGTH = 600  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
+API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
+
+
+@dataclass
+class ApiLogEntry:
+    """Structured log entry for API conversations."""
+    conversation_id: str
+    request_id: str
+    timestamp: str
+    source: str  # "local" or "api"
+    endpoint: str  # "/api/v1/ask" or "/api/v1/ask/stream"
+    user_name: Optional[str] = None
+    device_id: Optional[str] = None
+    token_prefix: Optional[str] = None
+    original_prompt: str = ""
+    new_chat: bool = False  # True if this request cleared the history
+    history_length: int = 0
+    images_count: int = 0
+    context_contacts: List[Dict[str, Any]] = field(default_factory=list)
+    context_devices: List[Dict[str, Any]] = field(default_factory=list)
+    context_knowledge: List[Dict[str, Any]] = field(default_factory=list)
+    final_prompt_length: int = 0
+    response_preview: str = ""
+    error: Optional[str] = None
+
+
+def generate_request_id() -> str:
+    """Generate a unique request ID."""
+    return str(uuid.uuid4())[:8]
+
+
+def generate_conversation_id(token: str) -> str:
+    """Generate a conversation ID based on token (first 8 chars of hash)."""
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()[:8]
+
+
+def log_api_request(entry: ApiLogEntry) -> None:
+    """Write structured API log entry to apiprompt.log."""
+    try:
+        API_PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+        separator = "=" * 80
+        new_chat_marker = " [NEW CHAT]" if entry.new_chat else ""
+        lines = [
+            separator,
+            f"[{entry.timestamp}]{new_chat_marker}",
+            f"Conversation ID: {entry.conversation_id}",
+            f"Request ID:      {entry.request_id}",
+            f"Source:          {entry.source}",
+            f"Endpoint:        {entry.endpoint}",
+            f"User:            {entry.user_name or 'unknown'}",
+            f"Device ID:       {entry.device_id or 'unknown'}",
+            f"Token:           {entry.token_prefix or 'unknown'}...",
+            f"New Chat:        {entry.new_chat}",
+            "",
+            f"--- Original Prompt ({len(entry.original_prompt)} chars) ---",
+            entry.original_prompt[:500] + ("..." if len(entry.original_prompt) > 500 else ""),
+            "",
+            f"History messages: {entry.history_length}",
+            f"Images attached:  {entry.images_count}",
+            "",
+            "--- Context Found ---",
+            f"Contacts ({len(entry.context_contacts)}):",
+        ]
+
+        if entry.context_contacts:
+            for c in entry.context_contacts:
+                lines.append(f"  - {c.get('name', '?')} (score: {c.get('score', 0):.3f})")
+        else:
+            lines.append("  (none)")
+
+        lines.append(f"Devices ({len(entry.context_devices)}):")
+        if entry.context_devices:
+            for d in entry.context_devices:
+                lines.append(f"  - {d.get('user_name', '?')} / {d.get('device_name', '?')} (score: {d.get('score', 0):.3f})")
+        else:
+            lines.append("  (none)")
+
+        lines.append(f"Knowledge ({len(entry.context_knowledge)}):")
+        if entry.context_knowledge:
+            for k in entry.context_knowledge:
+                lines.append(f"  - [{k.get('doc_id', '?')}] {k.get('title', '?')} (score: {k.get('score', 0):.3f})")
+                lines.append(f"    {k.get('snippet', '')}")
+        else:
+            lines.append("  (none)")
+
+        lines.extend([
+            "",
+            f"Final prompt length: {entry.final_prompt_length} chars",
+        ])
+
+        if entry.response_preview:
+            lines.extend([
+                "",
+                "--- Response Preview ---",
+                entry.response_preview[:300] + ("..." if len(entry.response_preview) > 300 else ""),
+            ])
+
+        if entry.error:
+            lines.extend([
+                "",
+                f"--- ERROR ---",
+                entry.error,
+            ])
+
+        lines.append("")
+
+        with API_PROMPT_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+
+    except OSError as exc:
+        logger.warning("Kon API log niet schrijven: %s", exc)
 
 
 contacts_repo = ContactsRepository()
@@ -95,7 +211,7 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
             continue
         title = payload.get("document_title") or payload.get("doc_id") or "doc"
         prefix = f"{title}"
-        snippet = text[:240] + ("…" if len(text) > 240 else "")
+        snippet = text[:KNOWLEDGE_SNIPPET_LENGTH] + ("…" if len(text) > KNOWLEDGE_SNIPPET_LENGTH else "")
         desc = f"{prefix}: {snippet}"
         scored.append(("knowledge", desc, float(score or 0.0)))
 
@@ -111,6 +227,77 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
     for idx, (kind, desc, score) in enumerate(limited, 1):
         lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
     return lines
+
+
+def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str, List]]:
+    """Gather context lines AND detailed info for logging."""
+    scored: list[tuple[str, str, float]] = []
+    details: Dict[str, List] = {
+        "contacts": [],
+        "devices": [],
+        "knowledge": [],
+    }
+
+    contact_hits = contacts_repo.search_contacts(prompt_text, limit=5)
+    if not contact_hits and hasattr(contacts_repo, "keyword_search_contacts"):
+        contact_hits = contacts_repo.keyword_search_contacts(prompt_text, limit=5)
+    for contact, score in contact_hits:
+        scored.append(
+            (
+                "contact",
+                _flatten_multiline(describe_contact(contact)),
+                float(score or 0.0),
+            )
+        )
+        details["contacts"].append({
+            "name": contact.name,
+            "score": float(score or 0.0),
+        })
+
+    device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    for device, score in device_hits:
+        scored.append(
+            (
+                "device",
+                _flatten_multiline(describe_device(device)),
+                float(score or 0.0),
+            )
+        )
+        details["devices"].append({
+            "user_name": device.user_name,
+            "device_name": device.device_name,
+            "score": float(score or 0.0),
+        })
+
+    knowledge_hits = knowledge_repo.search_chunks(prompt_text, limit=5)
+    for payload, score in knowledge_hits:
+        text = _flatten_multiline(str(payload.get("text") or ""))
+        if not text:
+            continue
+        title = payload.get("document_title") or payload.get("doc_id") or "doc"
+        prefix = f"{title}"
+        snippet = text[:KNOWLEDGE_SNIPPET_LENGTH] + ("..." if len(text) > KNOWLEDGE_SNIPPET_LENGTH else "")
+        desc = f"{prefix}: {snippet}"
+        scored.append(("knowledge", desc, float(score or 0.0)))
+        details["knowledge"].append({
+            "doc_id": payload.get("doc_id"),
+            "title": title,
+            "score": float(score or 0.0),
+            "snippet": text[:100] + ("..." if len(text) > 100 else ""),
+        })
+
+    if not scored:
+        return [], details
+
+    scored.sort(key=lambda item: item[2], reverse=True)
+    best_score = scored[0][2]
+    threshold = max(MIN_CONTEXT_SCORE, best_score * 0.7)
+    filtered = [item for item in scored if item[2] >= threshold]
+    limited = filtered[:MAX_CONTEXT_ITEMS]
+    lines: list[str] = []
+    for idx, (kind, desc, score) in enumerate(limited, 1):
+        lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
+    return lines, details
 
 
 def _prompt_template() -> str:
@@ -169,6 +356,37 @@ def build_augmented_prompt(
         base_lines.append("")
         base_lines.append(template)
     return "\n".join(base_lines).strip()
+
+
+def build_augmented_prompt_with_details(
+    user_prompt: str,
+    history: Optional[Sequence[ChatMessage]] = None,
+    images_count: int = 0,
+) -> tuple[str, Dict[str, List]]:
+    """Build augmented prompt AND return context details for logging."""
+    base_lines: list[str] = []
+
+    history_lines = _format_history_lines(history)
+    if history_lines:
+        base_lines.append(t("previous_chat"))
+        base_lines.extend(history_lines)
+        base_lines.append("")
+
+    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
+    if images_count > 0:
+        base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
+
+    context_lines, context_details = _gather_context_with_details(user_prompt)
+    if context_lines:
+        base_lines.append("> context:")
+        base_lines.extend(context_lines)
+
+    template = _prompt_template()
+    if template:
+        base_lines.append("")
+        base_lines.append(template)
+
+    return "\n".join(base_lines).strip(), context_details
 
 
 def log_prompt(final_prompt: str) -> None:
