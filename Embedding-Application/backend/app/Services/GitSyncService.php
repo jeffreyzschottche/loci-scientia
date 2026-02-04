@@ -35,6 +35,7 @@ class GitSyncService
         $repoPath = $this->repoPathFor($user->id, $config->repo_url);
 
         $this->ensureRepoCloned($config, $repoPath);
+        $this->ensureRepoIdentity($repoPath);
 
         $documents = $this->fetchDocuments($user);
         $this->exportStructuredFiles($documents, $repoPath);
@@ -144,6 +145,20 @@ class GitSyncService
         }
 
         return true;
+    }
+
+    private function ensureRepoIdentity(string $repoPath): void
+    {
+        $email = config('knowledgebase.user.email') ?: 'kennisbank@localhost';
+        $name = 'Kennisbank Sync';
+
+        Process::path($repoPath)->run(
+            sprintf('git config user.name %s', escapeshellarg($name))
+        );
+
+        Process::path($repoPath)->run(
+            sprintf('git config user.email %s', escapeshellarg($email))
+        );
     }
 
     private function authenticatedUrl(GitConfiguration $config): string
