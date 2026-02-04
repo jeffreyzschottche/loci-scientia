@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_ITEMS = 3
 MIN_CONTEXT_SCORE = 0.25
-KNOWLEDGE_SNIPPET_LENGTH = 600  # Characters to include from each knowledge chunk
+KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
