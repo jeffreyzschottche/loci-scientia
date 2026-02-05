@@ -29,6 +29,7 @@ from .apiAsk import (
     estimate_prompt_tokens,
     handle_ask,
     log_prompt,
+    merge_history_images,
     normalize_images,
     prepare_prompt,
     summarize_history,
@@ -509,12 +510,13 @@ def api_signon(req: SignOnRequest):
 async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     _mark_prompt_activity()
     history = chat_history.get(record.token)
-    final_prompt, images = prepare_prompt(req, history=history)
+    final_prompt, images, current_images = prepare_prompt(req, history=history)
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
         "user",
-        _format_prompt_for_history(req.prompt, len(images)),
+        _format_prompt_for_history(req.prompt, len(current_images)),
+        images=current_images,
     )
     response = await handle_ask(
         req,
@@ -542,7 +544,8 @@ async def sse_stream_generator(
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
     if images is None:
-        images = normalize_images(req.images)
+        current_images = normalize_images(req.images)
+        images = merge_history_images(history, current_images)
     if final_prompt is None:
         final_prompt = build_augmented_prompt(
             req.prompt,
@@ -645,12 +648,13 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     """Stream SSE response with queue position and token-by-token LLM output."""
     _mark_prompt_activity()
     history = chat_history.get(record.token)
-    final_prompt, images = prepare_prompt(req, history=history)
+    final_prompt, images, current_images = prepare_prompt(req, history=history)
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
         "user",
-        _format_prompt_for_history(req.prompt, len(images)),
+        _format_prompt_for_history(req.prompt, len(current_images)),
+        images=current_images,
     )
     return StreamingResponse(
         sse_stream_generator(

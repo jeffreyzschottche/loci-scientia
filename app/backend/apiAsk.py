@@ -128,10 +128,17 @@ def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]
         else:
             speaker = t("speaker_user")
         content = _flatten_multiline(message.content or "")
+        images_count = len(getattr(message, "images", []) or [])
+        if images_count > 0:
+            marker = f"[Afbeeldingen: {images_count}]"
+            if marker not in content:
+                content = f"{content}\n{marker}" if content else marker
         if not content:
             continue
         lines.append(f"{idx}. {speaker}: {content}")
     return lines
+
+
 
 
 def build_augmented_prompt(
@@ -164,15 +171,16 @@ def build_augmented_prompt(
 def prepare_prompt(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
-) -> tuple[str, list[str]]:
+) -> tuple[str, list[str], list[str]]:
     history_to_use = req.history if history is None else history
-    images = normalize_images(req.images)
+    current_images = normalize_images(req.images)
+    images = merge_history_images(history_to_use, current_images)
     final_prompt = build_augmented_prompt(
         req.prompt,
         history_to_use,
         images_count=len(images),
     )
-    return final_prompt, images
+    return final_prompt, images, current_images
 
 
 def estimate_prompt_tokens(text: str) -> int:
@@ -258,6 +266,18 @@ def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
     return normalized
 
 
+def merge_history_images(
+    history: Optional[Sequence[ChatMessage]],
+    current_images: Sequence[str],
+) -> list[str]:
+    merged: list[str] = []
+    if history:
+        for message in history:
+            merged.extend(normalize_images(getattr(message, "images", None)))
+    merged.extend(current_images)
+    return merged
+
+
 async def _call_ollama(
     prompt: str,
     options: Optional[dict] = None,
@@ -303,7 +323,8 @@ async def handle_ask(
 ) -> dict:
     history_to_use = req.history if history is None else history
     if images is None:
-        images = normalize_images(req.images)
+        current_images = normalize_images(req.images)
+        images = merge_history_images(history_to_use, current_images)
     if final_prompt is None:
         final_prompt = build_augmented_prompt(
             req.prompt,
