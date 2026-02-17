@@ -52,7 +52,7 @@ class Settings(BaseModel):
     ollama_models: list[str] = ["gemma3:4b"]
     ollama_kv_cache_type: Optional[str] = None
     ollama_max_context: dict[str, Optional[int]] = Field(default_factory=dict)
-    ollama_timeout: float = 60.0
+    ollama_timeout: float = 180.0
     admin_usernames: list[str] = ["ADMIN"]
     chat_summary_idle_minutes: int = 0
 
@@ -83,9 +83,9 @@ def get_settings() -> "Settings":
         raw_context.insert(0, "")
     ollama_max_context = _map_max_context(ollama_models, raw_context)
     try:
-        ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "60"))
+        ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "180"))
     except ValueError:
-        ollama_timeout = 60.0
+        ollama_timeout = 180.0
     raw_admins = os.environ.get("ADMIN_USERS", "ADMIN")
     admin_usernames = [name.strip() for name in raw_admins.split(",") if name.strip()]
     raw_idle_summary = os.environ.get("CHAT_SUMMARY_IDLE_MINUTES", "").strip()

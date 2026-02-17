@@ -499,6 +499,17 @@ def _fallback_response(original_prompt: str) -> str:
     )
 
 
+def _fallback_timeout_response(original_prompt: str) -> str:
+    timeout_seconds = f"{settings.ollama_timeout:g}"
+    return (
+        "[Ollama reageert te langzaam] "
+        f"Geen antwoord ontvangen binnen {timeout_seconds}s van "
+        f"{settings.ollama_base_url} met model '{settings.ollama_model}'. "
+        f"Je vroeg: '{original_prompt}'. "
+        "Dit gebeurt vaak bij een koude start of het laden van een groot model; probeer het opnieuw."
+    )
+
+
 async def handle_ask(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
@@ -513,9 +524,26 @@ async def handle_ask(
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt, images=images)
-    except Exception as exc:  # pragma: no cover - netwerkfout
+    except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout
+        logger.warning(
+            "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
+            settings.ollama_timeout,
+            settings.ollama_base_url,
+            settings.ollama_model,
+            exc,
+        )
+        message = _fallback_timeout_response(req.prompt)
+    except httpx.RequestError as exc:  # pragma: no cover - netwerkfout
         logger.warning(
             "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
+            settings.ollama_base_url,
+            settings.ollama_model,
+            exc,
+        )
+        message = _fallback_response(req.prompt)
+    except Exception as exc:  # pragma: no cover - netwerkfout
+        logger.warning(
+            "Onverwachte Ollama fout (url=%s, model=%s): %r",
             settings.ollama_base_url,
             settings.ollama_model,
             exc,

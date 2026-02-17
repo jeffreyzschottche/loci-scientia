@@ -702,6 +702,7 @@ async def sse_stream_generator(
 
     assistant_chunks: list[str] = []
     error_message: Optional[str] = None
+    mock_response: Optional[str] = None
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -760,7 +761,22 @@ async def sse_stream_generator(
                     except json.JSONDecodeError:
                         continue
 
-    except Exception as exc:
+    except httpx.TimeoutException as exc:
+        error_message = f"Ollama timeout after {settings.ollama_timeout:g}s: {exc!r}"
+        logger.warning(
+            "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
+            settings.ollama_timeout,
+            ollama_url,
+            settings.ollama_model,
+            exc,
+        )
+        mock_response = (
+            "[Ollama reageert te langzaam - Mock response] "
+            f"Geen antwoord binnen {settings.ollama_timeout:g}s van {ollama_url} "
+            f"met model '{settings.ollama_model}'. Je vroeg: '{req.prompt}'. "
+            "Dit gebeurt vaak bij een koude start of model-lading; probeer het opnieuw."
+        )
+    except httpx.RequestError as exc:
         # Fallback to mock response if Ollama is not available
         error_message = f"Ollama connection failed: {exc}"
         logger.warning(
@@ -774,7 +790,21 @@ async def sse_stream_generator(
             f"Kon geen antwoord krijgen van Ollama op {ollama_url} met model '{settings.ollama_model}'. "
             f"Je vroeg: '{req.prompt}'. Controleer of de Ollama-service draait en bereikbaar is."
         )
+    except Exception as exc:
+        error_message = f"Ollama onverwachte fout: {exc!r}"
+        logger.warning(
+            "Onverwachte Ollama fout (url=%s, model=%s): %r",
+            ollama_url,
+            settings.ollama_model,
+            exc,
+        )
+        mock_response = (
+            "[Ollama fout - Mock response] "
+            f"Er ging iets mis bij {ollama_url} met model '{settings.ollama_model}'. "
+            f"Je vroeg: '{req.prompt}'. Controleer de backend- en Ollama-logs."
+        )
 
+    if mock_response:
         # Stream the mock response word by word
         words = mock_response.split()
         for word in words:
