@@ -1001,6 +1001,18 @@ TRANSLATIONS = {
         "nl": "Stuur",
         "en": "Send",
     },
+    "chat_mode_label": {
+        "nl": "Mode",
+        "en": "Mode",
+    },
+    "chat_mode_hint": {
+        "nl": "Prompt-template",
+        "en": "Prompt template",
+    },
+    "chat_mode_default": {
+        "nl": "Standaard",
+        "en": "Default",
+    },
     "chat_error_prefix": {
         "nl": "[fout]",
         "en": "[error]",

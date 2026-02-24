@@ -27,7 +27,6 @@ from fastapi.staticfiles import StaticFiles
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import (
     ApiLogEntry,
-    build_augmented_prompt,
     build_augmented_prompt_with_details,
     generate_conversation_id,
     generate_request_id,
@@ -621,6 +620,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         req.prompt,
         history,
         images_count=len(images),
+        mode=req.mode,
     )
 
     # Create API log entry
@@ -634,6 +634,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         device_id=record.device_id,
         token_prefix=record.token[:8] if record.token else None,
         original_prompt=req.prompt,
+        mode=req.mode,
         new_chat=req.new_chat,
         history_length=len(history) if history else 0,
         images_count=len(images),
@@ -677,6 +678,7 @@ async def sse_stream_generator(
         req.prompt,
         history,
         images_count=len(images),
+        mode=req.mode,
     )
     log_prompt(final_prompt)
 
@@ -691,6 +693,7 @@ async def sse_stream_generator(
         device_id=record.device_id,
         token_prefix=record.token[:8] if record.token else None,
         original_prompt=req.prompt,
+        mode=req.mode,
         new_chat=req.new_chat,
         history_length=len(history) if history else 0,
         images_count=len(images),

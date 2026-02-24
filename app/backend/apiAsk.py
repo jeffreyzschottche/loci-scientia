@@ -2,7 +2,6 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 import httpx
@@ -12,7 +11,7 @@ from .devices_repo import DevicesRepository
 from .knowledge_repository import KnowledgeRepository
 from .schemas import ChatMessage, ChatRequest, Contact, Device
 from .settings import settings
-from .translations import t, get_current_language
+from .translations import t
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +19,7 @@ MAX_CONTEXT_ITEMS = 3
 MIN_CONTEXT_SCORE = 0.25
 KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
+PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
 
@@ -36,6 +36,7 @@ class ApiLogEntry:
     device_id: Optional[str] = None
     token_prefix: Optional[str] = None
     original_prompt: str = ""
+    mode: Optional[str] = None
     new_chat: bool = False  # True if this request cleared the history
     history_length: int = 0
     images_count: int = 0
@@ -75,6 +76,7 @@ def log_api_request(entry: ApiLogEntry) -> None:
             f"User:            {entry.user_name or 'unknown'}",
             f"Device ID:       {entry.device_id or 'unknown'}",
             f"Token:           {entry.token_prefix or 'unknown'}...",
+            f"Mode:            {entry.mode or 'default'}",
             f"New Chat:        {entry.new_chat}",
             "",
             f"--- Original Prompt ({len(entry.original_prompt)} chars) ---",
@@ -300,16 +302,47 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
     return lines, details
 
 
-def _prompt_template() -> str:
-    """Get the prompt template - NOT cached to allow language changes."""
+def _normalize_mode(mode: Optional[str]) -> str:
+    return (mode or "").strip().lower()
+
+
+def _mode_filename(mode: str) -> str:
+    slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in mode.strip()).strip("_")
+    return f"{slug}.txt" if slug else ""
+
+
+def _resolve_mode(mode: Optional[str]) -> Optional[str]:
+    normalized = _normalize_mode(mode)
+    if not normalized:
+        return None
+    for configured in settings.prompt_modes:
+        candidate = configured.strip()
+        if candidate and candidate.lower() == normalized:
+            return candidate
+    return None
+
+
+def _read_template(path: Path) -> str:
     try:
-        template = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
-        # If file exists but we're in English mode, use English template
-        if get_current_language() == "en":
-            return t("prompt_default_template")
-        return template
+        return path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
-        return t("prompt_default_template")
+        return ""
+
+
+def _prompt_template(mode: Optional[str] = None) -> str:
+    """Resolve prompt template for the selected mode with a default fallback."""
+    resolved_mode = _resolve_mode(mode)
+    if resolved_mode:
+        filename = _mode_filename(resolved_mode)
+        if filename:
+            mode_template = _read_template(PROMPT_TEMPLATE_DIR / filename)
+            if mode_template:
+                return mode_template
+
+    default_template = _read_template(PROMPT_TEMPLATE_PATH)
+    if default_template:
+        return default_template
+    return t("prompt_default_template")
 
 
 def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]:
@@ -335,6 +368,7 @@ def build_augmented_prompt(
     user_prompt: str,
     history: Optional[Sequence[ChatMessage]] = None,
     images_count: int = 0,
+    mode: Optional[str] = None,
 ) -> str:
     base_lines: list[str] = []
 
@@ -351,7 +385,7 @@ def build_augmented_prompt(
     if context_lines:
         base_lines.append("> context:")
         base_lines.extend(context_lines)
-    template = _prompt_template()
+    template = _prompt_template(mode=mode)
     if template:
         base_lines.append("")
         base_lines.append(template)
@@ -362,6 +396,7 @@ def build_augmented_prompt_with_details(
     user_prompt: str,
     history: Optional[Sequence[ChatMessage]] = None,
     images_count: int = 0,
+    mode: Optional[str] = None,
 ) -> tuple[str, Dict[str, List]]:
     """Build augmented prompt AND return context details for logging."""
     base_lines: list[str] = []
@@ -381,7 +416,7 @@ def build_augmented_prompt_with_details(
         base_lines.append("> context:")
         base_lines.extend(context_lines)
 
-    template = _prompt_template()
+    template = _prompt_template(mode=mode)
     if template:
         base_lines.append("")
         base_lines.append(template)
@@ -520,6 +555,7 @@ async def handle_ask(
         req.prompt,
         history_to_use,
         images_count=len(images),
+        mode=req.mode,
     )
     log_prompt(final_prompt)
     try:
