@@ -11,3 +11,7 @@ qdrant-client[fastembed]
 numpy
 fastembed
 pmtiles
+pypdf
+python-docx
+openpyxl
+xlrd

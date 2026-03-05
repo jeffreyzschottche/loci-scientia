@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class ChatMessage(BaseModel):
@@ -9,11 +9,23 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class PromptDocument(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    filename: str = Field(validation_alias=AliasChoices("filename", "name"))
+    data: str = Field(validation_alias=AliasChoices("data", "base64", "content"))
+    content_type: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("content_type", "mime_type", "type"),
+    )
+
+
 class ChatRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 128
     history: list[ChatMessage] = Field(default_factory=list)
     images: list[str] = Field(default_factory=list)
+    documents: list[PromptDocument] = Field(default_factory=list)
     new_chat: bool = False  # When True, clears server-side chat history first
 
 
