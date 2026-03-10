@@ -55,6 +55,7 @@ class Settings(BaseModel):
     ollama_timeout: float = 180.0
     admin_usernames: list[str] = ["ADMIN"]
     chat_summary_idle_minutes: int = 0
+    prompt_modes: list[str] = ["Developer", "Finance", "Law", "Child"]
 
 
 def get_settings() -> "Settings":
@@ -95,6 +96,10 @@ def get_settings() -> "Settings":
         chat_summary_idle_minutes = 0
     if chat_summary_idle_minutes < 0:
         chat_summary_idle_minutes = 0
+    raw_prompt_modes = os.environ.get("PROMPT_MODES", "Developer,Finance,Law,Child")
+    prompt_modes = [mode.strip() for mode in raw_prompt_modes.split(",") if mode.strip()]
+    if not prompt_modes:
+        prompt_modes = ["Developer", "Finance", "Law", "Child"]
     return Settings(
         offline_assets_dir=offline_assets_dir,
         ollama_base_url=ollama_base_url,
@@ -105,6 +110,7 @@ def get_settings() -> "Settings":
         ollama_timeout=ollama_timeout,
         admin_usernames=admin_usernames or ["ADMIN"],
         chat_summary_idle_minutes=chat_summary_idle_minutes,
+        prompt_modes=prompt_modes,
     )
 
 
