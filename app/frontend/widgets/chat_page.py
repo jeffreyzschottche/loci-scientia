@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_HTTP, BACKEND_BEARER_TOKEN
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PROMPT_MODES
 from ..translations import t, register_language_change_callback
 
 API_BASE = BACKEND_HTTP
@@ -263,6 +263,9 @@ class ChatPage(QWidget):
         self.message_rows: list[QWidget] = []
         self._bearer_token = BACKEND_BEARER_TOKEN or ""
         self._auto_token_error: str | None = None
+        self.available_modes = PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]
+        self.selected_mode: str | None = None
+        self.mode_buttons: dict[str, QPushButton] = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -289,6 +292,55 @@ class ChatPage(QWidget):
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
 
+        self.mode_card = QFrame()
+        self.mode_card.setObjectName("ChatModeCard")
+        self.mode_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.mode_card.setMaximumHeight(44)
+        self.mode_card.setStyleSheet(
+            "QFrame#ChatModeCard {"
+            "  background: transparent;"
+            "  border: none;"
+            "}"
+            "QPushButton[modeChip='true'] {"
+            "  background:#ffffff;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:999px;"
+            "  color:#374151;"
+            "  font-weight:600;"
+            "  padding:3px 14px;"
+            "}"
+            "QPushButton[modeChip='true']:hover { border-color:#111111; color:#111111; }"
+            "QPushButton[modeChip='true'][active='true'] {"
+            "  background:#111111;"
+            "  border-color:#111111;"
+            "  color:#facc15;"
+            "}"
+        )
+        mode_layout = QVBoxLayout(self.mode_card)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        mode_layout.setSpacing(0)
+
+        mode_scroll = QScrollArea()
+        mode_scroll.setWidgetResizable(True)
+        mode_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        mode_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        mode_scroll.setFrameShape(QFrame.NoFrame)
+        mode_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        mode_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        mode_scroll.setFixedHeight(30)
+
+        mode_container = QWidget()
+        self.mode_chip_layout = QHBoxLayout(mode_container)
+        self.mode_chip_layout.setContentsMargins(0, 0, 0, 0)
+        self.mode_chip_layout.setSpacing(8)
+        self._create_mode_chip(t("chat_mode_default"), None)
+        for mode in self.available_modes:
+            self._create_mode_chip(mode, mode)
+        self.mode_chip_layout.addStretch(1)
+        mode_scroll.setWidget(mode_container)
+        mode_layout.addWidget(mode_scroll)
+        layout.addWidget(self.mode_card)
+        self._set_selected_mode(None)
 
         self.history_card = QFrame()
         self.history_card.setObjectName("ChatWrapper")
@@ -359,6 +411,9 @@ class ChatPage(QWidget):
         self.new_chat_btn.setText(t("chat_start_new"))
         self.input.setPlaceholderText(t("chat_placeholder"))
         self.send_btn.setText(t("chat_send"))
+        default_btn = self.mode_buttons.get(MODE_DEFAULT_KEY)
+        if default_btn:
+            default_btn.setText(t("chat_mode_default"))
         if self.empty_label:
             self.empty_label.setText(t("chat_welcome"))
 
@@ -382,18 +437,27 @@ class ChatPage(QWidget):
         self.current_thinking_text = ""
         self.current_reply_widget = None
         self._show_typing_indicator()
-        asyncio.create_task(self._stream(text))
+        asyncio.create_task(self._stream(text, self.selected_mode))
 
-    async def _stream(self, prompt: str):
+    def _request_payload(self, prompt: str, mode: str | None = None) -> dict:
+        payload = {
+            "prompt": prompt,
+            "max_new_tokens": 128,
+        }
+        if mode:
+            payload["mode"] = mode
+        return payload
+
+    async def _stream(self, prompt: str, mode: str | None):
         try:
-            await asyncio.to_thread(self._stream_sse, prompt)
+            await asyncio.to_thread(self._stream_sse, prompt, mode)
             return
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             if status == 401:
                 # Probeer automatisch een token op te halen voor de lokale admin.
                 if self._refresh_auto_token():
-                    await asyncio.to_thread(self._stream_sse, prompt)
+                    await asyncio.to_thread(self._stream_sse, prompt, mode)
                     return
                 message = (
                     self._auto_token_error
@@ -423,14 +487,11 @@ class ChatPage(QWidget):
             )
         self.signals.done.emit()
 
-    def _stream_sse(self, prompt: str) -> None:
+    def _stream_sse(self, prompt: str, mode: str | None = None) -> None:
         """Stream SSE events van het backend (incl. wachtrij status)."""
 
         url = f"{API_BASE}/api/v1/ask/stream"
-        payload = {
-            "prompt": prompt,
-            "max_new_tokens": 128,
-        }
+        payload = self._request_payload(prompt, mode)
         with requests.post(
             url,
             json=payload,
@@ -438,7 +499,11 @@ class ChatPage(QWidget):
             timeout=60,
             headers=self._auth_headers(),
         ) as resp:
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                if resp.status_code in (401, 404):
+                    resp.raise_for_status()
+                detail = self._format_api_error_response(resp)
+                raise RuntimeError(detail)
 
             for line in resp.iter_lines():
                 if not line:
@@ -492,7 +557,7 @@ class ChatPage(QWidget):
             try:
                 resp = requests.post(
                     url,
-                    json={"prompt": prompt},
+                    json=self._request_payload(prompt, mode),
                     timeout=5,
                     headers=headers,
                 )
@@ -503,8 +568,11 @@ class ChatPage(QWidget):
                 continue
             try:
                 resp.raise_for_status()
-            except Exception as exc:  # pragma: no cover - UI feedback only
-                last_error = exc
+            except Exception:  # pragma: no cover - UI feedback only
+                if resp.status_code == 401:
+                    last_error = RuntimeError(t("chat_error_401"))
+                else:
+                    last_error = RuntimeError(self._format_api_error_response(resp))
                 continue
             try:
                 data = resp.json()
@@ -517,6 +585,67 @@ class ChatPage(QWidget):
                 }
             return {"message": str(data), "thinking": ""}
         raise last_error or RuntimeError(t("chat_no_valid_response"))
+
+    def _format_http_error(self, exc: requests.HTTPError) -> str:
+        response = getattr(exc, "response", None)
+        if response is None:
+            return f"{t('chat_error_prefix')} {exc}"
+        detail = self._format_api_error_response(response)
+        return f"{t('chat_error_prefix')} {detail}"
+
+    def _format_api_error_response(self, response: requests.Response) -> str:
+        detail_text = ""
+        payload = None
+        try:
+            _ = response.content  # ensure body is read for streamed responses
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+        if isinstance(payload, dict):
+            detail = payload.get("detail")
+            if detail is None:
+                detail = payload.get("message") or payload.get("error")
+            detail_text = self._format_api_error_detail(detail)
+            if not detail_text and payload:
+                try:
+                    detail_text = json.dumps(payload)
+                except TypeError:
+                    detail_text = str(payload)
+        elif isinstance(payload, list):
+            detail_text = "; ".join(str(item) for item in payload if item)
+
+        if not detail_text:
+            text = response.text.strip()
+            if text:
+                detail_text = text
+
+        if not detail_text:
+            reason = response.reason or ""
+            detail_text = f"HTTP {response.status_code} {reason}".strip()
+
+        return detail_text
+
+    def _format_api_error_detail(self, detail: object) -> str:
+        if isinstance(detail, dict):
+            message = detail.get("message") or detail.get("detail") or ""
+            estimated = detail.get("estimated_tokens")
+            max_context = detail.get("max_context")
+            if isinstance(estimated, int) and isinstance(max_context, int):
+                token_hint = t(
+                    "chat_error_tokens",
+                    estimated=estimated,
+                    max=max_context,
+                )
+                if message:
+                    return f"{message} ({token_hint})"
+                return token_hint
+            return message or ""
+        if isinstance(detail, list):
+            return "; ".join(str(item) for item in detail if item)
+        if detail is None:
+            return ""
+        return str(detail)
 
     @Slot(str)
     def _on_response_token(self, token: str):

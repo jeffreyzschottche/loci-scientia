@@ -55,16 +55,29 @@ class ChatHistoryStore:
             messages.extend(record.messages)
             return list(messages)
 
-    def append(self, key: str, role: str, content: str) -> None:
+    def append(
+        self,
+        key: str,
+        role: str,
+        content: str,
+        images: Optional[List[str]] = None,
+    ) -> None:
         clean = (content or "").strip()
-        if not key or not clean:
+        image_list = [item for item in (images or []) if item]
+        if not key or (not clean and not image_list):
             return
         with self._lock:
             record = self._data.get(key)
             if record is None:
                 record = HistoryRecord()
                 self._data[key] = record
-            record.messages.append(ChatMessage(role=role, content=clean))
+            record.messages.append(
+                ChatMessage(
+                    role=role,
+                    content=clean,
+                    images=list(image_list),
+                )
+            )
             if len(record.messages) > self._max_items:
                 record.messages = record.messages[-self._max_items :]
             record.updated_at = _utcnow()
@@ -134,6 +147,6 @@ class ChatHistoryStore:
             if record.summarized_at != expected_summarized_at:
                 return False
             record.summary = clean
-            record.messages = []
+            record.messages = [msg for msg in record.messages if getattr(msg, "images", None)]
             record.summarized_at = _utcnow()
             return True
