@@ -251,7 +251,8 @@ class ChatPage(QWidget):
                 self.signals.done.emit()
                 return
             if status != 404:
-                self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
+                message = self._format_http_error(exc)
+                self.signals.token.emit(message)
                 self.signals.done.emit()
                 return
             # 404 betekent dat streaming endpoint nog niet bestaat -> fallback
@@ -280,7 +281,11 @@ class ChatPage(QWidget):
             timeout=60,
             headers=self._auth_headers(),
         ) as resp:
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                if resp.status_code in (401, 404):
+                    resp.raise_for_status()
+                detail = self._format_api_error_response(resp)
+                raise RuntimeError(detail)
 
             for line in resp.iter_lines():
                 if not line:
@@ -335,8 +340,11 @@ class ChatPage(QWidget):
                 continue
             try:
                 resp.raise_for_status()
-            except Exception as exc:  # pragma: no cover - UI feedback only
-                last_error = exc
+            except Exception:  # pragma: no cover - UI feedback only
+                if resp.status_code == 401:
+                    last_error = RuntimeError(t("chat_error_401"))
+                else:
+                    last_error = RuntimeError(self._format_api_error_response(resp))
                 continue
             try:
                 data = resp.json()
@@ -347,28 +355,66 @@ class ChatPage(QWidget):
             return str(data)
         raise last_error or RuntimeError(t("chat_no_valid_response"))
 
-    def _mode_key(self, mode: str | None) -> str:
-        return MODE_DEFAULT_KEY if mode is None else mode
+    def _format_http_error(self, exc: requests.HTTPError) -> str:
+        response = getattr(exc, "response", None)
+        if response is None:
+            return f"{t('chat_error_prefix')} {exc}"
+        detail = self._format_api_error_response(response)
+        return f"{t('chat_error_prefix')} {detail}"
 
-    def _create_mode_chip(self, label: str, mode: str | None) -> None:
-        key = self._mode_key(mode)
-        button = QPushButton(label)
-        button.setProperty("modeChip", "true")
-        button.setProperty("active", "false")
-        button.setCursor(Qt.PointingHandCursor)
-        button.setFixedHeight(28)
-        button.clicked.connect(lambda _, value=mode: self._set_selected_mode(value))
-        self.mode_chip_layout.addWidget(button, 0, Qt.AlignLeft)
-        self.mode_buttons[key] = button
+    def _format_api_error_response(self, response: requests.Response) -> str:
+        detail_text = ""
+        payload = None
+        try:
+            _ = response.content  # ensure body is read for streamed responses
+            payload = response.json()
+        except ValueError:
+            payload = None
 
-    def _set_selected_mode(self, mode: str | None) -> None:
-        self.selected_mode = mode
-        active_key = self._mode_key(mode)
-        for key, button in self.mode_buttons.items():
-            is_active = key == active_key
-            button.setProperty("active", "true" if is_active else "false")
-            button.style().unpolish(button)
-            button.style().polish(button)
+        if isinstance(payload, dict):
+            detail = payload.get("detail")
+            if detail is None:
+                detail = payload.get("message") or payload.get("error")
+            detail_text = self._format_api_error_detail(detail)
+            if not detail_text and payload:
+                try:
+                    detail_text = json.dumps(payload)
+                except TypeError:
+                    detail_text = str(payload)
+        elif isinstance(payload, list):
+            detail_text = "; ".join(str(item) for item in payload if item)
+
+        if not detail_text:
+            text = response.text.strip()
+            if text:
+                detail_text = text
+
+        if not detail_text:
+            reason = response.reason or ""
+            detail_text = f"HTTP {response.status_code} {reason}".strip()
+
+        return detail_text
+
+    def _format_api_error_detail(self, detail: object) -> str:
+        if isinstance(detail, dict):
+            message = detail.get("message") or detail.get("detail") or ""
+            estimated = detail.get("estimated_tokens")
+            max_context = detail.get("max_context")
+            if isinstance(estimated, int) and isinstance(max_context, int):
+                token_hint = t(
+                    "chat_error_tokens",
+                    estimated=estimated,
+                    max=max_context,
+                )
+                if message:
+                    return f"{message} ({token_hint})"
+                return token_hint
+            return message or ""
+        if isinstance(detail, list):
+            return "; ".join(str(item) for item in detail if item)
+        if detail is None:
+            return ""
+        return str(detail)
 
     @Slot(str)
     def _on_token(self, token: str):

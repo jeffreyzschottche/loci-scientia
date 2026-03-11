@@ -1,6 +1,6 @@
 import logging
-import uuid
-from dataclasses import dataclass, field
+import math
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -21,121 +21,7 @@ KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge c
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
-API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
-
-
-@dataclass
-class ApiLogEntry:
-    """Structured log entry for API conversations."""
-    conversation_id: str
-    request_id: str
-    timestamp: str
-    source: str  # "local" or "api"
-    endpoint: str  # "/api/v1/ask" or "/api/v1/ask/stream"
-    user_name: Optional[str] = None
-    device_id: Optional[str] = None
-    token_prefix: Optional[str] = None
-    original_prompt: str = ""
-    mode: Optional[str] = None
-    new_chat: bool = False  # True if this request cleared the history
-    history_length: int = 0
-    images_count: int = 0
-    context_contacts: List[Dict[str, Any]] = field(default_factory=list)
-    context_devices: List[Dict[str, Any]] = field(default_factory=list)
-    context_knowledge: List[Dict[str, Any]] = field(default_factory=list)
-    final_prompt_length: int = 0
-    response_preview: str = ""
-    error: Optional[str] = None
-
-
-def generate_request_id() -> str:
-    """Generate a unique request ID."""
-    return str(uuid.uuid4())[:8]
-
-
-def generate_conversation_id(token: str) -> str:
-    """Generate a conversation ID based on token (first 8 chars of hash)."""
-    import hashlib
-    return hashlib.sha256(token.encode()).hexdigest()[:8]
-
-
-def log_api_request(entry: ApiLogEntry) -> None:
-    """Write structured API log entry to apiprompt.log."""
-    try:
-        API_PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-        separator = "=" * 80
-        new_chat_marker = " [NEW CHAT]" if entry.new_chat else ""
-        lines = [
-            separator,
-            f"[{entry.timestamp}]{new_chat_marker}",
-            f"Conversation ID: {entry.conversation_id}",
-            f"Request ID:      {entry.request_id}",
-            f"Source:          {entry.source}",
-            f"Endpoint:        {entry.endpoint}",
-            f"User:            {entry.user_name or 'unknown'}",
-            f"Device ID:       {entry.device_id or 'unknown'}",
-            f"Token:           {entry.token_prefix or 'unknown'}...",
-            f"Mode:            {entry.mode or 'default'}",
-            f"New Chat:        {entry.new_chat}",
-            "",
-            f"--- Original Prompt ({len(entry.original_prompt)} chars) ---",
-            entry.original_prompt[:500] + ("..." if len(entry.original_prompt) > 500 else ""),
-            "",
-            f"History messages: {entry.history_length}",
-            f"Images attached:  {entry.images_count}",
-            "",
-            "--- Context Found ---",
-            f"Contacts ({len(entry.context_contacts)}):",
-        ]
-
-        if entry.context_contacts:
-            for c in entry.context_contacts:
-                lines.append(f"  - {c.get('name', '?')} (score: {c.get('score', 0):.3f})")
-        else:
-            lines.append("  (none)")
-
-        lines.append(f"Devices ({len(entry.context_devices)}):")
-        if entry.context_devices:
-            for d in entry.context_devices:
-                lines.append(f"  - {d.get('user_name', '?')} / {d.get('device_name', '?')} (score: {d.get('score', 0):.3f})")
-        else:
-            lines.append("  (none)")
-
-        lines.append(f"Knowledge ({len(entry.context_knowledge)}):")
-        if entry.context_knowledge:
-            for k in entry.context_knowledge:
-                lines.append(f"  - [{k.get('doc_id', '?')}] {k.get('title', '?')} (score: {k.get('score', 0):.3f})")
-                lines.append(f"    {k.get('snippet', '')}")
-        else:
-            lines.append("  (none)")
-
-        lines.extend([
-            "",
-            f"Final prompt length: {entry.final_prompt_length} chars",
-        ])
-
-        if entry.response_preview:
-            lines.extend([
-                "",
-                "--- Response Preview ---",
-                entry.response_preview[:300] + ("..." if len(entry.response_preview) > 300 else ""),
-            ])
-
-        if entry.error:
-            lines.extend([
-                "",
-                f"--- ERROR ---",
-                entry.error,
-            ])
-
-        lines.append("")
-
-        with API_PROMPT_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write("\n".join(lines) + "\n")
-
-    except OSError as exc:
-        logger.warning("Kon API log niet schrijven: %s", exc)
+_TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
 
 contacts_repo = ContactsRepository()
@@ -358,10 +244,17 @@ def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]
         else:
             speaker = t("speaker_user")
         content = _flatten_multiline(message.content or "")
+        images_count = len(getattr(message, "images", []) or [])
+        if images_count > 0:
+            marker = f"[Afbeeldingen: {images_count}]"
+            if marker not in content:
+                content = f"{content}\n{marker}" if content else marker
         if not content:
             continue
         lines.append(f"{idx}. {speaker}: {content}")
     return lines
+
+
 
 
 def build_augmented_prompt(
@@ -392,36 +285,29 @@ def build_augmented_prompt(
     return "\n".join(base_lines).strip()
 
 
-def build_augmented_prompt_with_details(
-    user_prompt: str,
+def prepare_prompt(
+    req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
-    images_count: int = 0,
-    mode: Optional[str] = None,
-) -> tuple[str, Dict[str, List]]:
-    """Build augmented prompt AND return context details for logging."""
-    base_lines: list[str] = []
+) -> tuple[str, list[str], list[str]]:
+    history_to_use = req.history if history is None else history
+    current_images = normalize_images(req.images)
+    images = merge_history_images(history_to_use, current_images)
+    final_prompt = build_augmented_prompt(
+        req.prompt,
+        history_to_use,
+        images_count=len(images),
+    )
+    return final_prompt, images, current_images
 
-    history_lines = _format_history_lines(history)
-    if history_lines:
-        base_lines.append(t("previous_chat"))
-        base_lines.extend(history_lines)
-        base_lines.append("")
 
-    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
-    if images_count > 0:
-        base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
-
-    context_lines, context_details = _gather_context_with_details(user_prompt)
-    if context_lines:
-        base_lines.append("> context:")
-        base_lines.extend(context_lines)
-
-    template = _prompt_template(mode=mode)
-    if template:
-        base_lines.append("")
-        base_lines.append(template)
-
-    return "\n".join(base_lines).strip(), context_details
+def estimate_prompt_tokens(text: str) -> int:
+    if not text:
+        return 0
+    wordish = len(_TOKEN_PATTERN.findall(text))
+    char_est = math.ceil(len(text) / 4)
+    byte_est = math.ceil(len(text.encode("utf-8")) / 4)
+    # Heuristic: use the largest estimate to avoid undercounting.
+    return max(wordish, char_est, byte_est)
 
 
 def log_prompt(final_prompt: str) -> None:
@@ -497,6 +383,18 @@ def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
     return normalized
 
 
+def merge_history_images(
+    history: Optional[Sequence[ChatMessage]],
+    current_images: Sequence[str],
+) -> list[str]:
+    merged: list[str] = []
+    if history:
+        for message in history:
+            merged.extend(normalize_images(getattr(message, "images", None)))
+    merged.extend(current_images)
+    return merged
+
+
 async def _call_ollama(
     prompt: str,
     options: Optional[dict] = None,
@@ -548,15 +446,19 @@ def _fallback_timeout_response(original_prompt: str) -> str:
 async def handle_ask(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
+    final_prompt: Optional[str] = None,
+    images: Optional[Sequence[str]] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
-    images = normalize_images(req.images)
-    final_prompt = build_augmented_prompt(
-        req.prompt,
-        history_to_use,
-        images_count=len(images),
-        mode=req.mode,
-    )
+    if images is None:
+        current_images = normalize_images(req.images)
+        images = merge_history_images(history_to_use, current_images)
+    if final_prompt is None:
+        final_prompt = build_augmented_prompt(
+            req.prompt,
+            history_to_use,
+            images_count=len(images),
+        )
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt, images=images)

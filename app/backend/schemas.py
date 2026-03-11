@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"] = "user"
     content: str
+    images: list[str] = Field(default_factory=list)
 
 
 class ChatRequest(BaseModel):
