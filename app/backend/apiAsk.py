@@ -1,3 +1,6 @@
+import base64
+import binascii
+import io
 import logging
 import math
 import re
@@ -9,7 +12,7 @@ import httpx
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .knowledge_repository import KnowledgeRepository
-from .schemas import ChatMessage, ChatRequest, Contact, Device
+from .schemas import ChatMessage, ChatRequest, Contact, Device, PromptDocument
 from .settings import settings
 from .translations import t
 
@@ -21,7 +24,146 @@ KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge c
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
-_TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
+API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
+MAX_DOCUMENTS_PER_REQUEST = 4
+MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
+MAX_TOTAL_DOCUMENT_BYTES = 20 * 1024 * 1024
+MAX_DOCUMENT_CHARS = 40_000
+MAX_TOTAL_DOCUMENT_CHARS = 120_000
+
+
+@dataclass
+class ApiLogEntry:
+    """Structured log entry for API conversations."""
+    conversation_id: str
+    request_id: str
+    timestamp: str
+    source: str  # "local" or "api"
+    endpoint: str  # "/api/v1/ask" or "/api/v1/ask/stream"
+    user_name: Optional[str] = None
+    device_id: Optional[str] = None
+    token_prefix: Optional[str] = None
+    original_prompt: str = ""
+    new_chat: bool = False  # True if this request cleared the history
+    history_length: int = 0
+    images_count: int = 0
+    documents_count: int = 0
+    context_contacts: List[Dict[str, Any]] = field(default_factory=list)
+    context_devices: List[Dict[str, Any]] = field(default_factory=list)
+    context_knowledge: List[Dict[str, Any]] = field(default_factory=list)
+    context_documents: List[Dict[str, Any]] = field(default_factory=list)
+    final_prompt_length: int = 0
+    response_preview: str = ""
+    error: Optional[str] = None
+
+
+@dataclass
+class ParsedDocument:
+    filename: str
+    file_type: str
+    text: str
+    source_bytes: int
+    truncated: bool = False
+
+
+def generate_request_id() -> str:
+    """Generate a unique request ID."""
+    return str(uuid.uuid4())[:8]
+
+
+def generate_conversation_id(token: str) -> str:
+    """Generate a conversation ID based on token (first 8 chars of hash)."""
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()[:8]
+
+
+def log_api_request(entry: ApiLogEntry) -> None:
+    """Write structured API log entry to apiprompt.log."""
+    try:
+        API_PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+        separator = "=" * 80
+        new_chat_marker = " [NEW CHAT]" if entry.new_chat else ""
+        lines = [
+            separator,
+            f"[{entry.timestamp}]{new_chat_marker}",
+            f"Conversation ID: {entry.conversation_id}",
+            f"Request ID:      {entry.request_id}",
+            f"Source:          {entry.source}",
+            f"Endpoint:        {entry.endpoint}",
+            f"User:            {entry.user_name or 'unknown'}",
+            f"Device ID:       {entry.device_id or 'unknown'}",
+            f"Token:           {entry.token_prefix or 'unknown'}...",
+            f"New Chat:        {entry.new_chat}",
+            "",
+            f"--- Original Prompt ({len(entry.original_prompt)} chars) ---",
+            entry.original_prompt[:500] + ("..." if len(entry.original_prompt) > 500 else ""),
+            "",
+            f"History messages: {entry.history_length}",
+            f"Images attached:  {entry.images_count}",
+            f"Documents:        {entry.documents_count}",
+            "",
+            "--- Context Found ---",
+            f"Contacts ({len(entry.context_contacts)}):",
+        ]
+
+        if entry.context_contacts:
+            for c in entry.context_contacts:
+                lines.append(f"  - {c.get('name', '?')} (score: {c.get('score', 0):.3f})")
+        else:
+            lines.append("  (none)")
+
+        lines.append(f"Devices ({len(entry.context_devices)}):")
+        if entry.context_devices:
+            for d in entry.context_devices:
+                lines.append(f"  - {d.get('user_name', '?')} / {d.get('device_name', '?')} (score: {d.get('score', 0):.3f})")
+        else:
+            lines.append("  (none)")
+
+        lines.append(f"Knowledge ({len(entry.context_knowledge)}):")
+        if entry.context_knowledge:
+            for k in entry.context_knowledge:
+                lines.append(f"  - [{k.get('doc_id', '?')}] {k.get('title', '?')} (score: {k.get('score', 0):.3f})")
+                lines.append(f"    {k.get('snippet', '')}")
+        else:
+            lines.append("  (none)")
+
+        lines.append(f"Documents ({len(entry.context_documents)}):")
+        if entry.context_documents:
+            for d in entry.context_documents:
+                lines.append(
+                    f"  - {d.get('filename', '?')} [{d.get('file_type', '?')}] "
+                    f"{d.get('chars', 0)} chars / {d.get('bytes', 0)} bytes"
+                )
+        else:
+            lines.append("  (none)")
+
+        lines.extend([
+            "",
+            f"Final prompt length: {entry.final_prompt_length} chars",
+        ])
+
+        if entry.response_preview:
+            lines.extend([
+                "",
+                "--- Response Preview ---",
+                entry.response_preview[:300] + ("..." if len(entry.response_preview) > 300 else ""),
+            ])
+
+        if entry.error:
+            lines.extend([
+                "",
+                f"--- ERROR ---",
+                entry.error,
+            ])
+
+        lines.append("")
+
+        with API_PROMPT_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+
+    except OSError as exc:
+        logger.warning("Kon API log niet schrijven: %s", exc)
 
 
 contacts_repo = ContactsRepository()
@@ -66,6 +208,237 @@ def describe_device(device: Device) -> str:
 
 def _flatten_multiline(text: str) -> str:
     return " ".join(line.strip() for line in text.splitlines() if line.strip())
+
+
+def _clean_document_text(text: str) -> str:
+    return "\n".join(line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").splitlines())
+
+
+def _strip_data_url(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw.startswith("data:"):
+        return raw
+    _, _, b64 = raw.partition("base64,")
+    return b64.strip() if b64 else ""
+
+
+def _detect_document_type(document: PromptDocument) -> str:
+    file_name = (document.filename or "").strip().lower()
+    if "." in file_name:
+        ext = file_name.rsplit(".", 1)[-1]
+        if ext in {"pdf", "docx", "xls", "xlsx", "txt"}:
+            return ext
+    content_type = (document.content_type or "").strip().lower()
+    type_map = {
+        "application/pdf": "pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/msword": "docx",
+        "application/vnd.ms-excel": "xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "text/plain": "txt",
+    }
+    for key, value in type_map.items():
+        if key in content_type:
+            return value
+    return ""
+
+
+def _decode_base64_document(document: PromptDocument) -> bytes:
+    raw = _strip_data_url(document.data)
+    if not raw:
+        raise ValueError(f"Document '{document.filename}' has no base64 payload.")
+    try:
+        return base64.b64decode(raw, validate=True)
+    except binascii.Error as exc:
+        raise ValueError(f"Document '{document.filename}' contains invalid base64 data.") from exc
+
+
+def _extract_pdf_text(source: bytes) -> str:
+    try:
+        from pypdf import PdfReader
+    except Exception as exc:  # pragma: no cover - dependency absence
+        raise ValueError("PDF parsing requires 'pypdf'. Install backend dependencies first.") from exc
+
+    reader = PdfReader(io.BytesIO(source))
+    parts: list[str] = []
+    for page in reader.pages:
+        parts.append(page.extract_text() or "")
+    return "\n".join(parts)
+
+
+def _extract_docx_text(source: bytes) -> str:
+    try:
+        from docx import Document
+    except Exception as exc:  # pragma: no cover - dependency absence
+        raise ValueError("DOCX parsing requires 'python-docx'. Install backend dependencies first.") from exc
+
+    document = Document(io.BytesIO(source))
+    parts: list[str] = []
+    for paragraph in document.paragraphs:
+        if paragraph.text:
+            parts.append(paragraph.text)
+    for table in document.tables:
+        for row in table.rows:
+            cells = [str(cell.text).strip() for cell in row.cells if str(cell.text).strip()]
+            if cells:
+                parts.append(" | ".join(cells))
+    return "\n".join(parts)
+
+
+def _extract_xlsx_text(source: bytes) -> str:
+    try:
+        from openpyxl import load_workbook
+    except Exception as exc:  # pragma: no cover - dependency absence
+        raise ValueError("XLSX parsing requires 'openpyxl'. Install backend dependencies first.") from exc
+
+    workbook = load_workbook(filename=io.BytesIO(source), read_only=True, data_only=True)
+    parts: list[str] = []
+    for sheet in workbook.worksheets:
+        parts.append(f"Sheet: {sheet.title}")
+        for row in sheet.iter_rows(values_only=True):
+            cells = [str(cell).strip() for cell in row if cell not in (None, "")]
+            if cells:
+                parts.append(" | ".join(cells))
+    workbook.close()
+    return "\n".join(parts)
+
+
+def _extract_xls_text(source: bytes) -> str:
+    try:
+        import xlrd
+    except Exception as exc:  # pragma: no cover - dependency absence
+        raise ValueError("XLS parsing requires 'xlrd'. Install backend dependencies first.") from exc
+
+    workbook = xlrd.open_workbook(file_contents=source, on_demand=True)
+    parts: list[str] = []
+    for sheet in workbook.sheets():
+        parts.append(f"Sheet: {sheet.name}")
+        for row_idx in range(sheet.nrows):
+            cells: list[str] = []
+            for value in sheet.row_values(row_idx):
+                cell_text = str(value).strip()
+                if cell_text:
+                    cells.append(cell_text)
+            if cells:
+                parts.append(" | ".join(cells))
+    workbook.release_resources()
+    return "\n".join(parts)
+
+
+def _extract_txt_text(source: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-16", "cp1252", "latin-1"):
+        try:
+            return source.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return source.decode("utf-8", errors="replace")
+
+
+def _extract_document_text(file_type: str, source: bytes) -> str:
+    if file_type == "pdf":
+        return _extract_pdf_text(source)
+    if file_type == "docx":
+        return _extract_docx_text(source)
+    if file_type == "xlsx":
+        return _extract_xlsx_text(source)
+    if file_type == "xls":
+        return _extract_xls_text(source)
+    if file_type == "txt":
+        return _extract_txt_text(source)
+    raise ValueError(f"Unsupported document type: {file_type}")
+
+
+def normalize_documents(documents: Optional[Sequence[PromptDocument]]) -> list[ParsedDocument]:
+    if not documents:
+        return []
+    if len(documents) > MAX_DOCUMENTS_PER_REQUEST:
+        raise ValueError(
+            f"Too many documents in one request ({len(documents)}). "
+            f"Maximum allowed is {MAX_DOCUMENTS_PER_REQUEST}."
+        )
+
+    parsed_documents: list[ParsedDocument] = []
+    total_bytes = 0
+    total_chars = 0
+
+    for index, document in enumerate(documents, 1):
+        filename = (document.filename or "").strip() or f"document-{index}"
+        file_type = _detect_document_type(document)
+        if not file_type:
+            raise ValueError(
+                f"Document '{filename}' is not supported. Allowed: pdf, docx, xls, xlsx, txt."
+            )
+
+        source = _decode_base64_document(document)
+        source_bytes = len(source)
+        if source_bytes > MAX_DOCUMENT_BYTES:
+            raise ValueError(
+                f"Document '{filename}' is too large ({source_bytes} bytes). "
+                f"Maximum per document is {MAX_DOCUMENT_BYTES} bytes."
+            )
+
+        total_bytes += source_bytes
+        if total_bytes > MAX_TOTAL_DOCUMENT_BYTES:
+            raise ValueError(
+                f"Total document payload is too large ({total_bytes} bytes). "
+                f"Maximum per request is {MAX_TOTAL_DOCUMENT_BYTES} bytes."
+            )
+
+        extracted = _clean_document_text(_extract_document_text(file_type, source)).strip()
+        if not extracted:
+            continue
+
+        truncated = False
+        if len(extracted) > MAX_DOCUMENT_CHARS:
+            extracted = extracted[:MAX_DOCUMENT_CHARS]
+            truncated = True
+
+        remaining_chars = MAX_TOTAL_DOCUMENT_CHARS - total_chars
+        if remaining_chars <= 0:
+            break
+        if len(extracted) > remaining_chars:
+            extracted = extracted[:remaining_chars]
+            truncated = True
+
+        total_chars += len(extracted)
+        parsed_documents.append(
+            ParsedDocument(
+                filename=filename,
+                file_type=file_type,
+                text=extracted,
+                source_bytes=source_bytes,
+                truncated=truncated,
+            )
+        )
+
+    return parsed_documents
+
+
+def _format_document_context_lines(documents: Optional[Sequence[ParsedDocument]]) -> list[str]:
+    if not documents:
+        return []
+    lines: list[str] = []
+    for index, document in enumerate(documents, 1):
+        lines.append(f"{index}. [{document.file_type}] {document.filename}")
+        lines.append(document.text)
+    return lines
+
+
+def _document_details(documents: Optional[Sequence[ParsedDocument]]) -> List[Dict[str, Any]]:
+    if not documents:
+        return []
+    details: List[Dict[str, Any]] = []
+    for document in documents:
+        details.append(
+            {
+                "filename": document.filename,
+                "file_type": document.file_type,
+                "bytes": document.source_bytes,
+                "chars": len(document.text),
+                "truncated": document.truncated,
+            }
+        )
+    return details
 
 
 def _gather_context_lines(prompt_text: str) -> list[str]:
@@ -261,7 +634,7 @@ def build_augmented_prompt(
     user_prompt: str,
     history: Optional[Sequence[ChatMessage]] = None,
     images_count: int = 0,
-    mode: Optional[str] = None,
+    documents: Optional[Sequence[ParsedDocument]] = None,
 ) -> str:
     base_lines: list[str] = []
 
@@ -274,6 +647,10 @@ def build_augmented_prompt(
     base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
     if images_count > 0:
         base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
+    document_lines = _format_document_context_lines(documents)
+    if document_lines:
+        base_lines.append("> document context:")
+        base_lines.extend(document_lines)
     context_lines = _gather_context_lines(user_prompt)
     if context_lines:
         base_lines.append("> context:")
@@ -288,16 +665,31 @@ def build_augmented_prompt(
 def prepare_prompt(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
-) -> tuple[str, list[str], list[str]]:
-    history_to_use = req.history if history is None else history
-    current_images = normalize_images(req.images)
-    images = merge_history_images(history_to_use, current_images)
-    final_prompt = build_augmented_prompt(
-        req.prompt,
-        history_to_use,
-        images_count=len(images),
-    )
-    return final_prompt, images, current_images
+    images_count: int = 0,
+    documents: Optional[Sequence[ParsedDocument]] = None,
+) -> tuple[str, Dict[str, List]]:
+    """Build augmented prompt AND return context details for logging."""
+    base_lines: list[str] = []
+
+    history_lines = _format_history_lines(history)
+    if history_lines:
+        base_lines.append(t("previous_chat"))
+        base_lines.extend(history_lines)
+        base_lines.append("")
+
+    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
+    if images_count > 0:
+        base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
+    document_lines = _format_document_context_lines(documents)
+    if document_lines:
+        base_lines.append("> document context:")
+        base_lines.extend(document_lines)
+
+    context_lines, context_details = _gather_context_with_details(user_prompt)
+    context_details["documents"] = _document_details(documents)
+    if context_lines:
+        base_lines.append("> context:")
+        base_lines.extend(context_lines)
 
 
 def estimate_prompt_tokens(text: str) -> int:
@@ -446,19 +838,17 @@ def _fallback_timeout_response(original_prompt: str) -> str:
 async def handle_ask(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
-    final_prompt: Optional[str] = None,
-    images: Optional[Sequence[str]] = None,
+    documents: Optional[Sequence[ParsedDocument]] = None,
+    final_prompt_override: Optional[str] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
-    if images is None:
-        current_images = normalize_images(req.images)
-        images = merge_history_images(history_to_use, current_images)
-    if final_prompt is None:
-        final_prompt = build_augmented_prompt(
-            req.prompt,
-            history_to_use,
-            images_count=len(images),
-        )
+    images = normalize_images(req.images)
+    final_prompt = final_prompt_override or build_augmented_prompt(
+        req.prompt,
+        history_to_use,
+        images_count=len(images),
+        documents=documents,
+    )
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt, images=images)

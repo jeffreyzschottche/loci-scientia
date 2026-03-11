@@ -26,12 +26,15 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import (
-    build_augmented_prompt,
-    estimate_prompt_tokens,
+    ApiLogEntry,
+    ParsedDocument,
+    build_augmented_prompt_with_details,
+    generate_conversation_id,
+    generate_request_id,
     handle_ask,
     log_api_request,
     log_prompt,
-    merge_history_images,
+    normalize_documents,
     normalize_images,
     prepare_prompt,
     summarize_history,
@@ -221,12 +224,17 @@ def _mark_prompt_activity() -> None:
     last_prompt_at = datetime.now(timezone.utc)
 
 
-def _format_prompt_for_history(prompt: str, images_count: int) -> str:
+def _format_prompt_for_history(prompt: str, images_count: int, documents_count: int = 0) -> str:
     clean = (prompt or "").strip()
     if not clean:
         return clean
+    tags: list[str] = []
     if images_count > 0:
-        return f"{clean}\n[Afbeeldingen: {images_count}]"
+        tags.append(f"Afbeeldingen: {images_count}")
+    if documents_count > 0:
+        tags.append(f"Documenten: {documents_count}")
+    if tags:
+        return f"{clean}\n[{'; '.join(tags)}]"
     return clean
 
 
@@ -617,6 +625,11 @@ def api_signon(req: SignOnRequest):
 async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     _mark_prompt_activity()
 
+    try:
+        documents = normalize_documents(req.documents)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # Clear history if new_chat flag is set
     if req.new_chat:
         chat_history.clear(record.token)
@@ -627,16 +640,56 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
     chat_history.append(
         record.token,
         "user",
-        _format_prompt_for_history(req.prompt, len(current_images)),
-        images=current_images,
+        _format_prompt_for_history(req.prompt, len(images), len(documents)),
     )
+
+    # Generate IDs for tracking
+    request_id = generate_request_id()
+    conversation_id = generate_conversation_id(record.token)
+
+    # Build prompt with details for logging
+    final_prompt, context_details = build_augmented_prompt_with_details(
+        req.prompt,
+        history,
+        images_count=len(images),
+        documents=documents,
+    )
+
+    # Create API log entry
+    log_entry = ApiLogEntry(
+        conversation_id=conversation_id,
+        request_id=request_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        source="api",
+        endpoint="/api/v1/ask",
+        user_name=record.user_name,
+        device_id=record.device_id,
+        token_prefix=record.token[:8] if record.token else None,
+        original_prompt=req.prompt,
+        new_chat=req.new_chat,
+        history_length=len(history) if history else 0,
+        images_count=len(images),
+        documents_count=len(documents),
+        context_contacts=context_details.get("contacts", []),
+        context_devices=context_details.get("devices", []),
+        context_knowledge=context_details.get("knowledge", []),
+        context_documents=context_details.get("documents", []),
+        final_prompt_length=len(final_prompt),
+    )
+
     response = await handle_ask(
         req,
         history=history,
-        final_prompt=final_prompt,
-        images=images,
+        documents=documents,
+        final_prompt_override=final_prompt,
     )
-    chat_history.append(record.token, "assistant", response.get("message", ""))
+    message = response.get("message", "")
+
+    # Update log entry with response
+    log_entry.response_preview = message
+    log_api_request(log_entry)
+
+    chat_history.append(record.token, "assistant", message)
     return response
 
 
@@ -649,21 +702,22 @@ def api_ask_reset(record: TokenRecord = Depends(require_token)):
 async def sse_stream_generator(
     req: ChatRequest,
     history: list,
+    documents: list[ParsedDocument],
     history_key: str,
     final_prompt: Optional[str] = None,
     images: Optional[list[str]] = None,
 ):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
-    if images is None:
-        current_images = normalize_images(req.images)
-        images = merge_history_images(history, current_images)
-    if final_prompt is None:
-        final_prompt = build_augmented_prompt(
-            req.prompt,
-            history,
-            images_count=len(images),
-        )
+    images = normalize_images(req.images)
+
+    # Build prompt with details for logging
+    final_prompt, context_details = build_augmented_prompt_with_details(
+        req.prompt,
+        history,
+        images_count=len(images),
+        documents=documents,
+    )
     log_prompt(final_prompt)
 
     # Create API log entry
@@ -681,9 +735,11 @@ async def sse_stream_generator(
         new_chat=req.new_chat,
         history_length=len(history) if history else 0,
         images_count=len(images),
+        documents_count=len(documents),
         context_contacts=context_details.get("contacts", []),
         context_devices=context_details.get("devices", []),
         context_knowledge=context_details.get("knowledge", []),
+        context_documents=context_details.get("documents", []),
         final_prompt_length=len(final_prompt),
     )
 
@@ -820,6 +876,11 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     """Stream SSE response with queue position and token-by-token LLM output."""
     _mark_prompt_activity()
 
+    try:
+        documents = normalize_documents(req.documents)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # Clear history if new_chat flag is set
     if req.new_chat:
         chat_history.clear(record.token)
@@ -830,8 +891,7 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     chat_history.append(
         record.token,
         "user",
-        _format_prompt_for_history(req.prompt, len(current_images)),
-        images=current_images,
+        _format_prompt_for_history(req.prompt, len(images), len(documents)),
     )
 
     # Generate IDs for tracking
@@ -839,13 +899,7 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     conversation_id = generate_conversation_id(record.token)
 
     return StreamingResponse(
-        sse_stream_generator(
-            req,
-            history,
-            record.token,
-            final_prompt=final_prompt,
-            images=images,
-        ),
+        sse_stream_generator(req, history, documents, record.token, record, request_id, conversation_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
