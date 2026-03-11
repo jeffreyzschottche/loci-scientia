@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,6 +23,16 @@ KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge c
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
+THINKING_TAG_RE = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
+THINKING_MODEL_MARKERS = (
+    "qwen3",
+    "qwen 3",
+    "qwen3.5",
+    "deepseek-r1",
+    "deepseek_r1",
+    "deepseek-v3.1",
+    "gpt-oss",
+)
 
 
 @dataclass
@@ -462,22 +473,63 @@ def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
     return normalized
 
 
-async def _call_ollama(
+def model_supports_ollama_thinking(model: str) -> bool:
+    normalized = (model or "").strip().lower()
+    return any(marker in normalized for marker in THINKING_MODEL_MARKERS)
+
+
+def build_ollama_generate_payload(
     prompt: str,
-    options: Optional[dict] = None,
+    *,
+    stream: bool,
     images: Optional[Sequence[str]] = None,
-) -> str:
-    ollama_url = f"{settings.ollama_base_url}/api/generate"
-    payload = {
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "model": settings.ollama_model,
         "prompt": prompt,
-        "stream": False,
+        "stream": stream,
     }
     if images:
         payload["images"] = list(images)
     max_context = settings.ollama_max_context.get(settings.ollama_model)
     if isinstance(max_context, int) and max_context > 0:
         payload["options"] = {"num_ctx": max_context}
+    if model_supports_ollama_thinking(settings.ollama_model):
+        payload["think"] = True
+    return payload
+
+
+def split_ollama_response_parts(
+    response_text: Optional[str],
+    thinking_text: Optional[str] = None,
+) -> tuple[str, str]:
+    response = (response_text or "").strip()
+    thinking_parts = [part.strip() for part in [(thinking_text or "").strip()] if part.strip()]
+    if response:
+        inline_thinking = [match.strip() for match in THINKING_TAG_RE.findall(response) if match.strip()]
+        if inline_thinking:
+            thinking_parts.extend(inline_thinking)
+            response = THINKING_TAG_RE.sub("", response).strip()
+    seen: set[str] = set()
+    ordered_thinking: list[str] = []
+    for part in thinking_parts:
+        if part and part not in seen:
+            seen.add(part)
+            ordered_thinking.append(part)
+    return ("\n\n".join(ordered_thinking).strip(), response)
+
+
+async def _call_ollama(
+    prompt: str,
+    options: Optional[dict] = None,
+    images: Optional[Sequence[str]] = None,
+) -> dict[str, str]:
+    ollama_url = f"{settings.ollama_base_url}/api/generate"
+    payload = build_ollama_generate_payload(
+        prompt,
+        stream=False,
+        images=images,
+    )
     if options:
         if "options" in payload:
             payload["options"].update(options)
@@ -487,7 +539,11 @@ async def _call_ollama(
         response = await client.post(ollama_url, json=payload)
         response.raise_for_status()
         data = response.json()
-        return (data.get("response") or "").strip()
+        thinking, message = split_ollama_response_parts(
+            response_text=data.get("response"),
+            thinking_text=data.get("thinking"),
+        )
+        return {"thinking": thinking, "message": message}
 
 
 def _fallback_response(original_prompt: str) -> str:
@@ -522,8 +578,11 @@ async def handle_ask(
         images_count=len(images),
     )
     log_prompt(final_prompt)
+    thinking = ""
     try:
-        message = await _call_ollama(final_prompt, images=images)
+        result = await _call_ollama(final_prompt, images=images)
+        message = result.get("message", "").strip()
+        thinking = result.get("thinking", "").strip()
     except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout
         logger.warning(
             "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
@@ -551,4 +610,4 @@ async def handle_ask(
         message = _fallback_response(req.prompt)
     if not message:
         message = t("no_response_generated")
-    return {"message": message}
+    return {"message": message, "thinking": thinking}

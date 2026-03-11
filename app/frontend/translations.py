@@ -1065,6 +1065,18 @@ TRANSLATIONS = {
         "nl": "Gekopieerd",
         "en": "Copied",
     },
+    "chat_thinking_block": {
+        "nl": "Nadenken",
+        "en": "Thinking",
+    },
+    "chat_response_block": {
+        "nl": "Antwoord",
+        "en": "Response",
+    },
+    "chat_response_pending": {
+        "nl": "Antwoord wordt opgebouwd...",
+        "en": "Response is being generated...",
+    },
 
     # ============================================
     # KNOWLEDGE PAGE (additional)
