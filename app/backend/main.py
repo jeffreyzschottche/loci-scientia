@@ -27,7 +27,8 @@ from fastapi.staticfiles import StaticFiles
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import (
     ApiLogEntry,
-    ParsedDocument,
+    build_ollama_generate_payload,
+    build_augmented_prompt,
     build_augmented_prompt_with_details,
     generate_conversation_id,
     generate_request_id,
@@ -36,7 +37,7 @@ from .apiAsk import (
     log_prompt,
     normalize_documents,
     normalize_images,
-    prepare_prompt,
+    split_ollama_response_parts,
     summarize_history,
 )
 from .chat_history import ChatHistoryStore
@@ -744,6 +745,7 @@ async def sse_stream_generator(
     )
 
     assistant_chunks: list[str] = []
+    thinking_chunks: list[str] = []
     error_message: Optional[str] = None
     mock_response: Optional[str] = None
 
@@ -755,16 +757,11 @@ async def sse_stream_generator(
 
     # Call Ollama API with streaming
     ollama_url = f"{settings.ollama_base_url}/api/generate"
-    ollama_payload = {
-        "model": settings.ollama_model,
-        "prompt": final_prompt,
-        "stream": True,
-    }
-    if images:
-        ollama_payload["images"] = list(images)
-    max_context = settings.ollama_max_context.get(settings.ollama_model)
-    if isinstance(max_context, int) and max_context > 0:
-        ollama_payload["options"] = {"num_ctx": max_context}
+    ollama_payload = build_ollama_generate_payload(
+        final_prompt,
+        stream=True,
+        images=images,
+    )
 
     try:
         async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
@@ -789,7 +786,14 @@ async def sse_stream_generator(
                     try:
                         data = json.loads(line)
 
-                        # Ollama sends token in "response" field
+                        if "thinking" in data:
+                            token = data["thinking"]
+                            if token:
+                                thinking_chunks.append(token)
+                                event_data = json.dumps({"thinking": token, "done": False})
+                                yield f"data: {event_data}\n\n"
+
+                        # Ollama sends answer tokens in "response" field
                         if "response" in data:
                             token = data["response"]
                             if token:  # Only send non-empty tokens
@@ -857,7 +861,12 @@ async def sse_stream_generator(
             yield f"data: {event_data}\n\n"
             await asyncio.sleep(0.1)
 
-    assistant_text = "".join(assistant_chunks).strip()
+    raw_assistant_text = "".join(assistant_chunks).strip()
+    raw_thinking_text = "".join(thinking_chunks).strip()
+    thinking_text, assistant_text = split_ollama_response_parts(
+        response_text=raw_assistant_text,
+        thinking_text=raw_thinking_text,
+    )
     if assistant_text:
         chat_history.append(history_key, "assistant", assistant_text)
 
@@ -867,7 +876,13 @@ async def sse_stream_generator(
     log_api_request(log_entry)
 
     # Send final done event
-    event_data = json.dumps({"done": True})
+    event_data = json.dumps(
+        {
+            "done": True,
+            "message": assistant_text,
+            "thinking": thinking_text,
+        }
+    )
     yield f"data: {event_data}\n\n"
 
 

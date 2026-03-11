@@ -7,7 +7,7 @@ import json
 import requests
 from datetime import datetime
 from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QTextDocument, QTextOption
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QTextBrowser,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -28,16 +30,225 @@ from ..translations import t, register_language_change_callback
 API_BASE = BACKEND_HTTP
 MAX_BUBBLE_WIDTH = 680
 ROW_GAP = 12
-SIDE_PADDING = 28
+SIDE_PADDING = 12
 ASSISTANT_AVATAR_SIZE = 32
-ASSISTANT_MAX_WIDTH = 820
-MODE_DEFAULT_KEY = "__default__"
+ASSISTANT_MAX_WIDTH = 900
+ASSISTANT_MIN_WIDTH = 640
 
 
 class ChatSignals(QObject):
-    token = Signal(str)
+    response_token = Signal(str)
+    thinking_token = Signal(str)
+    final_payload = Signal(str, str)
     done = Signal()
     queue_position = Signal(int)
+
+
+class AutoSizingMarkdownView(QTextBrowser):
+    def __init__(self):
+        super().__init__()
+        self._plain_text = ""
+        self._syncing_height = False
+        self.setReadOnly(True)
+        self.setOpenExternalLinks(True)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setLineWrapMode(QTextBrowser.WidgetWidth)
+        self.setStyleSheet("background:transparent; border:none;")
+        self.document().setDocumentMargin(0)
+        option = self.document().defaultTextOption()
+        option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.document().setDefaultTextOption(option)
+        self.document().setDefaultStyleSheet(
+            """
+            body { color:#111827; font-size:14px; line-height:1.55; overflow-wrap:anywhere; word-break:break-word; }
+            p { margin:0 0 10px 0; overflow-wrap:anywhere; word-break:break-word; }
+            h1, h2, h3, h4 { margin:14px 0 8px 0; color:#111111; font-weight:700; }
+            ul, ol { margin:0 0 10px 20px; }
+            li { margin:0 0 4px 0; overflow-wrap:anywhere; word-break:break-word; }
+            a { color:#0f766e; text-decoration:none; }
+            blockquote {
+                margin:10px 0;
+                padding:8px 12px;
+                border-left:4px solid #f59e0b;
+                background:#fffbeb;
+                color:#44403c;
+                overflow-wrap:anywhere;
+                word-break:break-word;
+            }
+            code {
+                font-family:"SFMono-Regular","Cascadia Mono","DejaVu Sans Mono",monospace;
+                background:#f3f4f6;
+                padding:2px 5px;
+                border-radius:6px;
+                overflow-wrap:anywhere;
+                word-break:break-word;
+            }
+            pre {
+                margin:10px 0;
+                padding:12px 14px;
+                background:#111827;
+                color:#f9fafb;
+                border-radius:12px;
+                white-space:pre-wrap;
+                word-wrap:break-word;
+                overflow-wrap:anywhere;
+                word-break:break-word;
+            }
+            pre code {
+                background:transparent;
+                padding:0;
+            }
+            """
+        )
+        layout = self.document().documentLayout()
+        if layout is not None:
+            layout.documentSizeChanged.connect(self._queue_sync_height)
+
+    def set_markdown_text(self, text: str, placeholder: str = "") -> None:
+        self._plain_text = text or ""
+        if self._plain_text.strip():
+            self.setMarkdown(self._plain_text)
+        elif placeholder:
+            self.setHtml(f"<p>{html.escape(placeholder)}</p>")
+        else:
+            self.setHtml("")
+        self._queue_sync_height()
+
+    def plain_text(self) -> str:
+        return self._plain_text
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._queue_sync_height()
+
+    def _queue_sync_height(self, *_args) -> None:
+        if self._syncing_height:
+            return
+        QTimer.singleShot(0, self._sync_height)
+
+    def _sync_height(self) -> None:
+        if self._syncing_height:
+            return
+        self._syncing_height = True
+        try:
+            width = max(0, self.viewport().width() - 4)
+            if abs(self.document().textWidth() - width) > 1:
+                self.document().setTextWidth(width)
+            self.document().adjustSize()
+            height = int(self.document().size().height()) + 8
+            self.setFixedHeight(max(28, height))
+        finally:
+            self._syncing_height = False
+
+
+class AssistantMessageWidget(QWidget):
+    thinking_toggled = Signal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self._response_text = ""
+        self._thinking_text = ""
+        self._thinking_initialized = False
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        self.setMinimumWidth(ASSISTANT_MIN_WIDTH)
+
+        self.thinking_card = QFrame()
+        self.thinking_card.setStyleSheet(
+            "QFrame {"
+            "  background:#f8fafc;"
+            "  border:1px solid #dbe4ef;"
+            "  border-radius:16px;"
+            "}"
+        )
+        thinking_layout = QVBoxLayout(self.thinking_card)
+        thinking_layout.setContentsMargins(12, 10, 12, 12)
+        thinking_layout.setSpacing(8)
+
+        self.thinking_toggle = QToolButton()
+        self.thinking_toggle.setCheckable(True)
+        self.thinking_toggle.setChecked(True)
+        self.thinking_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.thinking_toggle.setStyleSheet(
+            "QToolButton {"
+            "  border:none;"
+            "  color:#334155;"
+            "  font-size:12px;"
+            "  font-weight:700;"
+            "  text-align:left;"
+            "}"
+        )
+        self.thinking_toggle.clicked.connect(self._toggle_thinking)
+        thinking_layout.addWidget(self.thinking_toggle, 0, Qt.AlignLeft)
+
+        self.thinking_view = QLabel()
+        self.thinking_view.setWordWrap(True)
+        self.thinking_view.setTextFormat(Qt.PlainText)
+        self.thinking_view.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.thinking_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.thinking_view.setStyleSheet(
+            "background:transparent; border:none; color:#334155; line-height:1.5;"
+        )
+        thinking_layout.addWidget(self.thinking_view)
+        layout.addWidget(self.thinking_card)
+
+        self.response_view = AutoSizingMarkdownView()
+        self.response_view.setStyleSheet("background:transparent; border:none; color:#111827;")
+        layout.addWidget(self.response_view)
+
+        self.set_thinking_text("")
+        self.set_response_text("")
+
+    def set_response_text(self, text: str) -> None:
+        self._response_text = text or ""
+        self.response_view.set_markdown_text(self._response_text)
+
+    def set_thinking_text(self, text: str) -> None:
+        self._thinking_text = text or ""
+        has_thinking = bool(self._thinking_text.strip())
+        self.thinking_card.setVisible(has_thinking)
+        self.thinking_toggle.setText(t("chat_thinking_block"))
+        if has_thinking:
+            self.thinking_view.setText(self._thinking_text)
+            if not self._thinking_initialized:
+                self._thinking_initialized = True
+                self.set_thinking_expanded(False)
+            else:
+                self._update_thinking_arrow()
+        else:
+            self.thinking_view.setText("")
+            self._update_thinking_arrow()
+
+    def response_text(self) -> str:
+        return self._response_text
+
+    def thinking_text(self) -> str:
+        return self._thinking_text
+
+    def has_thinking(self) -> bool:
+        return bool(self._thinking_text.strip())
+
+    def is_thinking_expanded(self) -> bool:
+        return self.thinking_toggle.isChecked()
+
+    def set_thinking_expanded(self, expanded: bool) -> None:
+        self.thinking_toggle.setChecked(expanded)
+        self._update_thinking_arrow()
+        self.thinking_toggled.emit(expanded)
+
+    def _toggle_thinking(self) -> None:
+        self.set_thinking_expanded(self.thinking_toggle.isChecked())
+
+    def _update_thinking_arrow(self) -> None:
+        self.thinking_toggle.setArrowType(
+            Qt.DownArrow if self.thinking_toggle.isChecked() else Qt.RightArrow
+        )
+        self.thinking_view.setVisible(self.thinking_toggle.isChecked())
 
 
 class ChatPage(QWidget):
@@ -45,8 +256,9 @@ class ChatPage(QWidget):
         super().__init__()
         self.ws_client = ws_client
         self.signals = ChatSignals()
-        self.current_message = ""  # Buffer for accumulating tokens
-        self.current_reply_label: QLabel | None = None
+        self.current_response_text = ""
+        self.current_thinking_text = ""
+        self.current_reply_widget: AssistantMessageWidget | None = None
         self.queue_label: QLabel | None = None
         self.message_rows: list[QWidget] = []
         self._bearer_token = BACKEND_BEARER_TOKEN or ""
@@ -173,7 +385,9 @@ class ChatPage(QWidget):
 
         self.send_btn.clicked.connect(self._on_send)
         self.input.returnPressed.connect(self._on_send)
-        self.signals.token.connect(self._on_token)
+        self.signals.response_token.connect(self._on_response_token)
+        self.signals.thinking_token.connect(self._on_thinking_token)
+        self.signals.final_payload.connect(self._on_final_payload)
         self.signals.done.connect(self._on_done)
         self.signals.queue_position.connect(self._on_queue_position)
 
@@ -206,8 +420,9 @@ class ChatPage(QWidget):
     def _start_new_chat(self):
         """Reset the conversation history."""
         self._clear_history()
-        self.current_message = ""
-        self.current_reply_label = None
+        self.current_response_text = ""
+        self.current_thinking_text = ""
+        self.current_reply_widget = None
         self.queue_label = None
         asyncio.create_task(self._reset_remote_history())
 
@@ -218,8 +433,9 @@ class ChatPage(QWidget):
             return
         self._append_message("user", text)
         self.input.clear()
-        self.current_message = ""  # Reset message buffer
-        self.current_reply_label = None
+        self.current_response_text = ""
+        self.current_thinking_text = ""
+        self.current_reply_widget = None
         self._show_typing_indicator()
         asyncio.create_task(self._stream(text, self.selected_mode))
 
@@ -247,26 +463,28 @@ class ChatPage(QWidget):
                     self._auto_token_error
                     or f"{t('chat_error_prefix')} {t('chat_error_401')}"
                 )
-                self.signals.token.emit(message)
+                self.signals.response_token.emit(message)
                 self.signals.done.emit()
                 return
             if status != 404:
-                message = self._format_http_error(exc)
-                self.signals.token.emit(message)
+                self.signals.response_token.emit(f"{t('chat_error_prefix')} {exc}")
                 self.signals.done.emit()
                 return
             # 404 betekent dat streaming endpoint nog niet bestaat -> fallback
         except Exception as exc:
-            self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
+            self.signals.response_token.emit(f"{t('chat_error_prefix')} {exc}")
             self.signals.done.emit()
             return
 
         try:
-            message = await asyncio.to_thread(self._legacy_post, prompt, mode)
+            payload = await asyncio.to_thread(self._legacy_post, prompt)
         except Exception as exc:
-            self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
+            self.signals.response_token.emit(f"{t('chat_error_prefix')} {exc}")
         else:
-            self.signals.token.emit(message)
+            self.signals.final_payload.emit(
+                payload.get("thinking", ""),
+                payload.get("message", ""),
+            )
         self.signals.done.emit()
 
     def _stream_sse(self, prompt: str, mode: str | None = None) -> None:
@@ -305,20 +523,30 @@ class ChatPage(QWidget):
                     self.signals.queue_position.emit(position)
                     continue
 
+                if "thinking" in event_data and not event_data.get("done"):
+                    token = event_data.get("thinking") or ""
+                    if token:
+                        self.signals.thinking_token.emit(token)
+                    continue
+
                 if "token" in event_data and not event_data.get("done"):
                     token = event_data.get("token") or ""
                     if token:
-                        self.signals.token.emit(token)
+                        self.signals.response_token.emit(token)
                     continue
 
                 if event_data.get("done"):
+                    self.signals.final_payload.emit(
+                        event_data.get("thinking", "") or "",
+                        event_data.get("message", "") or "",
+                    )
                     self.signals.done.emit()
                     return
 
         # Als de stream eindigt zonder done-event, sluit netjes af.
         self.signals.done.emit()
 
-    def _legacy_post(self, prompt: str, mode: str | None = None) -> str:
+    def _legacy_post(self, prompt: str) -> dict[str, str]:
         """Fallback naar het niet-streamende endpoint."""
 
         endpoints = ["/api/v1/ask"]
@@ -349,10 +577,13 @@ class ChatPage(QWidget):
             try:
                 data = resp.json()
             except ValueError:
-                return resp.text.strip() or t("chat_empty_response")
+                return {"message": resp.text.strip() or t("chat_empty_response"), "thinking": ""}
             if isinstance(data, dict):
-                return data.get("message") or data.get("text") or str(data)
-            return str(data)
+                return {
+                    "message": data.get("message") or data.get("text") or str(data),
+                    "thinking": data.get("thinking") or "",
+                }
+            return {"message": str(data), "thinking": ""}
         raise last_error or RuntimeError(t("chat_no_valid_response"))
 
     def _format_http_error(self, exc: requests.HTTPError) -> str:
@@ -417,28 +648,49 @@ class ChatPage(QWidget):
         return str(detail)
 
     @Slot(str)
-    def _on_token(self, token: str):
-        """Append token to the current message."""
+    def _on_response_token(self, token: str):
         if token.startswith(t("chat_error_prefix")):
-            if self.current_reply_label is None:
-                self.current_reply_label = self._append_message("assistant", token)
-            else:
-                self._set_label_text(self.current_reply_label, token)
-            self.current_message = token
+            widget = self._ensure_current_reply_widget()
+            self.current_response_text = token
+            widget.set_response_text(token)
+            widget.set_thinking_text("")
             return
 
-        if self.queue_label:
-            container = self.queue_label.parentWidget()
-            self.history_layout.removeWidget(container)
-            container.deleteLater()
-            self.queue_label = None
+        self._dismiss_queue_label()
+        self.current_response_text += token
 
-        if self.current_reply_label is None:
-            self.current_reply_label = self._append_message("assistant", token)
-            self.current_message = token
-        else:
-            self.current_message += token
-            self._set_label_text(self.current_reply_label, self.current_message)
+    @Slot(str)
+    def _on_thinking_token(self, token: str):
+        if not token:
+            return
+        self._dismiss_queue_label()
+        widget = self._ensure_current_reply_widget()
+        self.current_thinking_text += token
+        widget.set_thinking_text(self.current_thinking_text)
+
+    @Slot(str, str)
+    def _on_final_payload(self, thinking: str, message: str):
+        if not thinking and not message:
+            return
+        widget = self._ensure_current_reply_widget()
+        self.current_thinking_text = thinking or self.current_thinking_text
+        self.current_response_text = message or self.current_response_text
+        widget.set_thinking_text(self.current_thinking_text)
+        widget.set_response_text(self.current_response_text)
+        self._scroll_to_bottom()
+
+    def _ensure_current_reply_widget(self) -> AssistantMessageWidget:
+        if self.current_reply_widget is None:
+            self.current_reply_widget = self._append_message("assistant", "")
+        return self.current_reply_widget
+
+    def _dismiss_queue_label(self) -> None:
+        if not self.queue_label:
+            return
+        container = self.queue_label.parentWidget()
+        self.history_layout.removeWidget(container)
+        container.deleteLater()
+        self.queue_label = None
 
     def _auth_headers(self) -> dict[str, str] | None:
         token = self._ensure_token()
@@ -515,13 +767,18 @@ class ChatPage(QWidget):
     @Slot()
     def _on_done(self):
         """Finalize the current message."""
-        assistant_text = (self.current_message or "").strip()
-        if self.current_reply_label and not assistant_text:
+        assistant_text = self.current_response_text.strip()
+        if assistant_text and self.current_reply_widget is None:
+            self.current_reply_widget = self._append_message("assistant", "")
+            self.current_reply_widget.set_thinking_text(self.current_thinking_text)
+            self.current_reply_widget.set_response_text(assistant_text)
+        if self.current_reply_widget and not assistant_text:
             fallback = t("chat_no_response")
-            self._set_label_text(self.current_reply_label, fallback)
+            self.current_reply_widget.set_response_text(fallback)
             assistant_text = fallback
-        self.current_message = ""
-        self.current_reply_label = None
+        self.current_response_text = ""
+        self.current_thinking_text = ""
+        self.current_reply_widget = None
 
     @Slot(int)
     def _on_queue_position(self, position: int):
@@ -552,7 +809,7 @@ class ChatPage(QWidget):
         self._scroll_to_bottom()
         return label
 
-    def _append_message(self, role: str, text: str) -> QLabel:
+    def _append_message(self, role: str, text: str) -> QLabel | AssistantMessageWidget:
         if self.empty_label:
             self.empty_label.hide()
 
@@ -564,7 +821,10 @@ class ChatPage(QWidget):
 
         row_inner = QWidget()
         row_inner.setMaximumWidth(ASSISTANT_MAX_WIDTH if role == "assistant" else MAX_BUBBLE_WIDTH)
-        row_inner.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        row_inner.setSizePolicy(
+            QSizePolicy.Expanding if role == "assistant" else QSizePolicy.Maximum,
+            QSizePolicy.Maximum,
+        )
         inner_layout = QHBoxLayout(row_inner)
         inner_layout.setContentsMargins(0, 0, 0, 0)
         inner_layout.setSpacing(12)
@@ -575,7 +835,10 @@ class ChatPage(QWidget):
             bubble.setStyleSheet("background:#111111; border:1px solid #111111; border-radius:20px;")
         max_width = ASSISTANT_MAX_WIDTH if role == "assistant" else MAX_BUBBLE_WIDTH
         bubble.setMaximumWidth(int(max_width * (0.82 if role == "user" else 1.0)))
-        bubble.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        bubble.setSizePolicy(
+            QSizePolicy.Expanding if role == "assistant" else QSizePolicy.Maximum,
+            QSizePolicy.Maximum,
+        )
         bubble_layout = QVBoxLayout(bubble)
         bubble_layout.setContentsMargins(18, 14, 18, 14)
         bubble_layout.setSpacing(8)
@@ -589,26 +852,21 @@ class ChatPage(QWidget):
         )
         top_row.addWidget(role_chip, 0, Qt.AlignLeft)
         top_row.addStretch(1)
-
-        label = QLabel()
-        label.setWordWrap(True)
-        text_color = "#ffffff" if role == "user" else "#111111"
-        label.setStyleSheet(f"border:none; background:transparent; color:{text_color};")
-        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self._set_label_text(label, text)
-
         timestamp_label = QLabel(datetime.now().strftime("%H:%M"))
         timestamp_label.setStyleSheet(
-            f"font-size:11px; color:{text_color if role == 'user' else '#6b7280'};"
+            f"font-size:11px; color:{'#ffffff' if role == 'user' else '#6b7280'};"
         )
 
         if role == "assistant":
+            content_widget = AssistantMessageWidget()
+            content_widget.set_response_text(text)
+
             copy_btn = QPushButton(t("chat_copy"))
             copy_btn.setObjectName("CopyButton")
             copy_btn.setCursor(Qt.PointingHandCursor)
             copy_btn.setFixedHeight(26)
             copy_btn.clicked.connect(
-                lambda _, lbl=label, btn=copy_btn: self._handle_copy_click(lbl, btn)
+                lambda _, widget=content_widget, btn=copy_btn: self._handle_copy_click(widget, btn)
             )
             top_row.addWidget(copy_btn, 0, Qt.AlignRight)
 
@@ -616,14 +874,22 @@ class ChatPage(QWidget):
             print_btn.setObjectName("CopyButton")
             print_btn.setCursor(Qt.PointingHandCursor)
             print_btn.setFixedHeight(26)
-            print_btn.clicked.connect(lambda _, lbl=label: self._print_label_text(lbl))
+            print_btn.clicked.connect(lambda _, widget=content_widget: self._print_assistant_text(widget))
             top_row.addWidget(print_btn, 0, Qt.AlignRight)
+        else:
+            label = QLabel()
+            label.setWordWrap(True)
+            label.setStyleSheet("border:none; background:transparent; color:#ffffff;")
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            self._set_label_text(label, text)
 
         bubble_layout.addLayout(top_row)
-        bubble_layout.addWidget(label)
-        bubble_layout.addWidget(
-            timestamp_label, 0, Qt.AlignRight if role == "user" else Qt.AlignLeft
-        )
+        if role == "assistant":
+            bubble_layout.addWidget(content_widget)
+        else:
+            bubble_layout.addWidget(label)
+
+        bubble_layout.addWidget(timestamp_label, 0, Qt.AlignRight if role == "user" else Qt.AlignLeft)
 
         if role == "user":
             user_avatar = QLabel("👤")
@@ -647,7 +913,7 @@ class ChatPage(QWidget):
         self._insert_history_row(row_outer)
         self.message_rows.append(row_outer)
         self._scroll_to_bottom()
-        return label
+        return content_widget if role == "assistant" else label
 
     def _build_assistant_avatar(self) -> QLabel:
         avatar = QLabel("🥚")
@@ -657,22 +923,23 @@ class ChatPage(QWidget):
         return avatar
 
     def _show_typing_indicator(self):
-        if self.current_reply_label is not None:
+        if self.current_reply_widget is not None:
             return
-        self.current_reply_label = self._append_message("assistant", "💬")
-        self.current_message = ""
+        self.current_reply_widget = self._append_message("assistant", "")
+        self.current_response_text = ""
+        self.current_thinking_text = ""
 
     def _copy_text(self, text: str):
         clipboard = QApplication.clipboard()
         clipboard.setText(text)
 
-    def _copy_label_text(self, label: QLabel):
-        text = label.property("_plain_text") or label.text()
-        if isinstance(text, str):
+    def _copy_assistant_text(self, widget: AssistantMessageWidget):
+        text = widget.response_text() or widget.thinking_text()
+        if text:
             self._copy_text(text)
 
-    def _handle_copy_click(self, label: QLabel, button: QPushButton):
-        self._copy_label_text(label)
+    def _handle_copy_click(self, widget: AssistantMessageWidget, button: QPushButton):
+        self._copy_assistant_text(widget)
         original = button.text()
         button.setText(t("chat_copied"))
         button.setEnabled(False)
@@ -683,9 +950,9 @@ class ChatPage(QWidget):
 
         QTimer.singleShot(2000, _restore)
 
-    def _print_label_text(self, label: QLabel):
-        text = label.property("_plain_text") or label.text()
-        if not isinstance(text, str):
+    def _print_assistant_text(self, widget: AssistantMessageWidget):
+        text = widget.response_text() or widget.thinking_text()
+        if not text:
             return
         printer = QPrinter()
         dialog = QPrintDialog(printer, self)
