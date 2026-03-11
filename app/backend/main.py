@@ -36,6 +36,7 @@ from .apiAsk import (
     log_prompt,
     normalize_documents,
     normalize_images,
+    prepare_prompt,
     summarize_history,
 )
 from .chat_history import ChatHistoryStore
@@ -235,6 +236,24 @@ def _format_prompt_for_history(prompt: str, images_count: int, documents_count: 
     if tags:
         return f"{clean}\n[{'; '.join(tags)}]"
     return clean
+
+
+def _ensure_prompt_within_context(final_prompt: str) -> None:
+    max_context = settings.ollama_max_context.get(settings.ollama_model)
+    if not isinstance(max_context, int) or max_context <= 0:
+        return
+    estimated_tokens = estimate_prompt_tokens(final_prompt)
+    if estimated_tokens > max_context:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": (
+                    "Context limit reached. Start a new session or delete some context from this prompt."
+                ),
+                "estimated_tokens": estimated_tokens,
+                "max_context": max_context,
+            },
+        )
 
 
 async def _run_summary_cycle() -> None:
@@ -616,7 +635,8 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         chat_history.clear(record.token)
 
     history = chat_history.get(record.token)
-    images = normalize_images(req.images)
+    final_prompt, images, current_images = prepare_prompt(req, history=history)
+    _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
         "user",
@@ -684,9 +704,8 @@ async def sse_stream_generator(
     history: list,
     documents: list[ParsedDocument],
     history_key: str,
-    record: TokenRecord,
-    request_id: str,
-    conversation_id: str,
+    final_prompt: Optional[str] = None,
+    images: Optional[list[str]] = None,
 ):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
 
@@ -712,6 +731,7 @@ async def sse_stream_generator(
         device_id=record.device_id,
         token_prefix=record.token[:8] if record.token else None,
         original_prompt=req.prompt,
+        mode=req.mode,
         new_chat=req.new_chat,
         history_length=len(history) if history else 0,
         images_count=len(images),
@@ -866,7 +886,8 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
         chat_history.clear(record.token)
 
     history = chat_history.get(record.token)
-    images = normalize_images(req.images)
+    final_prompt, images, current_images = prepare_prompt(req, history=history)
+    _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
         "user",

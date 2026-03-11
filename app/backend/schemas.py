@@ -7,6 +7,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"] = "user"
     content: str
+    images: list[str] = Field(default_factory=list)
 
 
 class PromptDocument(BaseModel):
@@ -22,6 +23,7 @@ class PromptDocument(BaseModel):
 
 class ChatRequest(BaseModel):
     prompt: str
+    mode: Optional[str] = None
     max_new_tokens: int = 128
     history: list[ChatMessage] = Field(default_factory=list)
     images: list[str] = Field(default_factory=list)
