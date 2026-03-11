@@ -145,6 +145,8 @@ class AutoSizingMarkdownView(QTextBrowser):
 
 
 class AssistantMessageWidget(QWidget):
+    thinking_toggled = Signal(bool)
+
     def __init__(self):
         super().__init__()
         self._response_text = ""
@@ -211,15 +213,16 @@ class AssistantMessageWidget(QWidget):
         has_thinking = bool(self._thinking_text.strip())
         self.thinking_card.setVisible(has_thinking)
         self.thinking_toggle.setText(t("chat_thinking_block"))
-        self._update_thinking_arrow()
         if has_thinking:
             self.thinking_view.setText(self._thinking_text)
             if not self._thinking_initialized:
                 self._thinking_initialized = True
-                self.thinking_toggle.setChecked(True)
+                self.set_thinking_expanded(False)
+            else:
                 self._update_thinking_arrow()
         else:
             self.thinking_view.setText("")
+            self._update_thinking_arrow()
 
     def response_text(self) -> str:
         return self._response_text
@@ -227,10 +230,19 @@ class AssistantMessageWidget(QWidget):
     def thinking_text(self) -> str:
         return self._thinking_text
 
-    def _toggle_thinking(self) -> None:
-        visible = self.thinking_toggle.isChecked()
-        self.thinking_view.setVisible(visible)
+    def has_thinking(self) -> bool:
+        return bool(self._thinking_text.strip())
+
+    def is_thinking_expanded(self) -> bool:
+        return self.thinking_toggle.isChecked()
+
+    def set_thinking_expanded(self, expanded: bool) -> None:
+        self.thinking_toggle.setChecked(expanded)
         self._update_thinking_arrow()
+        self.thinking_toggled.emit(expanded)
+
+    def _toggle_thinking(self) -> None:
+        self.set_thinking_expanded(self.thinking_toggle.isChecked())
 
     def _update_thinking_arrow(self) -> None:
         self.thinking_toggle.setArrowType(
@@ -526,7 +538,6 @@ class ChatPage(QWidget):
         widget = self._ensure_current_reply_widget()
         self.current_thinking_text += token
         widget.set_thinking_text(self.current_thinking_text)
-        self._scroll_to_bottom()
 
     @Slot(str, str)
     def _on_final_payload(self, thinking: str, message: str):
