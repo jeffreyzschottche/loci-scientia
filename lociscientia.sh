@@ -100,6 +100,29 @@ _wait_for_ollama() {
     return 1
 }
 
+running_kernel_has_headers() {
+    local kernel
+    kernel="$(uname -r)"
+    [ -d "/usr/src/linux-headers-$kernel" ]
+}
+
+report_gpu_runtime_status() {
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        if nvidia-smi >/dev/null 2>&1; then
+            echo "✅ NVIDIA driver actief"
+            return 0
+        fi
+    fi
+
+    if lspci 2>/dev/null | grep -qi 'NVIDIA'; then
+        echo "⚠️  NVIDIA GPU gedetecteerd, maar driver/runtime is niet actief."
+        if ! running_kernel_has_headers; then
+            echo "⚠️  Kernel headers voor $(uname -r) ontbreken; NVIDIA DKMS kan daardoor niet bouwen."
+        fi
+    fi
+    return 1
+}
+
 detect_platform() {
     local uname_s
     uname_s="$(uname -s 2>/dev/null || echo unknown)"
@@ -387,7 +410,10 @@ start_ollama() {
         return 1
     fi
 
+    report_gpu_runtime_status || true
+
     MODEL_NAME="${OLLAMA_MODEL:-gemma3:4b}"
+    ollama_host="${OLLAMA_BASE_URL:-${OLLAMA_HOST:-http://127.0.0.1:11434}}"
     kv_cache_type_raw="${OLLAMA_KV_CACHE_TYPE:-${OLLAMA_KV_QUANT:-}}"
     kv_cache_type="$(_trim "${kv_cache_type_raw%%,*}")"
     kv_cache_type="$(printf '%s' "$kv_cache_type" | tr '[:upper:]' '[:lower:]')"
@@ -410,12 +436,14 @@ start_ollama() {
     fi
 
     echo "⏳ Ollama server starten..."
+    export OLLAMA_HOST="$ollama_host"
     if [ -n "$kv_cache_type" ]; then
         export OLLAMA_KV_CACHE_TYPE="$kv_cache_type"
         echo "✅ OLLAMA_KV_CACHE_TYPE=$OLLAMA_KV_CACHE_TYPE"
     else
         unset OLLAMA_KV_CACHE_TYPE
     fi
+    echo "✅ OLLAMA_HOST=$OLLAMA_HOST"
     _run_ollama serve > "$PROJECT_ROOT/ollama.log" 2>&1 &
     ollama_pid=$!
     echo "$ollama_pid" > "$PROJECT_ROOT/ollama.pid" 2>/dev/null || true
