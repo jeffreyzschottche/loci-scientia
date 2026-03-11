@@ -2,28 +2,31 @@ import logging
 import math
 import re
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 import httpx
 
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
+from .knowledge_repository import KnowledgeRepository
 from .schemas import ChatMessage, ChatRequest, Contact, Device
 from .settings import settings
-from .translations import t, get_current_language
+from .translations import t
 
 logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_ITEMS = 3
-MIN_CONTEXT_SCORE = 0.35
+MIN_CONTEXT_SCORE = 0.25
+KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
+PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 _TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
 
 contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
+knowledge_repo = KnowledgeRepository()
 
 
 def describe_contact(contact: Contact) -> str:
@@ -89,6 +92,17 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
             )
         )
 
+    knowledge_hits = knowledge_repo.search_chunks(prompt_text, limit=5)
+    for payload, score in knowledge_hits:
+        text = _flatten_multiline(str(payload.get("text") or ""))
+        if not text:
+            continue
+        title = payload.get("document_title") or payload.get("doc_id") or "doc"
+        prefix = f"{title}"
+        snippet = text[:KNOWLEDGE_SNIPPET_LENGTH] + ("…" if len(text) > KNOWLEDGE_SNIPPET_LENGTH else "")
+        desc = f"{prefix}: {snippet}"
+        scored.append(("knowledge", desc, float(score or 0.0)))
+
     if not scored:
         return []
 
@@ -103,16 +117,118 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
     return lines
 
 
-def _prompt_template() -> str:
-    """Get the prompt template - NOT cached to allow language changes."""
+def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str, List]]:
+    """Gather context lines AND detailed info for logging."""
+    scored: list[tuple[str, str, float]] = []
+    details: Dict[str, List] = {
+        "contacts": [],
+        "devices": [],
+        "knowledge": [],
+    }
+
+    contact_hits = contacts_repo.search_contacts(prompt_text, limit=5)
+    if not contact_hits and hasattr(contacts_repo, "keyword_search_contacts"):
+        contact_hits = contacts_repo.keyword_search_contacts(prompt_text, limit=5)
+    for contact, score in contact_hits:
+        scored.append(
+            (
+                "contact",
+                _flatten_multiline(describe_contact(contact)),
+                float(score or 0.0),
+            )
+        )
+        details["contacts"].append({
+            "name": contact.name,
+            "score": float(score or 0.0),
+        })
+
+    device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    for device, score in device_hits:
+        scored.append(
+            (
+                "device",
+                _flatten_multiline(describe_device(device)),
+                float(score or 0.0),
+            )
+        )
+        details["devices"].append({
+            "user_name": device.user_name,
+            "device_name": device.device_name,
+            "score": float(score or 0.0),
+        })
+
+    knowledge_hits = knowledge_repo.search_chunks(prompt_text, limit=5)
+    for payload, score in knowledge_hits:
+        text = _flatten_multiline(str(payload.get("text") or ""))
+        if not text:
+            continue
+        title = payload.get("document_title") or payload.get("doc_id") or "doc"
+        prefix = f"{title}"
+        snippet = text[:KNOWLEDGE_SNIPPET_LENGTH] + ("..." if len(text) > KNOWLEDGE_SNIPPET_LENGTH else "")
+        desc = f"{prefix}: {snippet}"
+        scored.append(("knowledge", desc, float(score or 0.0)))
+        details["knowledge"].append({
+            "doc_id": payload.get("doc_id"),
+            "title": title,
+            "score": float(score or 0.0),
+            "snippet": text[:100] + ("..." if len(text) > 100 else ""),
+        })
+
+    if not scored:
+        return [], details
+
+    scored.sort(key=lambda item: item[2], reverse=True)
+    best_score = scored[0][2]
+    threshold = max(MIN_CONTEXT_SCORE, best_score * 0.7)
+    filtered = [item for item in scored if item[2] >= threshold]
+    limited = filtered[:MAX_CONTEXT_ITEMS]
+    lines: list[str] = []
+    for idx, (kind, desc, score) in enumerate(limited, 1):
+        lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
+    return lines, details
+
+
+def _normalize_mode(mode: Optional[str]) -> str:
+    return (mode or "").strip().lower()
+
+
+def _mode_filename(mode: str) -> str:
+    slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in mode.strip()).strip("_")
+    return f"{slug}.txt" if slug else ""
+
+
+def _resolve_mode(mode: Optional[str]) -> Optional[str]:
+    normalized = _normalize_mode(mode)
+    if not normalized:
+        return None
+    for configured in settings.prompt_modes:
+        candidate = configured.strip()
+        if candidate and candidate.lower() == normalized:
+            return candidate
+    return None
+
+
+def _read_template(path: Path) -> str:
     try:
-        template = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8").strip()
-        # If file exists but we're in English mode, use English template
-        if get_current_language() == "en":
-            return t("prompt_default_template")
-        return template
+        return path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
-        return t("prompt_default_template")
+        return ""
+
+
+def _prompt_template(mode: Optional[str] = None) -> str:
+    """Resolve prompt template for the selected mode with a default fallback."""
+    resolved_mode = _resolve_mode(mode)
+    if resolved_mode:
+        filename = _mode_filename(resolved_mode)
+        if filename:
+            mode_template = _read_template(PROMPT_TEMPLATE_DIR / filename)
+            if mode_template:
+                return mode_template
+
+    default_template = _read_template(PROMPT_TEMPLATE_PATH)
+    if default_template:
+        return default_template
+    return t("prompt_default_template")
 
 
 def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]:
@@ -145,6 +261,7 @@ def build_augmented_prompt(
     user_prompt: str,
     history: Optional[Sequence[ChatMessage]] = None,
     images_count: int = 0,
+    mode: Optional[str] = None,
 ) -> str:
     base_lines: list[str] = []
 
@@ -161,7 +278,7 @@ def build_augmented_prompt(
     if context_lines:
         base_lines.append("> context:")
         base_lines.extend(context_lines)
-    template = _prompt_template()
+    template = _prompt_template(mode=mode)
     if template:
         base_lines.append("")
         base_lines.append(template)
@@ -315,6 +432,17 @@ def _fallback_response(original_prompt: str) -> str:
     )
 
 
+def _fallback_timeout_response(original_prompt: str) -> str:
+    timeout_seconds = f"{settings.ollama_timeout:g}"
+    return (
+        "[Ollama reageert te langzaam] "
+        f"Geen antwoord ontvangen binnen {timeout_seconds}s van "
+        f"{settings.ollama_base_url} met model '{settings.ollama_model}'. "
+        f"Je vroeg: '{original_prompt}'. "
+        "Dit gebeurt vaak bij een koude start of het laden van een groot model; probeer het opnieuw."
+    )
+
+
 async def handle_ask(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
@@ -334,9 +462,26 @@ async def handle_ask(
     log_prompt(final_prompt)
     try:
         message = await _call_ollama(final_prompt, images=images)
-    except Exception as exc:  # pragma: no cover - netwerkfout
+    except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout
+        logger.warning(
+            "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
+            settings.ollama_timeout,
+            settings.ollama_base_url,
+            settings.ollama_model,
+            exc,
+        )
+        message = _fallback_timeout_response(req.prompt)
+    except httpx.RequestError as exc:  # pragma: no cover - netwerkfout
         logger.warning(
             "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
+            settings.ollama_base_url,
+            settings.ollama_model,
+            exc,
+        )
+        message = _fallback_response(req.prompt)
+    except Exception as exc:  # pragma: no cover - netwerkfout
+        logger.warning(
+            "Onverwachte Ollama fout (url=%s, model=%s): %r",
             settings.ollama_base_url,
             settings.ollama_model,
             exc,

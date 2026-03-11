@@ -116,8 +116,8 @@ def _is_model_complete(model_dir: Path) -> bool:
     """Check of het model compleet is door te kijken of de essentiële bestanden bestaan."""
     if not model_dir.exists():
         return False
-    # Check voor een ONNX model bestand (model_optimized.onnx of dynamic_uint8.onnx)
-    has_onnx = any(model_dir.glob("*.onnx"))
+    # Check voor een ONNX model bestand (kan in root of in onnx/ subdirectory zitten)
+    has_onnx = any(model_dir.glob("*.onnx")) or any(model_dir.glob("**/*.onnx"))
     has_config = (model_dir / "config.json").exists()
     return has_onnx and has_config
 

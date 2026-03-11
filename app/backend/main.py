@@ -18,6 +18,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.concurrency import run_in_threadpool
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -28,6 +29,7 @@ from .apiAsk import (
     build_augmented_prompt,
     estimate_prompt_tokens,
     handle_ask,
+    log_api_request,
     log_prompt,
     merge_history_images,
     normalize_images,
@@ -38,6 +40,8 @@ from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
+from .kennisbank_sync import read_sync_state, sync_kennisbank
+from .knowledge_library import get_library_overview, load_document_detail
 from .schemas import (
     BearerTokenResponse,
     ChatRequest,
@@ -181,6 +185,17 @@ def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRe
     ):
         raise HTTPException(status_code=403, detail="Admin token vereist")
     return record
+
+
+def _empty_sync_state() -> dict:
+    return {
+        "synced": False,
+        "git": None,
+        "qdrant": None,
+        "sqlite": None,
+        "stats": None,
+        "synced_at": None,
+    }
 
 
 @app.middleware("http")
@@ -495,6 +510,98 @@ def support_access_disable(
     return state.to_response()
 
 
+@app.get("/api/v1/kennisbank/sync-state")
+def kennisbank_sync_state(_: TokenRecord = Depends(require_admin_token)):
+    state = read_sync_state()
+    if not state:
+        return _empty_sync_state()
+    return {**state, "synced": True}
+
+
+@app.post("/api/v1/kennisbank/sync")
+async def kennisbank_sync_endpoint(_: TokenRecord = Depends(require_admin_token)):
+    try:
+        result = await run_in_threadpool(sync_kennisbank)
+    except Exception as exc:  # pragma: no cover - onverwachte git/qdrant fouten
+        logger.exception("Kennisbank sync faalde: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Kennisbank sync mislukt: {exc}") from exc
+    return {**result, "synced": True}
+
+
+@app.post("/api/v1/kennisbank/sync/stream")
+async def kennisbank_sync_stream(_: TokenRecord = Depends(require_admin_token)):
+    """Stream SSE progress updates tijdens kennisbank sync."""
+    import queue
+    import threading
+
+    progress_queue: queue.Queue = queue.Queue()
+    result_holder: dict = {}
+    error_holder: list = []
+
+    def progress_callback(current: int, total: int, message: str):
+        progress_queue.put({"progress": current, "total": total, "status": message})
+
+    def run_sync():
+        try:
+            result = sync_kennisbank(progress_callback=progress_callback)
+            result_holder["result"] = result
+        except Exception as exc:
+            error_holder.append(str(exc))
+            logger.exception("Kennisbank sync faalde: %s", exc)
+
+    async def event_stream():
+        # Start sync in background thread
+        thread = threading.Thread(target=run_sync, daemon=True)
+        thread.start()
+
+        # Stream progress updates
+        while thread.is_alive() or not progress_queue.empty():
+            try:
+                update = progress_queue.get(timeout=0.5)
+                payload = json.dumps(update)
+                yield f"data: {payload}\n\n"
+            except queue.Empty:
+                continue
+
+        # Check for errors
+        if error_holder:
+            payload = json.dumps({"error": error_holder[0], "done": True})
+            yield f"data: {payload}\n\n"
+            return
+
+        # Send final result
+        if "result" in result_holder:
+            final = {**result_holder["result"], "synced": True, "done": True}
+            payload = json.dumps(final)
+            yield f"data: {payload}\n\n"
+        else:
+            payload = json.dumps({"error": "Onbekende fout", "done": True})
+            yield f"data: {payload}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/api/v1/kennisbank/library")
+def kennisbank_library(_: TokenRecord = Depends(require_admin_token)):
+    return get_library_overview()
+
+
+@app.get("/api/v1/kennisbank/library/documents/{doc_id}")
+def kennisbank_document_detail(doc_id: str, _: TokenRecord = Depends(require_admin_token)):
+    try:
+        document = load_document_detail(doc_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document niet gevonden") from None
+    return {"document": document}
+
+
 @app.post("/api/v1/signon", response_model=BearerTokenResponse)
 def api_signon(req: SignOnRequest):
     device = devices_repo.find_by_username(req.user_name)
@@ -509,6 +616,11 @@ def api_signon(req: SignOnRequest):
 @app.post("/api/v1/ask")
 async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     _mark_prompt_activity()
+
+    # Clear history if new_chat flag is set
+    if req.new_chat:
+        chat_history.clear(record.token)
+
     history = chat_history.get(record.token)
     final_prompt, images, current_images = prepare_prompt(req, history=history)
     _ensure_prompt_within_context(final_prompt)
@@ -553,7 +665,31 @@ async def sse_stream_generator(
             images_count=len(images),
         )
     log_prompt(final_prompt)
+
+    # Create API log entry
+    log_entry = ApiLogEntry(
+        conversation_id=conversation_id,
+        request_id=request_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        source="api",
+        endpoint="/api/v1/ask/stream",
+        user_name=record.user_name,
+        device_id=record.device_id,
+        token_prefix=record.token[:8] if record.token else None,
+        original_prompt=req.prompt,
+        mode=req.mode,
+        new_chat=req.new_chat,
+        history_length=len(history) if history else 0,
+        images_count=len(images),
+        context_contacts=context_details.get("contacts", []),
+        context_devices=context_details.get("devices", []),
+        context_knowledge=context_details.get("knowledge", []),
+        final_prompt_length=len(final_prompt),
+    )
+
     assistant_chunks: list[str] = []
+    error_message: Optional[str] = None
+    mock_response: Optional[str] = None
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -580,6 +716,7 @@ async def sse_stream_generator(
                 if response.status_code >= 400:
                     # Lees fouttekst voor logging zodat we weten waarom de fallback triggert.
                     error_body = await response.aread()
+                    error_message = f"Ollama status {response.status_code}: {error_body.decode('utf-8', errors='replace').strip()}"
                     logger.warning(
                         "Ollama gaf status %s voor model '%s' via %s: %s",
                         response.status_code,
@@ -611,8 +748,24 @@ async def sse_stream_generator(
                     except json.JSONDecodeError:
                         continue
 
-    except Exception as exc:
+    except httpx.TimeoutException as exc:
+        error_message = f"Ollama timeout after {settings.ollama_timeout:g}s: {exc!r}"
+        logger.warning(
+            "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
+            settings.ollama_timeout,
+            ollama_url,
+            settings.ollama_model,
+            exc,
+        )
+        mock_response = (
+            "[Ollama reageert te langzaam - Mock response] "
+            f"Geen antwoord binnen {settings.ollama_timeout:g}s van {ollama_url} "
+            f"met model '{settings.ollama_model}'. Je vroeg: '{req.prompt}'. "
+            "Dit gebeurt vaak bij een koude start of model-lading; probeer het opnieuw."
+        )
+    except httpx.RequestError as exc:
         # Fallback to mock response if Ollama is not available
+        error_message = f"Ollama connection failed: {exc}"
         logger.warning(
             "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
             ollama_url,
@@ -624,7 +777,21 @@ async def sse_stream_generator(
             f"Kon geen antwoord krijgen van Ollama op {ollama_url} met model '{settings.ollama_model}'. "
             f"Je vroeg: '{req.prompt}'. Controleer of de Ollama-service draait en bereikbaar is."
         )
+    except Exception as exc:
+        error_message = f"Ollama onverwachte fout: {exc!r}"
+        logger.warning(
+            "Onverwachte Ollama fout (url=%s, model=%s): %r",
+            ollama_url,
+            settings.ollama_model,
+            exc,
+        )
+        mock_response = (
+            "[Ollama fout - Mock response] "
+            f"Er ging iets mis bij {ollama_url} met model '{settings.ollama_model}'. "
+            f"Je vroeg: '{req.prompt}'. Controleer de backend- en Ollama-logs."
+        )
 
+    if mock_response:
         # Stream the mock response word by word
         words = mock_response.split()
         for word in words:
@@ -638,6 +805,11 @@ async def sse_stream_generator(
     if assistant_text:
         chat_history.append(history_key, "assistant", assistant_text)
 
+    # Update log entry with response and write to log
+    log_entry.response_preview = assistant_text
+    log_entry.error = error_message
+    log_api_request(log_entry)
+
     # Send final done event
     event_data = json.dumps({"done": True})
     yield f"data: {event_data}\n\n"
@@ -647,6 +819,11 @@ async def sse_stream_generator(
 async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     """Stream SSE response with queue position and token-by-token LLM output."""
     _mark_prompt_activity()
+
+    # Clear history if new_chat flag is set
+    if req.new_chat:
+        chat_history.clear(record.token)
+
     history = chat_history.get(record.token)
     final_prompt, images, current_images = prepare_prompt(req, history=history)
     _ensure_prompt_within_context(final_prompt)
@@ -656,6 +833,11 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
         _format_prompt_for_history(req.prompt, len(current_images)),
         images=current_images,
     )
+
+    # Generate IDs for tracking
+    request_id = generate_request_id()
+    conversation_id = generate_conversation_id(record.token)
+
     return StreamingResponse(
         sse_stream_generator(
             req,

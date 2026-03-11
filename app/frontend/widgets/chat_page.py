@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_HTTP, BACKEND_BEARER_TOKEN
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PROMPT_MODES
 from ..translations import t, register_language_change_callback
 
 API_BASE = BACKEND_HTTP
@@ -31,6 +31,7 @@ ROW_GAP = 12
 SIDE_PADDING = 28
 ASSISTANT_AVATAR_SIZE = 32
 ASSISTANT_MAX_WIDTH = 820
+MODE_DEFAULT_KEY = "__default__"
 
 
 class ChatSignals(QObject):
@@ -50,6 +51,9 @@ class ChatPage(QWidget):
         self.message_rows: list[QWidget] = []
         self._bearer_token = BACKEND_BEARER_TOKEN or ""
         self._auto_token_error: str | None = None
+        self.available_modes = PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]
+        self.selected_mode: str | None = None
+        self.mode_buttons: dict[str, QPushButton] = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -76,6 +80,55 @@ class ChatPage(QWidget):
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
 
+        self.mode_card = QFrame()
+        self.mode_card.setObjectName("ChatModeCard")
+        self.mode_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.mode_card.setMaximumHeight(44)
+        self.mode_card.setStyleSheet(
+            "QFrame#ChatModeCard {"
+            "  background: transparent;"
+            "  border: none;"
+            "}"
+            "QPushButton[modeChip='true'] {"
+            "  background:#ffffff;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:999px;"
+            "  color:#374151;"
+            "  font-weight:600;"
+            "  padding:3px 14px;"
+            "}"
+            "QPushButton[modeChip='true']:hover { border-color:#111111; color:#111111; }"
+            "QPushButton[modeChip='true'][active='true'] {"
+            "  background:#111111;"
+            "  border-color:#111111;"
+            "  color:#facc15;"
+            "}"
+        )
+        mode_layout = QVBoxLayout(self.mode_card)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        mode_layout.setSpacing(0)
+
+        mode_scroll = QScrollArea()
+        mode_scroll.setWidgetResizable(True)
+        mode_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        mode_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        mode_scroll.setFrameShape(QFrame.NoFrame)
+        mode_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        mode_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        mode_scroll.setFixedHeight(30)
+
+        mode_container = QWidget()
+        self.mode_chip_layout = QHBoxLayout(mode_container)
+        self.mode_chip_layout.setContentsMargins(0, 0, 0, 0)
+        self.mode_chip_layout.setSpacing(8)
+        self._create_mode_chip(t("chat_mode_default"), None)
+        for mode in self.available_modes:
+            self._create_mode_chip(mode, mode)
+        self.mode_chip_layout.addStretch(1)
+        mode_scroll.setWidget(mode_container)
+        mode_layout.addWidget(mode_scroll)
+        layout.addWidget(self.mode_card)
+        self._set_selected_mode(None)
 
         self.history_card = QFrame()
         self.history_card.setObjectName("ChatWrapper")
@@ -144,6 +197,9 @@ class ChatPage(QWidget):
         self.new_chat_btn.setText(t("chat_start_new"))
         self.input.setPlaceholderText(t("chat_placeholder"))
         self.send_btn.setText(t("chat_send"))
+        default_btn = self.mode_buttons.get(MODE_DEFAULT_KEY)
+        if default_btn:
+            default_btn.setText(t("chat_mode_default"))
         if self.empty_label:
             self.empty_label.setText(t("chat_welcome"))
 
@@ -165,18 +221,27 @@ class ChatPage(QWidget):
         self.current_message = ""  # Reset message buffer
         self.current_reply_label = None
         self._show_typing_indicator()
-        asyncio.create_task(self._stream(text))
+        asyncio.create_task(self._stream(text, self.selected_mode))
 
-    async def _stream(self, prompt: str):
+    def _request_payload(self, prompt: str, mode: str | None = None) -> dict:
+        payload = {
+            "prompt": prompt,
+            "max_new_tokens": 128,
+        }
+        if mode:
+            payload["mode"] = mode
+        return payload
+
+    async def _stream(self, prompt: str, mode: str | None):
         try:
-            await asyncio.to_thread(self._stream_sse, prompt)
+            await asyncio.to_thread(self._stream_sse, prompt, mode)
             return
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             if status == 401:
                 # Probeer automatisch een token op te halen voor de lokale admin.
                 if self._refresh_auto_token():
-                    await asyncio.to_thread(self._stream_sse, prompt)
+                    await asyncio.to_thread(self._stream_sse, prompt, mode)
                     return
                 message = (
                     self._auto_token_error
@@ -197,21 +262,18 @@ class ChatPage(QWidget):
             return
 
         try:
-            message = await asyncio.to_thread(self._legacy_post, prompt)
+            message = await asyncio.to_thread(self._legacy_post, prompt, mode)
         except Exception as exc:
             self.signals.token.emit(f"{t('chat_error_prefix')} {exc}")
         else:
             self.signals.token.emit(message)
         self.signals.done.emit()
 
-    def _stream_sse(self, prompt: str) -> None:
+    def _stream_sse(self, prompt: str, mode: str | None = None) -> None:
         """Stream SSE events van het backend (incl. wachtrij status)."""
 
         url = f"{API_BASE}/api/v1/ask/stream"
-        payload = {
-            "prompt": prompt,
-            "max_new_tokens": 128,
-        }
+        payload = self._request_payload(prompt, mode)
         with requests.post(
             url,
             json=payload,
@@ -256,7 +318,7 @@ class ChatPage(QWidget):
         # Als de stream eindigt zonder done-event, sluit netjes af.
         self.signals.done.emit()
 
-    def _legacy_post(self, prompt: str) -> str:
+    def _legacy_post(self, prompt: str, mode: str | None = None) -> str:
         """Fallback naar het niet-streamende endpoint."""
 
         endpoints = ["/api/v1/ask"]
@@ -267,7 +329,7 @@ class ChatPage(QWidget):
             try:
                 resp = requests.post(
                     url,
-                    json={"prompt": prompt},
+                    json=self._request_payload(prompt, mode),
                     timeout=5,
                     headers=headers,
                 )

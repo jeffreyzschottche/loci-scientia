@@ -12,9 +12,11 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     prompt: str
+    mode: Optional[str] = None
     max_new_tokens: int = 128
     history: list[ChatMessage] = Field(default_factory=list)
     images: list[str] = Field(default_factory=list)
+    new_chat: bool = False  # When True, clears server-side chat history first
 
 
 class ContactBase(BaseModel):

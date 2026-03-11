@@ -1,0 +1,15 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: aitje-embedder-mariadb
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_DATABASE: Aitje-ExternalEmbedding
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+
+volumes:
+  mariadb-data:
