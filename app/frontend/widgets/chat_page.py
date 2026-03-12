@@ -34,6 +34,7 @@ SIDE_PADDING = 12
 ASSISTANT_AVATAR_SIZE = 32
 ASSISTANT_MAX_WIDTH = 900
 ASSISTANT_MIN_WIDTH = 640
+MODE_DEFAULT_KEY = "__default__"
 
 
 class ChatSignals(QObject):
@@ -417,6 +418,30 @@ class ChatPage(QWidget):
         if self.empty_label:
             self.empty_label.setText(t("chat_welcome"))
 
+    def _create_mode_chip(self, label: str, mode: str | None) -> QPushButton:
+        key = mode or MODE_DEFAULT_KEY
+        button = QPushButton(label)
+        button.setCursor(Qt.PointingHandCursor)
+        button.setProperty("modeChip", "true")
+        button.setProperty("active", "false")
+        button.setCheckable(True)
+        button.clicked.connect(lambda checked=False, value=mode: self._set_selected_mode(value))
+        self.mode_buttons[key] = button
+        self.mode_chip_layout.addWidget(button, 0, Qt.AlignLeft)
+        return button
+
+    def _set_selected_mode(self, mode: str | None) -> None:
+        self.selected_mode = mode
+        active_key = mode or MODE_DEFAULT_KEY
+        for key, button in self.mode_buttons.items():
+            is_active = key == active_key
+            button.setChecked(is_active)
+            button.setProperty("active", "true" if is_active else "false")
+            style = button.style()
+            style.unpolish(button)
+            style.polish(button)
+            button.update()
+
     def _start_new_chat(self):
         """Reset the conversation history."""
         self._clear_history()
@@ -477,7 +502,7 @@ class ChatPage(QWidget):
             return
 
         try:
-            payload = await asyncio.to_thread(self._legacy_post, prompt)
+            payload = await asyncio.to_thread(self._legacy_post, prompt, mode)
         except Exception as exc:
             self.signals.response_token.emit(f"{t('chat_error_prefix')} {exc}")
         else:
@@ -546,7 +571,7 @@ class ChatPage(QWidget):
         # Als de stream eindigt zonder done-event, sluit netjes af.
         self.signals.done.emit()
 
-    def _legacy_post(self, prompt: str) -> dict[str, str]:
+    def _legacy_post(self, prompt: str, mode: str | None = None) -> dict[str, str]:
         """Fallback naar het niet-streamende endpoint."""
 
         endpoints = ["/api/v1/ask"]

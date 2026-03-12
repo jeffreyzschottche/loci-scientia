@@ -2,6 +2,7 @@ import base64
 import binascii
 import io
 import logging
+import math
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
 THINKING_TAG_RE = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
+_TOKEN_PATTERN = re.compile(r"\S+")
 THINKING_MODEL_MARKERS = (
     "qwen3",
     "qwen 3",
@@ -46,6 +48,7 @@ class ApiLogEntry:
     timestamp: str
     source: str  # "local" or "api"
     endpoint: str  # "/api/v1/ask" or "/api/v1/ask/stream"
+    mode: Optional[str] = None
     user_name: Optional[str] = None
     device_id: Optional[str] = None
     token_prefix: Optional[str] = None
@@ -97,6 +100,7 @@ def log_api_request(entry: ApiLogEntry) -> None:
             f"Request ID:      {entry.request_id}",
             f"Source:          {entry.source}",
             f"Endpoint:        {entry.endpoint}",
+            f"Mode:            {entry.mode or 'default'}",
             f"User:            {entry.user_name or 'unknown'}",
             f"Device ID:       {entry.device_id or 'unknown'}",
             f"Token:           {entry.token_prefix or 'unknown'}...",
@@ -641,38 +645,24 @@ def build_augmented_prompt(
     history: Optional[Sequence[ChatMessage]] = None,
     images_count: int = 0,
     documents: Optional[Sequence[ParsedDocument]] = None,
+    mode: Optional[str] = None,
 ) -> str:
-    base_lines: list[str] = []
-
-    history_lines = _format_history_lines(history)
-    if history_lines:
-        base_lines.append(t("previous_chat"))
-        base_lines.extend(history_lines)
-        base_lines.append("")
-
-    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
-    if images_count > 0:
-        base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
-    document_lines = _format_document_context_lines(documents)
-    if document_lines:
-        base_lines.append("> document context:")
-        base_lines.extend(document_lines)
-    context_lines = _gather_context_lines(user_prompt)
-    if context_lines:
-        base_lines.append("> context:")
-        base_lines.extend(context_lines)
-    template = _prompt_template(mode=mode)
-    if template:
-        base_lines.append("")
-        base_lines.append(template)
-    return "\n".join(base_lines).strip()
+    prompt, _ = build_augmented_prompt_with_details(
+        user_prompt,
+        history=history,
+        images_count=images_count,
+        documents=documents,
+        mode=mode,
+    )
+    return prompt
 
 
-def prepare_prompt(
-    req: ChatRequest,
+def build_augmented_prompt_with_details(
+    user_prompt: str,
     history: Optional[Sequence[ChatMessage]] = None,
     images_count: int = 0,
     documents: Optional[Sequence[ParsedDocument]] = None,
+    mode: Optional[str] = None,
 ) -> tuple[str, Dict[str, List]]:
     """Build augmented prompt AND return context details for logging."""
     base_lines: list[str] = []
@@ -696,6 +686,29 @@ def prepare_prompt(
     if context_lines:
         base_lines.append("> context:")
         base_lines.extend(context_lines)
+    template = _prompt_template(mode=mode)
+    if template:
+        base_lines.append("")
+        base_lines.append(template)
+    return "\n".join(base_lines).strip(), context_details
+
+
+def prepare_prompt(
+    req: ChatRequest,
+    history: Optional[Sequence[ChatMessage]] = None,
+    documents: Optional[Sequence[ParsedDocument]] = None,
+) -> tuple[str, list[str]]:
+    """Normalize request payload and return the prompt used for context checks."""
+    history_to_use = req.history if history is None else history
+    normalized_images = normalize_images(req.images)
+    prompt = build_augmented_prompt(
+        req.prompt,
+        history=history_to_use,
+        images_count=len(normalized_images),
+        documents=documents,
+        mode=req.mode,
+    )
+    return prompt, normalized_images
 
 
 def estimate_prompt_tokens(text: str) -> int:
@@ -887,6 +900,7 @@ async def handle_ask(
         history_to_use,
         images_count=len(images),
         documents=documents,
+        mode=req.mode,
     )
     log_prompt(final_prompt)
     thinking = ""
