@@ -29,6 +29,12 @@ PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
 THINKING_TAG_RE = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _TOKEN_PATTERN = re.compile(r"\S+")
+MIN_IMAGE_DIMENSION = 32
+MAX_DOCUMENTS_PER_REQUEST = 3
+MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
+MAX_TOTAL_DOCUMENT_BYTES = 12 * 1024 * 1024
+MAX_DOCUMENT_CHARS = 40_000
+MAX_TOTAL_DOCUMENT_CHARS = 100_000
 THINKING_MODEL_MARKERS = (
     "qwen3",
     "qwen 3",
@@ -230,6 +236,46 @@ def _strip_data_url(value: str) -> str:
         return raw
     _, _, b64 = raw.partition("base64,")
     return b64.strip() if b64 else ""
+
+
+def _decode_base64_image(value: str, index: int) -> bytes:
+    raw = _strip_data_url(value)
+    if not raw:
+        raise ValueError(f"Image {index} has no base64 payload.")
+    try:
+        return base64.b64decode(raw, validate=True)
+    except binascii.Error as exc:
+        raise ValueError(f"Image {index} contains invalid base64 data.") from exc
+
+
+def _validate_image_payload(value: str, index: int) -> None:
+    source = _decode_base64_image(value, index)
+    try:
+        from PIL import Image, UnidentifiedImageError
+    except Exception:
+        return
+
+    try:
+        with Image.open(io.BytesIO(source)) as image:
+            width, height = image.size
+            image_format = (image.format or "unknown").upper()
+    except UnidentifiedImageError as exc:
+        raise ValueError(f"Image {index} is not a supported image format.") from exc
+
+    if width < MIN_IMAGE_DIMENSION or height < MIN_IMAGE_DIMENSION:
+        raise ValueError(
+            f"Image {index} is too small for Ollama vision ({width}x{height}). "
+            f"Minimum size is {MIN_IMAGE_DIMENSION}x{MIN_IMAGE_DIMENSION}."
+        )
+
+    logger.info(
+        "Validated image %s for Ollama: format=%s size=%sx%s bytes=%s",
+        index,
+        image_format,
+        width,
+        height,
+        len(source),
+    )
 
 
 def _detect_document_type(document: PromptDocument) -> str:
@@ -779,7 +825,7 @@ def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
     if not images:
         return []
     normalized: list[str] = []
-    for item in images:
+    for index, item in enumerate(images, 1):
         if not item:
             continue
         data = item.strip()
@@ -788,8 +834,9 @@ def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
         if data.startswith("data:"):
             _, _, b64 = data.partition("base64,")
             if not b64:
-                continue
+                raise ValueError(f"Image {index} has an invalid data URL without base64 payload.")
             data = b64.strip()
+        _validate_image_payload(data, index)
         normalized.append(data)
     return normalized
 

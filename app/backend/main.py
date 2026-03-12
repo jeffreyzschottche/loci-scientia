@@ -638,7 +638,10 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         chat_history.clear(record.token)
 
     history = chat_history.get(record.token)
-    final_prompt, images = prepare_prompt(req, history=history, documents=documents)
+    try:
+        final_prompt, images = prepare_prompt(req, history=history, documents=documents)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
@@ -910,7 +913,10 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
         chat_history.clear(record.token)
 
     history = chat_history.get(record.token)
-    final_prompt, images = prepare_prompt(req, history=history, documents=documents)
+    try:
+        final_prompt, images = prepare_prompt(req, history=history, documents=documents)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         record.token,
