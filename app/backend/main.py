@@ -670,6 +670,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         source="api",
         endpoint="/api/v1/ask",
         mode=req.mode,
+        thinking_enabled=req.thinking,
         user_name=record.user_name,
         device_id=record.device_id,
         token_prefix=record.token[:8] if record.token else None,
@@ -740,6 +741,7 @@ async def sse_stream_generator(
         timestamp=datetime.now(timezone.utc).isoformat(),
         source="api",
         endpoint="/api/v1/ask/stream",
+        thinking_enabled=req.thinking,
         user_name=record.user_name,
         device_id=record.device_id,
         token_prefix=record.token[:8] if record.token else None,
@@ -773,6 +775,7 @@ async def sse_stream_generator(
         final_prompt,
         stream=True,
         images=images,
+        thinking=req.thinking,
     )
 
     try:

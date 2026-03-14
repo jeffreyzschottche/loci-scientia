@@ -267,6 +267,7 @@ class ChatPage(QWidget):
         self.available_modes = PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]
         self.selected_mode: str | None = None
         self.mode_buttons: dict[str, QPushButton] = {}
+        self.thinking_enabled = True
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -274,6 +275,31 @@ class ChatPage(QWidget):
 
         controls = QHBoxLayout()
         controls.setContentsMargins(0, 0, 0, 0)
+        controls.setSpacing(10)
+        self.thinking_btn = QPushButton()
+        self.thinking_btn.setObjectName("ThinkingToggle")
+        self.thinking_btn.setCheckable(True)
+        self.thinking_btn.setChecked(self.thinking_enabled)
+        self.thinking_btn.setCursor(Qt.PointingHandCursor)
+        self.thinking_btn.setMinimumHeight(40)
+        self.thinking_btn.clicked.connect(self._toggle_thinking)
+        self.thinking_btn.setStyleSheet(
+            "QPushButton#ThinkingToggle {"
+            "  background:#ffffff;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:20px;"
+            "  padding:6px 18px;"
+            "  color:#374151;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton#ThinkingToggle:hover { border-color:#111111; color:#111111; }"
+            "QPushButton#ThinkingToggle:checked {"
+            "  background:#111111;"
+            "  border-color:#111111;"
+            "  color:#facc15;"
+            "}"
+        )
+        controls.addWidget(self.thinking_btn, 0, Qt.AlignLeft)
         controls.addStretch(1)
         self.new_chat_btn = QPushButton(t("chat_start_new"))
         self.new_chat_btn.setCursor(Qt.PointingHandCursor)
@@ -292,6 +318,7 @@ class ChatPage(QWidget):
         controls.addWidget(self.new_chat_btn, 0, Qt.AlignRight)
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
+        self._sync_thinking_button()
 
         self.mode_card = QFrame()
         self.mode_card.setObjectName("ChatModeCard")
@@ -410,6 +437,7 @@ class ChatPage(QWidget):
     def _update_translations(self) -> None:
         """Update UI elements when language changes."""
         self.new_chat_btn.setText(t("chat_start_new"))
+        self._sync_thinking_button()
         self.input.setPlaceholderText(t("chat_placeholder"))
         self.send_btn.setText(t("chat_send"))
         default_btn = self.mode_buttons.get(MODE_DEFAULT_KEY)
@@ -442,6 +470,16 @@ class ChatPage(QWidget):
             style.polish(button)
             button.update()
 
+    def _toggle_thinking(self, checked: bool) -> None:
+        self.thinking_enabled = checked
+        self._sync_thinking_button()
+
+    def _sync_thinking_button(self) -> None:
+        self.thinking_btn.setChecked(self.thinking_enabled)
+        self.thinking_btn.setText(
+            t("chat_thinking_enabled") if self.thinking_enabled else t("chat_thinking_disabled")
+        )
+
     def _start_new_chat(self):
         """Reset the conversation history."""
         self._clear_history()
@@ -467,6 +505,7 @@ class ChatPage(QWidget):
     def _request_payload(self, prompt: str, mode: str | None = None) -> dict:
         payload = {
             "prompt": prompt,
+            "thinking": self.thinking_enabled,
             "max_new_tokens": 128,
         }
         if mode:

@@ -1085,6 +1085,14 @@ TRANSLATIONS = {
         "nl": "Nadenken",
         "en": "Thinking",
     },
+    "chat_thinking_enabled": {
+        "nl": "Nadenken aan",
+        "en": "Thinking on",
+    },
+    "chat_thinking_disabled": {
+        "nl": "Nadenken uit",
+        "en": "Thinking off",
+    },
     "chat_response_block": {
         "nl": "Antwoord",
         "en": "Response",
