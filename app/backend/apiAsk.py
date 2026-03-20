@@ -55,6 +55,7 @@ class ApiLogEntry:
     source: str  # "local" or "api"
     endpoint: str  # "/api/v1/ask" or "/api/v1/ask/stream"
     mode: Optional[str] = None
+    thinking_enabled: Optional[bool] = None
     user_name: Optional[str] = None
     device_id: Optional[str] = None
     token_prefix: Optional[str] = None
@@ -107,6 +108,7 @@ def log_api_request(entry: ApiLogEntry) -> None:
             f"Source:          {entry.source}",
             f"Endpoint:        {entry.endpoint}",
             f"Mode:            {entry.mode or 'default'}",
+            f"Thinking:        {'on' if entry.thinking_enabled else 'off' if entry.thinking_enabled is not None else 'auto'}",
             f"User:            {entry.user_name or 'unknown'}",
             f"Device ID:       {entry.device_id or 'unknown'}",
             f"Token:           {entry.token_prefix or 'unknown'}...",
@@ -851,6 +853,7 @@ def build_ollama_generate_payload(
     *,
     stream: bool,
     images: Optional[Sequence[str]] = None,
+    thinking: Optional[bool] = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": settings.ollama_model,
@@ -863,7 +866,7 @@ def build_ollama_generate_payload(
     if isinstance(max_context, int) and max_context > 0:
         payload["options"] = {"num_ctx": max_context}
     if model_supports_ollama_thinking(settings.ollama_model):
-        payload["think"] = True
+        payload["think"] = True if thinking is None else bool(thinking)
     return payload
 
 
@@ -891,12 +894,14 @@ async def _call_ollama(
     prompt: str,
     options: Optional[dict] = None,
     images: Optional[Sequence[str]] = None,
+    thinking: Optional[bool] = None,
 ) -> dict[str, str]:
     ollama_url = f"{settings.ollama_base_url}/api/generate"
     payload = build_ollama_generate_payload(
         prompt,
         stream=False,
         images=images,
+        thinking=thinking,
     )
     if options:
         if "options" in payload:
@@ -952,7 +957,7 @@ async def handle_ask(
     log_prompt(final_prompt)
     thinking = ""
     try:
-        result = await _call_ollama(final_prompt, images=images)
+        result = await _call_ollama(final_prompt, images=images, thinking=req.thinking)
         message = result.get("message", "").strip()
         thinking = result.get("thinking", "").strip()
     except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout
