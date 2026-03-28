@@ -574,63 +574,10 @@ echo "⏳ Backend starten (log: $backend_log)..."
 "${BACKEND_CMD[@]}" >"$backend_log" 2>&1 &
 backend_pid=$!
 
-PMTILES_HOST="${PMTILES_HOST:-127.0.0.1}"
-PMTILES_PORT="${PMTILES_PORT:-8080}"
-PMTILES_TILESET="${PMTILES_TILESET:-europe}"
-DEFAULT_PMTILES_DIR="$PROJECT_ROOT/app/maps"
-PMTILES_DIR_RAW="${PMTILES_DATA_DIR:-$DEFAULT_PMTILES_DIR}"
-PMTILES_DIR="$PMTILES_DIR_RAW"
-if command -v python3 >/dev/null 2>&1; then
-    PMTILES_DIR="$(PMTILES_DIR_RAW="$PMTILES_DIR_RAW" python3 - <<'PY' 2>/dev/null || true
-import os
-from pathlib import Path
-raw = os.environ.get("PMTILES_DIR_RAW")
-print(Path(raw).expanduser().resolve())
-PY
-)"
-    PMTILES_DIR="${PMTILES_DIR:-$PMTILES_DIR_RAW}"
-fi
-PMTILES_DATA_DIR="$PMTILES_DIR"
-if [ ! -d "$PMTILES_DIR" ]; then
-    echo "⚠️  opgegeven PMTiles-pad '$PMTILES_DIR' bestaat niet."
-    echo "    Pas PMTILES_DATA_DIR in .env aan of controleer of de schijf aangekoppeld is."
-fi
-export PMTILES_HOST PMTILES_PORT PMTILES_TILESET PMTILES_DATA_DIR
-PMTILES_BASE_URL="${PMTILES_BASE_URL:-http://$PMTILES_HOST:$PMTILES_PORT}"
-export PMTILES_BASE_URL
-if [ -z "${MAP_GLYPHS_URL:-}" ]; then
-    MAP_GLYPHS_URL="${BACKEND_HTTP%/}/fonts/{fontstack}/{range}.pbf"
-fi
-if [ -z "${MAP_SPRITE_URL:-}" ]; then
-    MAP_SPRITE_URL="${BACKEND_HTTP%/}/sprites/v4/light"
-fi
-if [ -z "${PMTILES_STATUS_HINT:-}" ]; then
-    PMTILES_STATUS_HINT="Kaartdata kon niet geladen worden. Controleer of de pmtiles-server draait op ${PMTILES_HOST}:${PMTILES_PORT} en dat ${PMTILES_TILESET}.pmtiles beschikbaar is."
-fi
-export MAP_GLYPHS_URL MAP_SPRITE_URL PMTILES_STATUS_HINT
-pmtiles_log="$PROJECT_ROOT/pmtiles.log"
-pmtiles_pid=""
-
-if lsof -ti:"$PMTILES_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    old_pid=$(lsof -ti:"$PMTILES_PORT" -sTCP:LISTEN)
-    echo "⚠️  bestaand proces op poort $PMTILES_PORT gevonden (pid $old_pid), stoppen…"
-    kill "$old_pid" >/dev/null 2>&1 || true
-    sleep 1
-fi
-
-echo "⏳ pmtiles server starten voor $PMTILES_DIR (log: $pmtiles_log)..."
-pmtiles serve "$PMTILES_DIR" --port="$PMTILES_PORT" --cors='*' >"$pmtiles_log" 2>&1 &
-pmtiles_pid=$!
-
 cleanup() {
     echo
     echo "🛑 Backend stoppen..."
     kill "$backend_pid" >/dev/null 2>&1 || true
-
-    echo "🛑 pmtiles server stoppen..."
-    if [ -n "${pmtiles_pid:-}" ]; then
-        kill "$pmtiles_pid" >/dev/null 2>&1 || true
-    fi
 
     if [ -n "${ollama_pid:-}" ]; then
         echo "🛑 Ollama stoppen..."

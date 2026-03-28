@@ -69,16 +69,3 @@ PROMPT_MODES = [
     for mode in os.environ.get("PROMPT_MODES", "Developer,Finance,Law,Child").split(",")
     if mode.strip()
 ]
-
-PMTILES_HOST = os.environ.get("PMTILES_HOST", "127.0.0.1")
-PMTILES_PORT = int(os.environ.get("PMTILES_PORT", "8080"))
-PMTILES_BASE_URL = os.environ.get("PMTILES_BASE_URL", f"http://{PMTILES_HOST}:{PMTILES_PORT}").rstrip("/")
-PMTILES_TILESET = os.environ.get("PMTILES_TILESET", "europe").strip("/") or "europe"
-PMTILES_TILE_TEMPLATE = f"{PMTILES_BASE_URL}/{PMTILES_TILESET}/{{z}}/{{x}}/{{y}}.mvt"
-
-MAP_GLYPHS_URL = os.environ.get("MAP_GLYPHS_URL") or f"{BACKEND_HTTP}/fonts/{{fontstack}}/{{range}}.pbf"
-MAP_SPRITE_URL = os.environ.get("MAP_SPRITE_URL") or f"{BACKEND_HTTP}/sprites/v4/light"
-PMTILES_STATUS_HINT = os.environ.get(
-    "PMTILES_STATUS_HINT",
-    f"Kaartdata kon niet geladen worden. Controleer of de pmtiles-server draait op {PMTILES_HOST}:{PMTILES_PORT} en dat {PMTILES_TILESET}.pmtiles beschikbaar is.",
-)

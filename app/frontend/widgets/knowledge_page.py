@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import threading
-import webbrowser
 from datetime import datetime
 from queue import Queue, Empty
 
@@ -29,7 +28,7 @@ from PySide6.QtWidgets import (
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, BACKEND_TIMEOUT
 from ..translations import t, register_language_change_callback
-from .dialog_style import show_error_dialog
+from .dialog_style import OverlayDialog, show_error_dialog
 
 
 class SyncProgressDialog(QDialog):
@@ -169,7 +168,7 @@ class KnowledgePage(QWidget):
         header = QHBoxLayout()
         header.addStretch(1)
         self._upload_btn = self._pill_button(t("kb_upload_document"), primary=True)
-        self._upload_btn.clicked.connect(self._open_upload_portal)
+        self._upload_btn.clicked.connect(self._show_upload_instructions)
         header.addWidget(self._upload_btn, 0, Qt.AlignRight)
         self._main_layout.addLayout(header)
 
@@ -269,9 +268,60 @@ class KnowledgePage(QWidget):
         btn.setFixedHeight(40)
         return btn
 
-    @staticmethod
-    def _open_upload_portal() -> None:
-        webbrowser.open("https://www.aitje.jeffrai.nl")
+    def _show_upload_instructions(self) -> None:
+        dialog = OverlayDialog(self)
+        dialog.setWindowTitle(t("kb_upload_popup_title"))
+
+        badge = QLabel(t("kb_upload_popup_badge"))
+        badge.setStyleSheet(
+            "font-size:11px; font-weight:700; letter-spacing:0.18em; color:#6b7280;"
+        )
+        dialog.card_layout.addWidget(badge)
+
+        title = QLabel(t("kb_upload_popup_title"))
+        title.setWordWrap(True)
+        title.setStyleSheet("font-size:24px; font-weight:800; color:#111111;")
+        dialog.card_layout.addWidget(title)
+
+        body = QLabel(t("kb_upload_popup_body"))
+        body.setWordWrap(True)
+        body.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        body.setStyleSheet("font-size:15px; font-weight:500; line-height:1.55; color:#374151;")
+        dialog.card_layout.addWidget(body)
+
+        url_label = QLabel("kennisbank.aitje.com")
+        url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        url_label.setStyleSheet(
+            "background:#f9fafb; border:1px solid #e5e7eb; border-radius:18px; "
+            "padding:14px 16px; font-size:16px; font-weight:700; color:#111111;"
+        )
+        dialog.card_layout.addWidget(url_label)
+
+        dialog.card_layout.addStretch(1)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(12)
+
+        close_btn = QPushButton(t("close"))
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#ffffff;"
+            "  color:#111111;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:18px;"
+            "  padding:8px 18px;"
+            "  font-weight:600;"
+            "  min-height:36px;"
+            "}"
+            "QPushButton:hover { background:#f9fafb; border-color:#d1d5db; }"
+        )
+        close_btn.clicked.connect(dialog.reject)
+
+        actions.addStretch(1)
+        actions.addWidget(close_btn)
+        dialog.card_layout.addLayout(actions)
+        dialog.exec()
 
     def _sync_status_card(self) -> QFrame:
         card = QFrame()

@@ -11,10 +11,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 import httpx
 
-from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .knowledge_repository import KnowledgeRepository
-from .schemas import ChatMessage, ChatRequest, Contact, Device, PromptDocument
+from .schemas import ChatMessage, ChatRequest, Device, PromptDocument
 from .settings import settings
 from .translations import t
 
@@ -29,6 +28,16 @@ PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
 THINKING_TAG_RE = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _TOKEN_PATTERN = re.compile(r"\S+")
+_CONTEXT_TOKEN_PATTERN = re.compile(r"[0-9A-Za-zÀ-ÖØ-öø-ÿ][0-9A-Za-zÀ-ÖØ-öø-ÿ_-]*")
+_CONTEXT_STOPWORDS = {
+    "aan", "al", "als", "bij", "dan", "dat", "de", "den", "der", "dit", "doe", "door",
+    "een", "en", "er", "geef", "haar", "heb", "heeft", "hem", "het", "hier", "hoe",
+    "hun", "iemand", "ik", "in", "info", "informatie", "is", "je", "kan", "me", "meer", "met", "mij", "mijn",
+    "naar", "niet", "nu", "of", "om", "ons", "ook", "over", "te", "tot", "uit", "van",
+    "vertel", "voor", "wat", "we", "wel", "wie", "wil", "wordt", "ze", "zei", "zelf", "zich",
+    "zijn", "zo", "zou",
+    "allemaal", "product", "producten",
+}
 MIN_IMAGE_DIMENSION = 32
 MAX_DOCUMENTS_PER_REQUEST = 3
 MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
@@ -64,7 +73,6 @@ class ApiLogEntry:
     history_length: int = 0
     images_count: int = 0
     documents_count: int = 0
-    context_contacts: List[Dict[str, Any]] = field(default_factory=list)
     context_devices: List[Dict[str, Any]] = field(default_factory=list)
     context_knowledge: List[Dict[str, Any]] = field(default_factory=list)
     context_documents: List[Dict[str, Any]] = field(default_factory=list)
@@ -122,16 +130,9 @@ def log_api_request(entry: ApiLogEntry) -> None:
             f"Documents:        {entry.documents_count}",
             "",
             "--- Context Found ---",
-            f"Contacts ({len(entry.context_contacts)}):",
+            f"Devices ({len(entry.context_devices)}):",
         ]
 
-        if entry.context_contacts:
-            for c in entry.context_contacts:
-                lines.append(f"  - {c.get('name', '?')} (score: {c.get('score', 0):.3f})")
-        else:
-            lines.append("  (none)")
-
-        lines.append(f"Devices ({len(entry.context_devices)}):")
         if entry.context_devices:
             for d in entry.context_devices:
                 lines.append(f"  - {d.get('user_name', '?')} / {d.get('device_name', '?')} (score: {d.get('score', 0):.3f})")
@@ -183,36 +184,8 @@ def log_api_request(entry: ApiLogEntry) -> None:
     except OSError as exc:
         logger.warning("Kon API log niet schrijven: %s", exc)
 
-
-contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 knowledge_repo = KnowledgeRepository()
-
-
-def describe_contact(contact: Contact) -> str:
-    company = f" ({contact.company})" if contact.company else ""
-    location_bits = [
-        contact.location_label or "",
-        contact.location_street or "",
-        contact.location_city or "",
-        contact.location_region or "",
-        contact.location_country or "",
-    ]
-    location_text = ", ".join(bit for bit in location_bits if bit)
-    if not location_text and contact.location_context:
-        location_text = contact.location_context
-    coords = ""
-    if contact.location_lat is not None and contact.location_lon is not None:
-        coords = f"{contact.location_lat:.5f}, {contact.location_lon:.5f}"
-    lines = [
-        f"{contact.name}{company}",
-        f"  ✉ {contact.email}" if contact.email else "",
-        f"  ☎ {contact.phone}" if contact.phone else "",
-        f"  ❝ {contact.notes}" if contact.notes else "",
-        f"  📍 {location_text}" if location_text else "",
-        f"     ({coords})" if coords else "",
-    ]
-    return "\n".join(line for line in lines if line)
 
 
 def describe_device(device: Device) -> str:
@@ -499,19 +472,50 @@ def _document_details(documents: Optional[Sequence[ParsedDocument]]) -> List[Dic
     return details
 
 
+def _context_terms(value: str) -> set[str]:
+    terms: set[str] = set()
+    for raw in _CONTEXT_TOKEN_PATTERN.findall((value or "").lower()):
+        token = raw.strip("_-")
+        if token.isdigit():
+            continue
+        if token.endswith("s") and len(token) > 4:
+            token = token[:-1]
+        if len(token) < 3 or token in _CONTEXT_STOPWORDS:
+            continue
+        terms.add(token)
+    return terms
+
+
+def _ranked_knowledge_hits(prompt_text: str) -> List[tuple[Dict[str, Any], float, int]]:
+    query_terms = _context_terms(prompt_text)
+    ranked: list[tuple[Dict[str, Any], float, int]] = []
+
+    for payload, score in knowledge_repo.search_chunks(prompt_text, limit=5):
+        haystack = " ".join(
+            [
+                str(payload.get("document_title") or ""),
+                str(payload.get("doc_id") or ""),
+                str(payload.get("section") or ""),
+                str(payload.get("text") or "")[:800],
+            ]
+        )
+        overlap = len(query_terms & _context_terms(haystack)) if query_terms else 0
+        ranked.append((payload, float(score or 0.0), overlap))
+
+    if not ranked:
+        return []
+
+    if query_terms:
+        overlapping = [item for item in ranked if item[2] > 0]
+        if overlapping:
+            ranked = overlapping
+
+    ranked.sort(key=lambda item: (item[2], item[1]), reverse=True)
+    return ranked
+
+
 def _gather_context_lines(prompt_text: str) -> list[str]:
     scored: list[tuple[str, str, float]] = []
-    contact_hits = contacts_repo.search_contacts(prompt_text, limit=5)
-    if not contact_hits and hasattr(contacts_repo, "keyword_search_contacts"):
-        contact_hits = contacts_repo.keyword_search_contacts(prompt_text, limit=5)
-    for contact, score in contact_hits:
-        scored.append(
-            (
-                "contact",
-                _flatten_multiline(describe_contact(contact)),
-                float(score or 0.0),
-            )
-        )
 
     device_hits = devices_repo.search_devices(prompt_text, limit=5)
     for device, score in device_hits:
@@ -523,8 +527,8 @@ def _gather_context_lines(prompt_text: str) -> list[str]:
             )
         )
 
-    knowledge_hits = knowledge_repo.search_chunks(prompt_text, limit=5)
-    for payload, score in knowledge_hits:
+    knowledge_hits = _ranked_knowledge_hits(prompt_text)
+    for payload, score, _overlap in knowledge_hits:
         text = _flatten_multiline(str(payload.get("text") or ""))
         if not text:
             continue
@@ -552,26 +556,9 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
     """Gather context lines AND detailed info for logging."""
     scored: list[tuple[str, str, float]] = []
     details: Dict[str, List] = {
-        "contacts": [],
         "devices": [],
         "knowledge": [],
     }
-
-    contact_hits = contacts_repo.search_contacts(prompt_text, limit=5)
-    if not contact_hits and hasattr(contacts_repo, "keyword_search_contacts"):
-        contact_hits = contacts_repo.keyword_search_contacts(prompt_text, limit=5)
-    for contact, score in contact_hits:
-        scored.append(
-            (
-                "contact",
-                _flatten_multiline(describe_contact(contact)),
-                float(score or 0.0),
-            )
-        )
-        details["contacts"].append({
-            "name": contact.name,
-            "score": float(score or 0.0),
-        })
 
     device_hits = devices_repo.search_devices(prompt_text, limit=5)
     for device, score in device_hits:
@@ -588,8 +575,8 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
             "score": float(score or 0.0),
         })
 
-    knowledge_hits = knowledge_repo.search_chunks(prompt_text, limit=5)
-    for payload, score in knowledge_hits:
+    knowledge_hits = _ranked_knowledge_hits(prompt_text)
+    for payload, score, overlap in knowledge_hits:
         text = _flatten_multiline(str(payload.get("text") or ""))
         if not text:
             continue
@@ -602,6 +589,7 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
             "doc_id": payload.get("doc_id"),
             "title": title,
             "score": float(score or 0.0),
+            "term_overlap": overlap,
             "snippet": text[:100] + ("..." if len(text) > 100 else ""),
         })
 

@@ -23,6 +23,8 @@ class PromptDocument(BaseModel):
 
 class ChatRequest(BaseModel):
     prompt: str
+    request_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     mode: Optional[str] = None
     thinking: bool = True
     max_new_tokens: int = 128
@@ -30,46 +32,6 @@ class ChatRequest(BaseModel):
     images: list[str] = Field(default_factory=list)
     documents: list[PromptDocument] = Field(default_factory=list)
     new_chat: bool = False  # When True, clears server-side chat history first
-
-
-class ContactBase(BaseModel):
-    name: str
-    company: str
-    email: str
-    phone: str
-    notes: str = ""
-    location_label: Optional[str] = None
-    location_street: Optional[str] = None
-    location_city: Optional[str] = None
-    location_region: Optional[str] = None
-    location_country: Optional[str] = None
-    location_lat: Optional[float] = None
-    location_lon: Optional[float] = None
-    location_context: Optional[str] = None
-
-
-class Contact(ContactBase):
-    id: str
-
-
-class ContactCreate(ContactBase):
-    pass
-
-
-class ContactPatch(BaseModel):
-    name: Optional[str] = None
-    company: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    notes: Optional[str] = None
-    location_label: Optional[str] = None
-    location_street: Optional[str] = None
-    location_city: Optional[str] = None
-    location_region: Optional[str] = None
-    location_country: Optional[str] = None
-    location_lat: Optional[float] = None
-    location_lon: Optional[float] = None
-    location_context: Optional[str] = None
 
 
 class Device(BaseModel):
@@ -109,6 +71,14 @@ class BearerTokenResponse(BaseModel):
 
 class OllamaModelRequest(BaseModel):
     model: str
+
+
+class ChatCancelRequest(BaseModel):
+    request_id: str
+
+
+class ChatResetRequest(BaseModel):
+    conversation_id: Optional[str] = None
 
 
 class SupportAccessRequest(BaseModel):

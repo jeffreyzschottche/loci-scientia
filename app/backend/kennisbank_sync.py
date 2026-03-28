@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
-from .contacts_repo import QDRANT_LOCAL_DIR, _get_qdrant_client
+from .qdrant_utils import QDRANT_LOCAL_DIR, get_qdrant_client
 from .rag.embedder import embed_text
 
 logger = logging.getLogger(__name__)
@@ -311,7 +311,7 @@ def _index_in_qdrant(
     - Delete verwijderde chunks
     - Behoudt ongewijzigde chunks
     """
-    with _get_qdrant_client(_knowledge_embedded_path()) as client:
+    with get_qdrant_client(_knowledge_embedded_path()) as client:
         _ensure_collection(client, vector_size)
 
         # Delete verwijderde chunks (converteer chunk_ids naar qdrant UUIDs)

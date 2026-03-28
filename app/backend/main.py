@@ -44,16 +44,14 @@ from .apiAsk import (
 )
 from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
-from .contacts_repo import ContactsRepository
 from .devices_repo import DevicesRepository
 from .kennisbank_sync import read_sync_state, sync_kennisbank
 from .knowledge_library import get_library_overview, load_document_detail
 from .schemas import (
     BearerTokenResponse,
+    ChatCancelRequest,
     ChatRequest,
-    Contact,
-    ContactCreate,
-    ContactPatch,
+    ChatResetRequest,
     Device,
     DeviceCreate,
     DevicePatch,
@@ -89,7 +87,6 @@ if settings.offline_assets_dir and settings.offline_assets_dir.exists():
     if sprites_dir.exists():
         app.mount("/sprites", StaticFiles(directory=str(sprites_dir)), name="sprites")
 
-contacts_repo = ContactsRepository()
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
 chat_history = ChatHistoryStore(max_items=20)
@@ -105,6 +102,27 @@ last_prompt_at: Optional[datetime] = None
 last_idle_summary_at: Optional[datetime] = None
 
 SUMMARY_POLL_SECONDS = 60
+
+
+class ActiveGeneration:
+    def __init__(self, token: str):
+        self.token = token
+        self.cancelled = False
+        self._response = None
+
+    def bind_response(self, response) -> None:
+        self._response = response
+
+    async def cancel(self) -> None:
+        self.cancelled = True
+        if self._response is not None:
+            try:
+                await self._response.aclose()
+            except Exception:
+                pass
+
+
+active_generations: dict[str, ActiveGeneration] = {}
 
 
 class ApiStats:
@@ -225,6 +243,13 @@ async def collect_api_stats(request: Request, call_next):
 def _mark_prompt_activity() -> None:
     global last_prompt_at
     last_prompt_at = datetime.now(timezone.utc)
+
+
+def _history_key(record: TokenRecord, conversation_id: Optional[str]) -> str:
+    conversation = (conversation_id or "").strip()
+    if not conversation:
+        return record.token
+    return f"{record.token}:{conversation}"
 
 
 def _format_prompt_for_history(prompt: str, images_count: int, documents_count: int = 0) -> str:
@@ -633,25 +658,27 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    history_key = _history_key(record, req.conversation_id)
+
     # Clear history if new_chat flag is set
     if req.new_chat:
-        chat_history.clear(record.token)
+        chat_history.clear(history_key)
 
-    history = chat_history.get(record.token)
+    history = chat_history.get(history_key)
     try:
         final_prompt, images = prepare_prompt(req, history=history, documents=documents)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
-        record.token,
+        history_key,
         "user",
         _format_prompt_for_history(req.prompt, len(images), len(documents)),
     )
 
     # Generate IDs for tracking
     request_id = generate_request_id()
-    conversation_id = generate_conversation_id(record.token)
+    conversation_id = req.conversation_id or generate_conversation_id(record.token)
 
     # Build prompt with details for logging
     final_prompt, context_details = build_augmented_prompt_with_details(
@@ -679,7 +706,6 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         history_length=len(history) if history else 0,
         images_count=len(images),
         documents_count=len(documents),
-        context_contacts=context_details.get("contacts", []),
         context_devices=context_details.get("devices", []),
         context_knowledge=context_details.get("knowledge", []),
         context_documents=context_details.get("documents", []),
@@ -698,13 +724,17 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
     log_entry.response_preview = message
     log_api_request(log_entry)
 
-    chat_history.append(record.token, "assistant", message)
+    chat_history.append(history_key, "assistant", message)
     return response
 
 
 @app.post("/api/v1/ask/reset")
-def api_ask_reset(record: TokenRecord = Depends(require_token)):
-    chat_history.clear(record.token)
+def api_ask_reset(
+    req: Optional[ChatResetRequest] = None,
+    record: TokenRecord = Depends(require_token),
+):
+    conversation_id = req.conversation_id if req else None
+    chat_history.clear(_history_key(record, conversation_id))
     return {"ok": True}
 
 
@@ -716,6 +746,7 @@ async def sse_stream_generator(
     record: TokenRecord,
     request_id: str,
     conversation_id: str,
+    generation: ActiveGeneration,
     final_prompt: Optional[str] = None,
     images: Optional[list[str]] = None,
 ):
@@ -751,7 +782,6 @@ async def sse_stream_generator(
         history_length=len(history) if history else 0,
         images_count=len(images),
         documents_count=len(documents),
-        context_contacts=context_details.get("contacts", []),
         context_devices=context_details.get("devices", []),
         context_knowledge=context_details.get("knowledge", []),
         context_documents=context_details.get("documents", []),
@@ -765,6 +795,9 @@ async def sse_stream_generator(
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
+        if generation.cancelled:
+            active_generations.pop(request_id, None)
+            return
         event_data = json.dumps({"status": "queued", "position": position})
         yield f"data: {event_data}\n\n"
         await asyncio.sleep(1)
@@ -781,6 +814,7 @@ async def sse_stream_generator(
     try:
         async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
             async with client.stream("POST", ollama_url, json=ollama_payload) as response:
+                generation.bind_response(response)
                 if response.status_code >= 400:
                     # Lees fouttekst voor logging zodat we weten waarom de fallback triggert.
                     error_body = await response.aread()
@@ -795,6 +829,9 @@ async def sse_stream_generator(
                     response.raise_for_status()
 
                 async for line in response.aiter_lines():
+                    if generation.cancelled:
+                        active_generations.pop(request_id, None)
+                        return
                     if not line:
                         continue
 
@@ -870,6 +907,9 @@ async def sse_stream_generator(
         # Stream the mock response word by word
         words = mock_response.split()
         for word in words:
+            if generation.cancelled:
+                active_generations.pop(request_id, None)
+                return
             token = word + " "
             assistant_chunks.append(token)
             event_data = json.dumps({"token": token, "done": False})
@@ -899,6 +939,7 @@ async def sse_stream_generator(
         }
     )
     yield f"data: {event_data}\n\n"
+    active_generations.pop(request_id, None)
 
 
 @app.post("/api/v1/ask/stream")
@@ -911,35 +952,40 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    history_key = _history_key(record, req.conversation_id)
+
     # Clear history if new_chat flag is set
     if req.new_chat:
-        chat_history.clear(record.token)
+        chat_history.clear(history_key)
 
-    history = chat_history.get(record.token)
+    history = chat_history.get(history_key)
     try:
         final_prompt, images = prepare_prompt(req, history=history, documents=documents)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
-        record.token,
+        history_key,
         "user",
         _format_prompt_for_history(req.prompt, len(images), len(documents)),
     )
 
     # Generate IDs for tracking
-    request_id = generate_request_id()
-    conversation_id = generate_conversation_id(record.token)
+    request_id = (req.request_id or generate_request_id()).strip()
+    conversation_id = req.conversation_id or generate_conversation_id(record.token)
+    generation = ActiveGeneration(record.token)
+    active_generations[request_id] = generation
 
     return StreamingResponse(
         sse_stream_generator(
             req,
             history,
             documents,
-            record.token,
+            history_key,
             record,
             request_id,
             conversation_id,
+            generation,
             final_prompt=final_prompt,
             images=images,
         ),
@@ -951,44 +997,17 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
     )
 
 
-@app.get("/contacts", response_model=list[Contact])
-def list_contacts():
-    return contacts_repo.list_contacts()
-
-
-@app.post("/contacts", response_model=Contact)
-def create_contact(data: ContactCreate):
-    try:
-        return contacts_repo.create_contact(data)
-    except Exception as exc:  # pragma: no cover - simple error surface
-        # Log de volledige traceback zodat we fouten in Qdrant of
-        # het opslagpad kunnen debuggen.
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.patch("/contacts/{contact_id}", response_model=Contact)
-def patch_contact(contact_id: str, patch: ContactPatch):
-    try:
-        return contacts_repo.update_contact(contact_id, patch)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="contact not found")
-    except Exception as exc:  # pragma: no cover
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.delete("/contacts/{contact_id}")
-def delete_contact(contact_id: str):
-    try:
-        contacts_repo.delete_contact(contact_id)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return {"status": "ok"}
+@app.post("/api/v1/ask/cancel")
+async def api_ask_cancel(req: ChatCancelRequest, record: TokenRecord = Depends(require_token)):
+    request_id = req.request_id.strip()
+    generation = active_generations.get(request_id)
+    if generation is None:
+        return {"ok": True, "cancelled": False}
+    if generation.token != record.token:
+        raise HTTPException(status_code=403, detail="Request hoort niet bij dit token")
+    await generation.cancel()
+    active_generations.pop(request_id, None)
+    return {"ok": True, "cancelled": True}
 
 
 @app.get("/devices", response_model=list[Device])

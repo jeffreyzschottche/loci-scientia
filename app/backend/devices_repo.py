@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from qdrant_client import QdrantClient
 from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorParams
 
-from .contacts_repo import _get_qdrant_client, QDRANT_LOCAL_DIR
+from .qdrant_utils import QDRANT_LOCAL_DIR, get_qdrant_client
 from .rag.embedder import embed_text
 from .schemas import Device, DeviceCreate, DevicePatch
 
@@ -22,7 +22,7 @@ class DevicesRepository:
         )
 
     def _client_context(self):
-        return _get_qdrant_client(self._embedded_path)
+        return get_qdrant_client(self._embedded_path)
 
     def _embedding_text(self, payload: Dict[str, str]) -> str:
         parts = []

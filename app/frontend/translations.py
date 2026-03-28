@@ -17,8 +17,8 @@ TRANSLATIONS = {
     # HEADERBAR
     # ============================================
     "subtitle_local_ai_console": {
-        "nl": "Lokale AI-console",
-        "en": "Local AI Console",
+        "nl": "Edge AI-console",
+        "en": "Edge AI Console",
     },
     "online": {
         "nl": "ONLINE",
@@ -28,13 +28,17 @@ TRANSLATIONS = {
         "nl": "OFFLINE",
         "en": "OFFLINE",
     },
+    "close": {
+        "nl": "Sluiten",
+        "en": "Close",
+    },
 
     # ============================================
     # SIDEBAR
     # ============================================
     "sidebar_subtitle": {
-        "nl": "Lokale AI console",
-        "en": "Local AI Console",
+        "nl": "Edge AI console",
+        "en": "Edge AI Console",
     },
     "nav_chat": {
         "nl": "Chat",
@@ -57,8 +61,8 @@ TRANSLATIONS = {
         "en": "Network",
     },
     "nav_devices": {
-        "nl": "Connected Devices",
-        "en": "Connected Devices",
+        "nl": "Gebruikersbeheer",
+        "en": "User Management",
     },
     "nav_settings": {
         "nl": "Instellingen",
@@ -125,8 +129,8 @@ TRANSLATIONS = {
         "en": "Network",
     },
     "page_title_devices": {
-        "nl": "Connected Devices & Gebruikersbeheer",
-        "en": "Connected Devices & User Management",
+        "nl": "Gebruikersbeheer",
+        "en": "User Management",
     },
     "page_title_settings": {
         "nl": "Instellingen",
@@ -137,8 +141,8 @@ TRANSLATIONS = {
     # PAGE SUBTITLES
     # ============================================
     "page_subtitle_chat": {
-        "nl": "Start een gesprek met je lokale AI-assistent",
-        "en": "Start a conversation with your local AI assistant",
+        "nl": "Start een gesprek met je Edge AI-assistent",
+        "en": "Start a conversation with your Edge AI assistant",
     },
     "page_subtitle_kb": {
         "nl": "Beheer kennisbankdocumenten en SD-kaartopslag",
@@ -620,6 +624,22 @@ TRANSLATIONS = {
         "nl": "⬆ Upload Document",
         "en": "⬆ Upload Document",
     },
+    "kb_upload_popup_badge": {
+        "nl": "KENNISBANK PORTAAL",
+        "en": "KNOWLEDGE PORTAL",
+    },
+    "kb_upload_popup_title": {
+        "nl": "Upload documenten via je eigen kennisbank-account",
+        "en": "Upload documents via your own knowledge base account",
+    },
+    "kb_upload_popup_body": {
+        "nl": "Open kennisbank.aitje.com en log daar in met de gegevens die we je eerder hebben gestuurd. Gebruik je eigen kennis-account als je een kennisabonnement of SLA hebt. Vanuit dat portaal kun je je documenten beheren en uploaden.",
+        "en": "Open kennisbank.aitje.com and sign in with the credentials we sent you earlier. Use your own knowledge account if you have a knowledge subscription or SLA. From that portal you can manage and upload your documents.",
+    },
+    "kb_upload_popup_open": {
+        "nl": "Open portaal",
+        "en": "Open portal",
+    },
     "kb_sd_card_capacity": {
         "nl": "SD Kaart Capaciteit",
         "en": "SD Card Capacity",
@@ -1000,6 +1020,14 @@ TRANSLATIONS = {
     "chat_send": {
         "nl": "Stuur",
         "en": "Send",
+    },
+    "chat_stop": {
+        "nl": "STOP",
+        "en": "STOP",
+    },
+    "chat_stop_feedback": {
+        "nl": "Vertel AITJE wat het beter moet doen",
+        "en": "Tell AITJE what it should do better",
     },
     "chat_mode_label": {
         "nl": "Mode",

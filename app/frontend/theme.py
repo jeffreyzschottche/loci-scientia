@@ -1,5 +1,5 @@
 AITJE_QSS = """
-* { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; color: #111111; }
+* { font-family: 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif; color: #111111; }
 QLabel {
   border: none;
   background: transparent;
@@ -8,8 +8,23 @@ QMainWindow, QWidget#RootWidget {
   background: #ffffff;
   color: #111111;
 }
-#CenterContainer, #ContentArea {
+#ContentArea {
   background: #f5f5f5;
+}
+#PageIntro {
+  background: transparent;
+}
+QLabel#PageTitle {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #111111;
+}
+QLabel#PageSubtitle {
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
 }
 QScrollArea {
   background: #f5f5f5;
@@ -50,9 +65,6 @@ QScrollBar::add-page, QScrollBar::sub-page {
 #Sidebar, #Sidebar QWidget {
   background: #ffffff;
 }
-#Sidebar {
-  border-right: 1px solid #ececec;
-}
 #Header {
   background: #ffffff;
   border-bottom: 1px solid #ececec;
@@ -78,23 +90,26 @@ QPushButton:hover {
   border-color: rgba(17, 17, 17, 0.3);
 }
 #Sidebar QPushButton {
-  padding: 4px 16px;
-  min-height: 30px;
-  border-radius: 15px;
-  border: none;
+  background: #ffffff;
+  padding: 0;
+  min-height: 40px;
+  border-radius: 20px;
+  border: 1px solid #ececec;
 }
 #Sidebar QPushButton QLabel {
   background: transparent;
 }
 #Sidebar QPushButton:hover {
-  background: rgba(250, 204, 21, 0.12);
+  background: #f8f6ef;
+  border-color: #e7dcc0;
 }
 #Sidebar QPushButton[active="true"] {
   background: #facc15;
   color: #050505;
-  border: none;
-  border-radius: 15px;
-  min-height: 30px;
+  border: 1px solid #facc15;
+  border-radius: 20px;
+  min-height: 40px;
+  padding: 0;
 }
 #Sidebar QPushButton[active="true"] QLabel {
   color: #050505;

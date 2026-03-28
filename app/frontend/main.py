@@ -4,7 +4,17 @@ import os
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QLinearGradient, QBrush, QPen
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QIcon,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPalette,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -23,14 +33,48 @@ from .net.ws_client import WSClient
 from .theme import AITJE_QSS
 from .translations import t, register_language_change_callback
 from .widgets.chat_page import ChatPage
-from .widgets.contacts_page import ContactsPage
 from .widgets.devices_page import DevicesPage
 from .widgets.headerbar import HeaderBar
 from .widgets.knowledge_page import KnowledgePage
-from .widgets.maps_page import MapsPage
 from .widgets.network_page import NetworkStatusPage
 from .widgets.sidebar import Sidebar
 from .widgets.settings_page import SettingsPage
+
+
+class RoundedProgressBar(QProgressBar):
+    """Custom progress bar so rounded corners render consistently on macOS/Qt."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTextVisible(False)
+        self.setRange(0, 100)
+        self.setFixedHeight(28)
+
+    def paintEvent(self, event):  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        outer_rect = self.rect().adjusted(0, 0, -1, -1)
+        radius = outer_rect.height() / 2
+
+        track_path = QPainterPath()
+        track_path.addRoundedRect(outer_rect, radius, radius)
+        painter.fillPath(track_path, QColor("#f5f5f5"))
+        painter.setPen(QPen(QColor("#e4e4e7"), 1))
+        painter.drawPath(track_path)
+
+        progress = 0 if self.maximum() <= self.minimum() else (
+            (self.value() - self.minimum()) / (self.maximum() - self.minimum())
+        )
+
+        if progress > 0:
+            fill_rect = outer_rect.adjusted(2, 2, -2, -2)
+            fill_rect.setWidth(max(fill_rect.height(), int(fill_rect.width() * progress)))
+            fill_radius = fill_rect.height() / 2
+
+            fill_path = QPainterPath()
+            fill_path.addRoundedRect(fill_rect, fill_radius, fill_radius)
+            painter.fillPath(fill_path, QColor("#facc15"))
 
 
 class BootScreen(QWidget):
@@ -83,17 +127,6 @@ class BootScreen(QWidget):
                 font-weight: 700;
                 color: #111111;
             }
-            QProgressBar {
-                background: #f5f5f5;
-                border: 1px solid #e4e4e7;
-                border-radius: 999px;
-                height: 28px;
-                color: #111111;
-            }
-            QProgressBar::chunk {
-                border-radius: 999px;
-                background: #facc15;
-            }
             """
         )
 
@@ -134,9 +167,7 @@ class BootScreen(QWidget):
         progress_layout = QVBoxLayout()
         progress_layout.setSpacing(8)
 
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setTextVisible(False)
+        self.progress_bar = RoundedProgressBar()
         progress_layout.addWidget(self.progress_bar)
 
         info_row = QHBoxLayout()
@@ -213,54 +244,23 @@ class MainWindow(QMainWindow):
         root.setObjectName("RootWidget")
         self.setCentralWidget(root)
 
-        root_layout = QHBoxLayout(root)
+        root_layout = QVBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        self.sidebar = Sidebar()
-        self.sidebar.setFixedWidth(280)
-        root_layout.addWidget(self.sidebar)
-
-        self.center = QWidget()
-        self.center.setObjectName("CenterContainer")
-        center_layout = QVBoxLayout(self.center)
-        center_layout.setContentsMargins(0, 16, 0, 0)
-        center_layout.setSpacing(0)
-
-        self.header = HeaderBar("AITJE Dashboard")
+        self.header = HeaderBar("AITJE", t("subtitle_local_ai_console"))
         self.header.home_requested.connect(self._go_home)
-        center_layout.addWidget(self.header)
+        self.sidebar = Sidebar()
+        self.header.set_center_widget(self.sidebar)
+        root_layout.addWidget(self.header)
 
         self.pages = {
             "chat": ChatPage(self.ws_client),
             "kb": KnowledgePage(),
-            "maps": MapsPage(),
-            "contacts": ContactsPage(),
             "net": NetworkStatusPage(),
             "devices": DevicesPage(),
             "settings": SettingsPage(),
         }
-
-        contacts_page = self.pages.get("contacts")
-        maps_page = self.pages.get("maps")
-        if isinstance(contacts_page, ContactsPage):
-            contacts_page.view_on_map_requested.connect(
-                self._handle_view_on_map_request
-            )
-            contacts_page.add_location_requested.connect(
-                self._handle_add_location_request
-            )
-        if isinstance(maps_page, MapsPage) and isinstance(contacts_page, ContactsPage):
-            contacts_page.contacts_updated.connect(
-                lambda contact_id="": maps_page.handle_external_contact_change(
-                    contact_id or None
-                )
-            )
-            maps_page.contact_changed.connect(
-                lambda contact_id="": contacts_page.reload_contacts(
-                    select_id=contact_id or None
-                )
-            )
         self.content_scroll = QScrollArea()
         self.content_scroll.setWidgetResizable(True)
         self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -271,6 +271,23 @@ class MainWindow(QMainWindow):
         content_layout = QVBoxLayout(self.content)
         content_layout.setContentsMargins(24, 24, 24, 24)
         content_layout.setSpacing(16)
+
+        self.page_intro = QWidget()
+        self.page_intro.setObjectName("PageIntro")
+        intro_layout = QVBoxLayout(self.page_intro)
+        intro_layout.setContentsMargins(8, 0, 8, 0)
+        intro_layout.setSpacing(2)
+
+        self.page_title = QLabel()
+        self.page_title.setObjectName("PageTitle")
+        intro_layout.addWidget(self.page_title)
+
+        self.page_subtitle = QLabel()
+        self.page_subtitle.setObjectName("PageSubtitle")
+        intro_layout.addWidget(self.page_subtitle)
+
+        content_layout.addWidget(self.page_intro)
+
         for page in self.pages.values():
             content_layout.addWidget(page)
             page.setObjectName("Card")
@@ -278,8 +295,7 @@ class MainWindow(QMainWindow):
 
         self.content_scroll.setWidget(self.content)
 
-        center_layout.addWidget(self.content_scroll, 1)
-        root_layout.addWidget(self.center, 1)
+        root_layout.addWidget(self.content_scroll, 1)
 
         self.sidebar.navigate.connect(self.show_page)
         self.sidebar.set_current("chat")
@@ -295,20 +311,6 @@ class MainWindow(QMainWindow):
         """Update all UI elements when language changes."""
         self._update_page_header()
 
-    def _handle_view_on_map_request(self, contact: dict) -> None:
-        maps_page = self.pages.get("maps")
-        if isinstance(maps_page, MapsPage):
-            maps_page.focus_on_contact(contact)
-        self.sidebar.set_current("maps")
-        self.show_page("maps")
-
-    def _handle_add_location_request(self, contact: dict, force_pin: bool = False) -> None:
-        maps_page = self.pages.get("maps")
-        if isinstance(maps_page, MapsPage):
-            maps_page.request_location_for_contact(contact, force_pin=force_pin)
-        self.sidebar.set_current("maps")
-        self.show_page("maps")
-
     def show_page(self, key: str):
         for name, page in self.pages.items():
             page.setVisible(name == key)
@@ -316,13 +318,11 @@ class MainWindow(QMainWindow):
         self._update_page_header()
 
     def _update_page_header(self):
-        """Update header title and subtitle for current page."""
+        """Update in-content title and subtitle for current page."""
         key = getattr(self, "_current_page_key", "chat")
         title_keys = {
             "chat": "page_title_chat",
             "kb": "page_title_kb",
-            "maps": "page_title_maps",
-            "contacts": "page_title_contacts",
             "net": "page_title_net",
             "devices": "page_title_devices",
             "settings": "page_title_settings",
@@ -330,14 +330,12 @@ class MainWindow(QMainWindow):
         subtitle_keys = {
             "chat": "page_subtitle_chat",
             "kb": "page_subtitle_kb",
-            "maps": "page_subtitle_maps",
-            "contacts": "page_subtitle_contacts",
             "net": "page_subtitle_net",
             "devices": "page_subtitle_devices",
             "settings": "page_subtitle_settings",
         }
-        self.header.set_title(t(title_keys.get(key, "page_title_chat")))
-        self.header.set_subtitle(t(subtitle_keys.get(key, "subtitle_local_ai_console")))
+        self.page_title.setText(t(title_keys.get(key, "page_title_chat")))
+        self.page_subtitle.setText(t(subtitle_keys.get(key, "subtitle_local_ai_console")))
 
     def _go_home(self):
         self.sidebar.set_current("chat")
@@ -350,6 +348,26 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor("#ffffff"))
+    palette.setColor(QPalette.WindowText, QColor("#111111"))
+    palette.setColor(QPalette.Base, QColor("#ffffff"))
+    palette.setColor(QPalette.AlternateBase, QColor("#f5f5f5"))
+    palette.setColor(QPalette.ToolTipBase, QColor("#ffffff"))
+    palette.setColor(QPalette.ToolTipText, QColor("#111111"))
+    palette.setColor(QPalette.Text, QColor("#111111"))
+    palette.setColor(QPalette.Button, QColor("#ffffff"))
+    palette.setColor(QPalette.ButtonText, QColor("#111111"))
+    palette.setColor(QPalette.BrightText, QColor("#ffffff"))
+    palette.setColor(QPalette.Highlight, QColor("#facc15"))
+    palette.setColor(QPalette.HighlightedText, QColor("#111111"))
+    palette.setColor(QPalette.Light, QColor("#ffffff"))
+    palette.setColor(QPalette.Midlight, QColor("#f3f4f6"))
+    palette.setColor(QPalette.Mid, QColor("#e5e7eb"))
+    palette.setColor(QPalette.Dark, QColor("#d1d5db"))
+    palette.setColor(QPalette.Shadow, QColor("#9ca3af"))
+    app.setPalette(palette)
 
     app_dir = os.path.dirname(__file__)
     app_images_dir = os.path.join(app_dir, "images")
