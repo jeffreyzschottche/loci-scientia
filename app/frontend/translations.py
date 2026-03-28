@@ -145,8 +145,8 @@ TRANSLATIONS = {
         "en": "Start a conversation with your Edge AI assistant",
     },
     "page_subtitle_kb": {
-        "nl": "Beheer kennisbankdocumenten en SD-kaartopslag",
-        "en": "Manage knowledge bank documents and SD card storage",
+        "nl": "Inzage voor kennisbank documenten en opslag",
+        "en": "Insight into knowledge base documents and storage",
     },
     "page_subtitle_maps": {
         "nl": "Bekijk contactlocaties op de kaart",
@@ -275,6 +275,10 @@ TRANSLATIONS = {
     "settings_could_not_save_language": {
         "nl": "Kon taal niet opslaan:",
         "en": "Could not save language:",
+    },
+    "settings_could_not_save_focus_mode": {
+        "nl": "Kon focus mode niet opslaan:",
+        "en": "Could not save focus mode:",
     },
     "settings_backend_not_reachable": {
         "nl": "Backend niet bereikbaar; lokaal modellenlijstje geladen.",
@@ -616,6 +620,50 @@ TRANSLATIONS = {
         "nl": "Open WiFi configuratie",
         "en": "Open WiFi configuration",
     },
+    "network_resources_title": {
+        "nl": "Systeemverbruik",
+        "en": "System usage",
+    },
+    "network_ram_now": {
+        "nl": "RAM NU",
+        "en": "RAM NOW",
+    },
+    "network_ram_caption": {
+        "nl": "Actueel geheugenverbruik ({percent}% van het systeem).",
+        "en": "Current memory usage ({percent}% of system memory).",
+    },
+    "network_cpu_now": {
+        "nl": "CPU NU",
+        "en": "CPU NOW",
+    },
+    "network_cpu_caption": {
+        "nl": "Huidige systeembelasting.",
+        "en": "Current system load.",
+    },
+    "network_power_now": {
+        "nl": "STROOM NU",
+        "en": "POWER NOW",
+    },
+    "network_power_caption": {
+        "nl": "Live wattage van het apparaat.",
+        "en": "Live device wattage.",
+    },
+    "network_power_live": {
+        "nl": "Live gemeten via systeemsensor.",
+        "en": "Live reading from system sensor.",
+    },
+    "network_power_unavailable": {
+        "nl": "Geen live powersensor gevonden. Voor exact verbruik is Linux power telemetry of een slimme meter nodig.",
+        "en": "No live power sensor found. Exact usage requires Linux power telemetry or a smart meter.",
+    },
+    "network_performance_title": {
+        "nl": "Hoe AITJE nu draait",
+        "en": "How AITJE is running",
+    },
+    "network_performance_caption": {
+        "nl": "Een snelle indruk van geheugen, rekenlast en stroomvraag van het kastje.",
+        "en": "A quick view of memory, compute load, and device power demand.",
+    },
 
     # ============================================
     # KNOWLEDGE PAGE
@@ -688,6 +736,18 @@ TRANSLATIONS = {
         "nl": "Index Status",
         "en": "Index Status",
     },
+    "kb_vector_progress_storage": {
+        "nl": "Opslag",
+        "en": "Storage",
+    },
+    "kb_vector_progress_embeddings": {
+        "nl": "Embeddings",
+        "en": "Embeddings",
+    },
+    "kb_vector_progress_relations": {
+        "nl": "Relaties",
+        "en": "Relations",
+    },
     "kb_optimal": {
         "nl": "Optimaal",
         "en": "Optimal",
@@ -695,6 +755,42 @@ TRANSLATIONS = {
     "kb_documents": {
         "nl": "Kennisbank Documenten",
         "en": "Knowledge Bank Documents",
+    },
+    "kb_documents_subtitle": {
+        "nl": "Bekijk documenten en open per document direct de gekoppelde relaties.",
+        "en": "Review documents and open their related items directly.",
+    },
+    "kb_documents_search_placeholder": {
+        "nl": "Zoek in documenten...",
+        "en": "Search documents...",
+    },
+    "kb_preview_title": {
+        "nl": "Document Preview",
+        "en": "Document Preview",
+    },
+    "kb_preview_empty_title": {
+        "nl": "Selecteer een document",
+        "en": "Select a document",
+    },
+    "kb_preview_empty_body": {
+        "nl": "Klik links op een document om hier de inhoud te bekijken.",
+        "en": "Click a document on the left to view its contents here.",
+    },
+    "kb_preview_unavailable": {
+        "nl": "Voor dit document is momenteel geen preview beschikbaar.",
+        "en": "No preview is currently available for this document.",
+    },
+    "kb_preview_chunks": {
+        "nl": "{count} chunks",
+        "en": "{count} chunks",
+    },
+    "kb_tab_documents": {
+        "nl": "Documenten",
+        "en": "Documents",
+    },
+    "kb_tab_relations": {
+        "nl": "Relaties",
+        "en": "Relations",
     },
     "kb_document": {
         "nl": "Document",
@@ -781,9 +877,21 @@ TRANSLATIONS = {
         "nl": "Sync mislukt",
         "en": "Sync failed",
     },
+    "kb_sync_repo_missing": {
+        "nl": "De kennisbank Git-configuratie ontbreekt. Neem contact op met het team van Aitje via aitje.com.",
+        "en": "The knowledge base Git configuration is missing. Please contact the Aitje team via aitje.com.",
+    },
+    "kb_sync_support_suffix": {
+        "nl": "Neem contact op met het team van Aitje via aitje.com.",
+        "en": "Please contact the Aitje team via aitje.com.",
+    },
     "kb_sync_success": {
         "nl": "Sync voltooid",
         "en": "Sync completed",
+    },
+    "kb_sync_vectors_detail": {
+        "nl": "{count} vectors",
+        "en": "{count} vectors",
     },
     "kb_sync_starting": {
         "nl": "Sync wordt gestart...",
@@ -1040,6 +1148,10 @@ TRANSLATIONS = {
     "chat_mode_default": {
         "nl": "Standaard",
         "en": "Default",
+    },
+    "chat_focus_mode_label": {
+        "nl": "Focus mode:",
+        "en": "Focus mode:",
     },
     "chat_error_prefix": {
         "nl": "[fout]",
@@ -1348,6 +1460,10 @@ TRANSLATIONS = {
     "settings_ollama_model": {
         "nl": "Ollama model",
         "en": "Ollama model",
+    },
+    "settings_focus_mode": {
+        "nl": "Focus mode",
+        "en": "Focus mode",
     },
     "settings_model": {
         "nl": "Model",

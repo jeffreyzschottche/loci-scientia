@@ -15,6 +15,15 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
 )
+try:
+    from PySide6.QtCore import QUrl
+    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimediaWidgets import QVideoWidget
+except Exception:  # pragma: no cover - optional multimedia support
+    QAudioOutput = None
+    QMediaPlayer = None
+    QUrl = None
+    QVideoWidget = None
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -101,6 +110,8 @@ class BootScreen(QWidget):
         self.on_finished = on_finished
         self.duration_ms = duration_ms
         self.progress_value = 0
+        self._media_player = None
+        self._audio_output = None
 
         self.setObjectName("BootScreenRoot")
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
@@ -139,18 +150,8 @@ class BootScreen(QWidget):
         center.setSpacing(24)
         center.setAlignment(Qt.AlignCenter)
 
-        hero_pixmap = None
-        if logo_path and os.path.exists(logo_path):
-            hero_pixmap = QPixmap(logo_path)
-        hero_label = QLabel()
-        hero_label.setAlignment(Qt.AlignCenter)
-        if hero_pixmap and not hero_pixmap.isNull():
-            hero_label.setPixmap(
-                hero_pixmap.scaled(260, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            )
-        else:
-            hero_label.setPixmap(self._build_egg_pixmap(260, 320))
-        center.addWidget(hero_label, 0, Qt.AlignCenter)
+        hero_widget = self._build_hero_widget(logo_path)
+        center.addWidget(hero_widget, 0, Qt.AlignCenter)
 
         title = QLabel(t("boot_title"))
         title.setObjectName("BootTitle")
@@ -212,6 +213,42 @@ class BootScreen(QWidget):
         painter.end()
         return pixmap
 
+    def _build_hero_widget(self, media_path: Optional[str]) -> QWidget:
+        if (
+            media_path
+            and media_path.lower().endswith(".mp4")
+            and os.path.exists(media_path)
+            and QMediaPlayer is not None
+            and QVideoWidget is not None
+            and QUrl is not None
+        ):
+            video = QVideoWidget()
+            video.setFixedSize(320, 320)
+            video.setStyleSheet("background: #ffffff;")
+
+            self._media_player = QMediaPlayer(self)
+            self._audio_output = QAudioOutput(self)
+            self._audio_output.setMuted(True)
+            self._media_player.setAudioOutput(self._audio_output)
+            self._media_player.setVideoOutput(video)
+            self._media_player.setSource(QUrl.fromLocalFile(media_path))
+            self._media_player.setLoops(-1)
+            self._media_player.play()
+            return video
+
+        hero_pixmap = None
+        if media_path and os.path.exists(media_path):
+            hero_pixmap = QPixmap(media_path)
+        hero_label = QLabel()
+        hero_label.setAlignment(Qt.AlignCenter)
+        if hero_pixmap and not hero_pixmap.isNull():
+            hero_label.setPixmap(
+                hero_pixmap.scaled(260, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+        else:
+            hero_label.setPixmap(self._build_egg_pixmap(260, 320))
+        return hero_label
+
     def _advance(self):
         self.progress_value = min(100, self.progress_value + self.increment)
         self.progress_bar.setValue(self.progress_value)
@@ -227,6 +264,8 @@ class BootScreen(QWidget):
             QTimer.singleShot(400, self.finish)
 
     def finish(self):
+        if self._media_player is not None:
+            self._media_player.stop()
         if self.on_finished:
             self.on_finished()
         self.close()
@@ -347,6 +386,9 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    if sys.platform == "darwin":
+        os.environ.setdefault("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", "")
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     palette = QPalette()
@@ -371,11 +413,11 @@ def main():
 
     app_dir = os.path.dirname(__file__)
     app_images_dir = os.path.join(app_dir, "images")
-    app_icon_path = os.path.join(app_images_dir, "aitje-logo.png")
+    app_icon_path = os.path.join(app_images_dir, "aitje-nav-logo.png")
     if os.path.exists(app_icon_path):
         app.setWindowIcon(QIcon(app_icon_path))
 
-    boot_logo_path = app_icon_path
+    boot_logo_path = os.path.join(app_dir, "assets", "aitje-home-animated-egg-boomerang-white.mp4")
 
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)

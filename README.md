@@ -145,7 +145,6 @@ app/
   backend/
     main.py          # FastAPI entry
     apiAsk.py        # prompt + Ollama-logica
-    contacts_repo.py
     devices_repo.py
     schemas.py
     settings.py
@@ -156,7 +155,6 @@ app/
       devices_page.py# Connected devices (Toon client URL)
   requirements.txt
 qdrant_storage/
-  contacts_db/
   devices_db/
 .env.example
 lociscientia.sh
@@ -166,7 +164,7 @@ lociscientia.sh
 
 ## 🧠 Embeddings & Qdrant
 
-- Contacts/devices worden in `qdrant_storage/...` opgeslagen via `qdrant-client[fastembed]`.
+- Devices worden in `qdrant_storage/...` opgeslagen via `qdrant-client[fastembed]`.
 - `FASTEMBED_MODEL` default naar `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
 - Wil je volledig offline zijn? Zet de ONNX-modelbestanden in `fastembed_models/<modelnaam>` en stel `FASTEMBED_ALLOW_DOWNLOAD=0`.
 

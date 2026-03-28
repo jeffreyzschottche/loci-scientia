@@ -11,8 +11,10 @@ from PySide6.QtWidgets import (
 
 from ..translations import t
 
-DIALOG_WIDTH = 500
-DIALOG_HEIGHT = 550
+DEFAULT_DIALOG_WIDTH = 500
+DEFAULT_DIALOG_HEIGHT = 550
+COMPACT_DIALOG_WIDTH = 420
+COMPACT_DIALOG_HEIGHT = 260
 
 BUTTON_WIDTH = 120
 BUTTON_HEIGHT = 36
@@ -110,18 +112,20 @@ CLOSE_BTN_QSS = (
 class OverlayDialog(QDialog):
     """A frameless dialog rendered as an in-app overlay with a centered card."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, width: int = DEFAULT_DIALOG_WIDTH, height: int = DEFAULT_DIALOG_HEIGHT):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setModal(True)
+        self._card_width = width
+        self._card_height = height
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
         self.card = QFrame()
         self.card.setObjectName("OverlayCard")
-        self.card.setFixedSize(DIALOG_WIDTH, DIALOG_HEIGHT)
+        self.card.setFixedSize(self._card_width, self._card_height)
         self.card.setStyleSheet(CARD_QSS)
         outer.addWidget(self.card, 0, Qt.AlignCenter)
 
@@ -169,12 +173,12 @@ def center_dialog(dialog: QDialog) -> None:
     For plain QDialog fallback, centers on parent."""
     if isinstance(dialog, OverlayDialog):
         return
-    dialog.setFixedSize(DIALOG_WIDTH, DIALOG_HEIGHT)
+    dialog.setFixedSize(DEFAULT_DIALOG_WIDTH, DEFAULT_DIALOG_HEIGHT)
     parent = dialog.parent()
     if parent is not None:
         parent_geo = parent.window().geometry()
-        x = parent_geo.x() + (parent_geo.width() - DIALOG_WIDTH) // 2
-        y = parent_geo.y() + (parent_geo.height() - DIALOG_HEIGHT) // 2
+        x = parent_geo.x() + (parent_geo.width() - DEFAULT_DIALOG_WIDTH) // 2
+        y = parent_geo.y() + (parent_geo.height() - DEFAULT_DIALOG_HEIGHT) // 2
         dialog.move(x, y)
 
 
@@ -190,6 +194,7 @@ def _styled_button(text: str) -> QPushButton:
         "  padding:6px 16px;"
         "  font-weight:600;"
         "  font-size:13px;"
+        "  text-align:center;"
         "}"
         "QPushButton:hover { background:#050505; color:#facc15; }"
     )
@@ -197,8 +202,12 @@ def _styled_button(text: str) -> QPushButton:
     return btn
 
 
-def _base_dialog(parent, title: str, text: str) -> tuple[OverlayDialog, QVBoxLayout]:
-    dialog = OverlayDialog(parent)
+def _base_dialog(parent, title: str, text: str, *, compact: bool = False) -> tuple[OverlayDialog, QVBoxLayout]:
+    dialog = OverlayDialog(
+        parent,
+        width=COMPACT_DIALOG_WIDTH if compact else DEFAULT_DIALOG_WIDTH,
+        height=COMPACT_DIALOG_HEIGHT if compact else DEFAULT_DIALOG_HEIGHT,
+    )
     dialog.setWindowTitle(title)
     label = QLabel(text)
     label.setWordWrap(True)
@@ -207,8 +216,8 @@ def _base_dialog(parent, title: str, text: str) -> tuple[OverlayDialog, QVBoxLay
     return dialog, dialog.card_layout
 
 
-def show_info_dialog(parent, title: str, text: str) -> None:
-    dialog, layout = _base_dialog(parent, title, text)
+def show_info_dialog(parent, title: str, text: str, *, compact: bool = False) -> None:
+    dialog, layout = _base_dialog(parent, title, text, compact=compact)
     btn = _styled_button(t("ok"))
     btn.clicked.connect(dialog.accept)
     layout.addStretch(1)
@@ -216,12 +225,12 @@ def show_info_dialog(parent, title: str, text: str) -> None:
     dialog.exec()
 
 
-def show_warning_dialog(parent, title: str, text: str) -> None:
-    show_info_dialog(parent, title, text)
+def show_warning_dialog(parent, title: str, text: str, *, compact: bool = False) -> None:
+    show_info_dialog(parent, title, text, compact=compact)
 
 
-def show_error_dialog(parent, title: str, text: str) -> None:
-    show_info_dialog(parent, title, text)
+def show_error_dialog(parent, title: str, text: str, *, compact: bool = False) -> None:
+    show_info_dialog(parent, title, text, compact=compact)
 
 
 def ask_yes_no_dialog(

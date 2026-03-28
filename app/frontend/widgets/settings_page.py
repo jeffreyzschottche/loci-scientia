@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS, PROMPT_MODES
 from ..translations import t, register_language_change_callback
 from .dialog_style import ask_yes_no_dialog, show_error_dialog
 
@@ -42,6 +42,7 @@ class SettingsPage(QWidget):
         self._timezone_combo: QComboBox | None = None
         self._timezone_loading = False
         self._language_combo: QComboBox | None = None
+        self._focus_mode_combo: QComboBox | None = None
         self._system_loading = False
         self._support_active = False
         self._support_duration_keys = ["settings_30_min", "settings_1_hour", "settings_4_hours"]
@@ -121,6 +122,20 @@ class SettingsPage(QWidget):
     def _advanced_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
+
+        focus_mode_card = self._settings_card(t("settings_focus_mode"))
+        focus_mode_body = QWidget()
+        focus_mode_layout = QGridLayout(focus_mode_body)
+        focus_mode_layout.setHorizontalSpacing(12)
+        self._focus_mode_label = QLabel(t("settings_focus_mode"))
+        focus_mode_layout.addWidget(self._focus_mode_label, 0, 0)
+        self._focus_mode_combo = QComboBox()
+        self._populate_focus_mode_options()
+        focus_mode_layout.addWidget(self._focus_mode_combo, 0, 1)
+        self._focus_mode_combo.currentIndexChanged.connect(self._on_focus_mode_changed)
+        focus_mode_card.layout().addWidget(focus_mode_body)
+        layout.addWidget(focus_mode_card)
+
         model_card = self._settings_card(t("settings_ollama_model"))
         model_body = QWidget()
         model_layout = QGridLayout(model_body)
@@ -223,6 +238,15 @@ class SettingsPage(QWidget):
             return value
         return None
 
+    def _current_focus_mode(self) -> str | None:
+        env_value = os.environ.get("AITJE_DEFAULT_PROMPT_MODE")
+        if env_value:
+            return env_value.strip()
+        value = self._read_env_value("AITJE_DEFAULT_PROMPT_MODE")
+        if value:
+            return value
+        return None
+
     @staticmethod
     def _env_file_path() -> Path:
         return Path(__file__).resolve().parents[3] / ".env"
@@ -296,6 +320,34 @@ class SettingsPage(QWidget):
             os.environ["LANGUAGE"] = str(value)
         except Exception as exc:
             show_error_dialog(self, t("error"), f"{t('settings_could_not_save_language')} {exc}")
+
+    def _populate_focus_mode_options(self) -> None:
+        if not self._focus_mode_combo:
+            return
+        current_value = self._current_focus_mode()
+        self._focus_mode_combo.blockSignals(True)
+        self._focus_mode_combo.clear()
+        self._focus_mode_combo.addItem(t("chat_mode_default"), "")
+        for mode in PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]:
+            self._focus_mode_combo.addItem(mode, mode)
+        for index in range(self._focus_mode_combo.count()):
+            if (self._focus_mode_combo.itemData(index) or "") == (current_value or ""):
+                self._focus_mode_combo.setCurrentIndex(index)
+                break
+        self._focus_mode_combo.blockSignals(False)
+
+    def _on_focus_mode_changed(self, _index: int | None = None) -> None:
+        if not self._focus_mode_combo:
+            return
+        value = str(self._focus_mode_combo.currentData() or "").strip()
+        try:
+            self._set_env_value("AITJE_DEFAULT_PROMPT_MODE", value)
+            if value:
+                os.environ["AITJE_DEFAULT_PROMPT_MODE"] = value
+            else:
+                os.environ.pop("AITJE_DEFAULT_PROMPT_MODE", None)
+        except Exception as exc:
+            show_error_dialog(self, t("error"), f"{t('settings_could_not_save_focus_mode')} {exc}")
 
 
     def _auth_headers(self) -> dict:
@@ -603,6 +655,8 @@ class SettingsPage(QWidget):
             self._timezone_label.setText(t("settings_timezone"))
         if hasattr(self, "_language_label"):
             self._language_label.setText(t("settings_language"))
+        if hasattr(self, "_focus_mode_label"):
+            self._focus_mode_label.setText(t("settings_focus_mode"))
         if hasattr(self, "_duration_label"):
             self._duration_label.setText(t("settings_duration"))
         if hasattr(self, "_support_hint"):
@@ -613,6 +667,8 @@ class SettingsPage(QWidget):
             self._support_disable.setText(t("settings_stop_support"))
         if hasattr(self, "_ollama_apply"):
             self._ollama_apply.setText(t("settings_use"))
+        if hasattr(self, "_focus_mode_combo"):
+            self._populate_focus_mode_options()
         if hasattr(self, "_support_duration") and self._support_duration:
             current_idx = self._support_duration.currentIndex()
             self._support_duration.clear()

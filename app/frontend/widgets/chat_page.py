@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+import os
 import uuid
 
 import requests
@@ -36,9 +37,6 @@ SIDE_PADDING = 12
 ASSISTANT_AVATAR_SIZE = 32
 ASSISTANT_MAX_WIDTH = 900
 ASSISTANT_MIN_WIDTH = 640
-MODE_DEFAULT_KEY = "__default__"
-
-
 class ChatSignals(QObject):
     response_token = Signal(int, str)
     thinking_token = Signal(int, str)
@@ -258,8 +256,8 @@ class AssistantMessageWidget(QWidget):
         self.thinking_card = QFrame()
         self.thinking_card.setStyleSheet(
             "QFrame {"
-            "  background:#f8fafc;"
-            "  border:1px solid #dbe4ef;"
+            "  background:#fff8db;"
+            "  border:1px solid #f4d76a;"
             "  border-radius:16px;"
             "}"
         )
@@ -274,7 +272,7 @@ class AssistantMessageWidget(QWidget):
         self.thinking_toggle.setStyleSheet(
             "QToolButton {"
             "  border:none;"
-            "  color:#334155;"
+            "  color:#8a6700;"
             "  font-size:12px;"
             "  font-weight:700;"
             "  text-align:left;"
@@ -289,7 +287,7 @@ class AssistantMessageWidget(QWidget):
         self.thinking_view.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.thinking_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         self.thinking_view.setStyleSheet(
-            "background:transparent; border:none; color:#334155; line-height:1.5;"
+            "background:transparent; border:none; color:#5f4a00; line-height:1.5;"
         )
         thinking_layout.addWidget(self.thinking_view)
         layout.addWidget(self.thinking_card)
@@ -404,8 +402,7 @@ class ChatPage(QWidget):
         self._bearer_token = BACKEND_BEARER_TOKEN or ""
         self._auto_token_error: str | None = None
         self.available_modes = PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]
-        self.selected_mode: str | None = None
-        self.mode_buttons: dict[str, QPushButton] = {}
+        self.selected_mode = self._load_focus_mode()
         self.thinking_enabled = True
         self._is_generating = False
         self._stop_requested = False
@@ -454,60 +451,6 @@ class ChatPage(QWidget):
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
         self._sync_thinking_button()
-
-        self.mode_card = QFrame()
-        self.mode_card.setObjectName("ChatModeCard")
-        self.mode_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.mode_card.setMaximumHeight(54)
-        self.mode_card.setStyleSheet(
-            "QFrame#ChatModeCard {"
-            "  background:#ffffff;"
-            "  border:1px solid #ececec;"
-            "  border-radius:24px;"
-            "}"
-            "QPushButton[modeChip='true'] {"
-            "  background:#ffffff;"
-            "  border:1px solid #e5e7eb;"
-            "  border-radius:10px;"
-            "  color:#111111;"
-            "  font-weight:700;"
-            "  padding:5px 14px;"
-            "}"
-            "QPushButton[modeChip='true']:hover {"
-            "  background:#f9fafb;"
-            "  border-color:#d1d5db;"
-            "}"
-            "QPushButton[modeChip='true'][active='true'] {"
-            "  background:#facc15;"
-            "  border-color:#facc15;"
-            "  color:#050505;"
-            "}"
-        )
-        mode_layout = QVBoxLayout(self.mode_card)
-        mode_layout.setContentsMargins(12, 8, 12, 8)
-        mode_layout.setSpacing(0)
-
-        mode_scroll = QScrollArea()
-        mode_scroll.setWidgetResizable(True)
-        mode_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        mode_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        mode_scroll.setFrameShape(QFrame.NoFrame)
-        mode_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-        mode_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        mode_scroll.setFixedHeight(34)
-
-        mode_container = QWidget()
-        self.mode_chip_layout = QHBoxLayout(mode_container)
-        self.mode_chip_layout.setContentsMargins(0, 0, 0, 0)
-        self.mode_chip_layout.setSpacing(8)
-        self._create_mode_chip(t("chat_mode_default"), None)
-        for mode in self.available_modes:
-            self._create_mode_chip(mode, mode)
-        self.mode_chip_layout.addStretch(1)
-        mode_scroll.setWidget(mode_container)
-        mode_layout.addWidget(mode_scroll)
-        layout.addWidget(self.mode_card)
-        self._set_selected_mode(None)
 
         self.history_card = QFrame()
         self.history_card.setObjectName("ChatWrapper")
@@ -587,35 +530,17 @@ class ChatPage(QWidget):
         self._sync_thinking_button()
         self.input.setPlaceholderText(t("chat_placeholder"))
         self._sync_send_button()
-        default_btn = self.mode_buttons.get(MODE_DEFAULT_KEY)
-        if default_btn:
-            default_btn.setText(t("chat_mode_default"))
         if self.empty_label:
             self.empty_label.setText(t("chat_welcome"))
 
-    def _create_mode_chip(self, label: str, mode: str | None) -> QPushButton:
-        key = mode or MODE_DEFAULT_KEY
-        button = QPushButton(label)
-        button.setCursor(Qt.PointingHandCursor)
-        button.setProperty("modeChip", "true")
-        button.setProperty("active", "false")
-        button.setCheckable(True)
-        button.clicked.connect(lambda checked=False, value=mode: self._set_selected_mode(value))
-        self.mode_buttons[key] = button
-        self.mode_chip_layout.addWidget(button, 0, Qt.AlignLeft)
-        return button
-
-    def _set_selected_mode(self, mode: str | None) -> None:
-        self.selected_mode = mode
-        active_key = mode or MODE_DEFAULT_KEY
-        for key, button in self.mode_buttons.items():
-            is_active = key == active_key
-            button.setChecked(is_active)
-            button.setProperty("active", "true" if is_active else "false")
-            style = button.style()
-            style.unpolish(button)
-            style.polish(button)
-            button.update()
+    def _load_focus_mode(self) -> str | None:
+        value = os.environ.get("AITJE_DEFAULT_PROMPT_MODE", "").strip()
+        if not value:
+            return None
+        for mode in self.available_modes:
+            if mode.lower() == value.lower():
+                return mode
+        return None
 
     def _toggle_thinking(self, checked: bool) -> None:
         self.thinking_enabled = checked
@@ -665,6 +590,7 @@ class ChatPage(QWidget):
         text = self.input.text().strip()
         if not text:
             return
+        self.selected_mode = self._load_focus_mode()
         self._stop_requested = False
         self._is_generating = True
         self._request_seq += 1
