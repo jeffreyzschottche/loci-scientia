@@ -215,8 +215,8 @@ class HeaderBar(QWidget):
         super().__init__()
         self.setObjectName("Header")
         self._layout = QHBoxLayout(self)
-        self._layout.setContentsMargins(24, 12, 24, 12)
-        self._layout.setSpacing(18)
+        self._layout.setContentsMargins(18, 12, 18, 12)
+        self._layout.setSpacing(12)
         self.setFixedHeight(72)
 
         self._brand = QWidget()
@@ -246,6 +246,7 @@ class HeaderBar(QWidget):
         self._layout.addWidget(self._brand, 0, Qt.AlignVCenter)
 
         self._center = QWidget()
+        self._center.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
         self._center_layout = QHBoxLayout(self._center)
         self._center_layout.setContentsMargins(0, 0, 0, 0)
         self._center_layout.setSpacing(0)
@@ -255,7 +256,7 @@ class HeaderBar(QWidget):
         self._right = QWidget()
         right_layout = QHBoxLayout(self._right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(14)
+        right_layout.setSpacing(10)
 
         self._is_online = True
         self.status = QLabel()
@@ -280,12 +281,13 @@ class HeaderBar(QWidget):
             "  color: #050505;"
             "  font-weight: 700;"
             "  border-radius: 18px;"
-            "  padding: 10px 28px;"
+            "  padding: 10px 18px;"
             "  border: 0;"
             "}"
             "QPushButton:hover { background-color: #050505; color: #facc15; }"
         )
         self.home_btn.setMinimumHeight(40)
+        self.home_btn.setMinimumWidth(76)
         self.home_btn.clicked.connect(self.home_requested.emit)
         right_layout.addWidget(self.home_btn, 0, Qt.AlignVCenter)
 
@@ -301,9 +303,22 @@ class HeaderBar(QWidget):
             child = item.widget()
             if child is not None:
                 child.setParent(None)
+        widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self._center_layout.addStretch(1)
         self._center_layout.addWidget(widget, 0, Qt.AlignCenter)
         self._center_layout.addStretch(1)
+        minimum_width = widget.minimumSizeHint().width()
+        self._center.setMinimumWidth(minimum_width)
+        self.setMinimumWidth(
+            self._layout.contentsMargins().left()
+            + self._brand.minimumSizeHint().width()
+            + self._layout.spacing()
+            + self._center.minimumWidth()
+            + self._layout.spacing()
+            + self._right.minimumSizeHint().width()
+            + self._layout.contentsMargins().right()
+        )
+        self.updateGeometry()
 
     def _on_language_changed(self, lang: str):
         """Handle language change from selector."""
@@ -325,7 +340,7 @@ class HeaderBar(QWidget):
             color = "#ef4444"
         self.status.setText(text)
         self.status.setStyleSheet(
-            f"color:{color}; font-weight:600; letter-spacing:0.08em;"
+            f"color:{color}; font-weight:600; letter-spacing:0.03em;"
         )
 
     def set_title(self, title: str):

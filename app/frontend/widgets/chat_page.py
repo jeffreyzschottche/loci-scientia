@@ -9,7 +9,7 @@ import uuid
 import requests
 from datetime import datetime
 from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QColor, QFontMetrics, QPainter, QTextDocument, QTextOption
+from PySide6.QtGui import QColor, QFont, QPainter, QTextDocument, QTextOption
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -426,7 +426,11 @@ class ChatPage(QWidget):
         thinking_wrap_layout.setSpacing(10)
 
         self.thinking_label = QLabel()
-        self.thinking_label.setStyleSheet("color:#111111; font-weight:700;")
+        thinking_font = self.thinking_label.font()
+        thinking_font.setWeight(QFont.Bold)
+        self.thinking_label.setFont(thinking_font)
+        self.thinking_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.thinking_label.setStyleSheet("color:#111111;")
         thinking_wrap_layout.addWidget(self.thinking_label, 0, Qt.AlignVCenter)
 
         self.thinking_btn = IosSwitch(self.thinking_enabled)
@@ -602,13 +606,29 @@ class ChatPage(QWidget):
             self.thinking_btn.setChecked(self.thinking_enabled)
         enabled_label = t("chat_thinking_enabled")
         disabled_label = t("chat_thinking_disabled")
-        metrics = QFontMetrics(self.thinking_label.font())
-        self.thinking_label.setFixedWidth(
-            max(metrics.horizontalAdvance(enabled_label), metrics.horizontalAdvance(disabled_label)) + 4
-        )
+        metrics = self.thinking_label.fontMetrics()
+        label_width = max(
+            168,
+            metrics.horizontalAdvance(enabled_label),
+            metrics.horizontalAdvance(disabled_label),
+        ) + 24
+        self.thinking_label.setFixedWidth(label_width)
         self.thinking_label.setText(
             enabled_label if self.thinking_enabled else disabled_label
         )
+        wrap_layout = self.thinking_toggle_wrap.layout()
+        if wrap_layout is not None:
+            margins = wrap_layout.contentsMargins()
+            wrap_width = (
+                margins.left()
+                + label_width
+                + wrap_layout.spacing()
+                + self.thinking_btn.width()
+                + margins.right()
+            )
+            wrap_width += 24
+            self.thinking_toggle_wrap.setFixedWidth(wrap_width)
+            self.thinking_toggle_wrap.updateGeometry()
 
     def _start_new_chat(self):
         """Reset the conversation history."""

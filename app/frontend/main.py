@@ -430,6 +430,7 @@ class MainWindow(QMainWindow):
         self.sidebar.navigate.connect(self.show_page)
         self.sidebar.set_current("chat")
         self.show_page("chat")
+        self.setMinimumWidth(max(1200, self.header.minimumSizeHint().width() + 32))
 
         self.setStyleSheet(AITJE_QSS)
 
