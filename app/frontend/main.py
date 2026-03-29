@@ -1,9 +1,9 @@
+import os
 import asyncio
 import sys
-import os
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QScrollArea,
     QSizePolicy,
+    QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
@@ -112,6 +113,10 @@ class BootScreen(QWidget):
         self.progress_value = 0
         self._media_player = None
         self._audio_output = None
+        self._hero_stack = None
+        self._hero_video = None
+        self._hero_placeholder = None
+        self._hero_video_shown = False
 
         self.setObjectName("BootScreenRoot")
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
@@ -222,9 +227,35 @@ class BootScreen(QWidget):
             and QVideoWidget is not None
             and QUrl is not None
         ):
+            container = QWidget()
+            container.setFixedSize(320, 320)
+            stack = QStackedLayout(container)
+            stack.setContentsMargins(0, 0, 0, 0)
+            stack.setStackingMode(QStackedLayout.StackOne)
+
+            placeholder = QLabel()
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setFixedSize(320, 320)
+            placeholder.setStyleSheet("background:#ffffff;")
+            poster_path = os.path.splitext(media_path)[0] + "-first-frame.png"
+            poster_pixmap = QPixmap(poster_path) if os.path.exists(poster_path) else QPixmap()
+            if not poster_pixmap.isNull():
+                placeholder.setPixmap(
+                    poster_pixmap.scaled(320, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
+            else:
+                placeholder.setPixmap(self._build_egg_pixmap(260, 320))
+            stack.addWidget(placeholder)
+
             video = QVideoWidget()
             video.setFixedSize(320, 320)
             video.setStyleSheet("background: #ffffff;")
+            stack.addWidget(video)
+            stack.setCurrentWidget(placeholder)
+
+            self._hero_stack = stack
+            self._hero_video = video
+            self._hero_placeholder = placeholder
 
             self._media_player = QMediaPlayer(self)
             self._audio_output = QAudioOutput(self)
@@ -233,8 +264,9 @@ class BootScreen(QWidget):
             self._media_player.setVideoOutput(video)
             self._media_player.setSource(QUrl.fromLocalFile(media_path))
             self._media_player.setLoops(-1)
+            self._media_player.positionChanged.connect(self._on_boot_media_position_changed)
             self._media_player.play()
-            return video
+            return container
 
         hero_pixmap = None
         if media_path and os.path.exists(media_path):
@@ -248,6 +280,16 @@ class BootScreen(QWidget):
         else:
             hero_label.setPixmap(self._build_egg_pixmap(260, 320))
         return hero_label
+
+    def _show_boot_video(self):
+        if self._hero_video_shown or not self._hero_stack or not self._hero_video:
+            return
+        self._hero_stack.setCurrentWidget(self._hero_video)
+        self._hero_video_shown = True
+
+    def _on_boot_media_position_changed(self, position: int):
+        if position > 0:
+            self._show_boot_video()
 
     def _advance(self):
         self.progress_value = min(100, self.progress_value + self.increment)
@@ -289,9 +331,12 @@ class MainWindow(QMainWindow):
 
         self.header = HeaderBar("AITJE", t("subtitle_local_ai_console"))
         self.header.home_requested.connect(self._go_home)
+        self.header.shutdown_requested.connect(self._shutdown_app)
+        self.header.restart_requested.connect(self._restart_app)
         self.sidebar = Sidebar()
         self.header.set_center_widget(self.sidebar)
         root_layout.addWidget(self.header)
+        self._restart_on_close = False
 
         self.pages = {
             "chat": ChatPage(self.ws_client),
@@ -380,8 +425,18 @@ class MainWindow(QMainWindow):
         self.sidebar.set_current("chat")
         self.show_page("chat")
 
+    def _shutdown_app(self) -> None:
+        self._restart_on_close = False
+        self.close()
+
+    def _restart_app(self) -> None:
+        self._restart_on_close = True
+        self.close()
+
     def closeEvent(self, event):
         asyncio.create_task(self.ws_client.close())
+        if self._restart_on_close:
+            QProcess.startDetached(sys.executable, ["-m", "app.frontend.main"])
         event.accept()
 
 

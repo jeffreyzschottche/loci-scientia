@@ -163,7 +163,6 @@ class DevicesRepository:
             "user_name": data.user_name,
             "email": data.email,
             "password": data.password,
-            "phone": data.phone,
             "device_name": data.device_name,
         }
 

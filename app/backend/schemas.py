@@ -39,15 +39,16 @@ class Device(BaseModel):
     user_name: str
     email: str
     password: str
-    phone: str
+    phone: str = ""
     device_name: str
+    is_connected: bool = False
+    last_seen_at: Optional[datetime] = None
 
 
 class DeviceCreate(BaseModel):
     user_name: str
     email: str
     password: str
-    phone: str
     device_name: str
 
 
@@ -55,7 +56,6 @@ class DevicePatch(BaseModel):
     user_name: Optional[str] = None
     email: Optional[str] = None
     password: Optional[str] = None
-    phone: Optional[str] = None
     device_name: Optional[str] = None
 
 

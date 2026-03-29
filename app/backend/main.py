@@ -125,6 +125,45 @@ class ActiveGeneration:
 active_generations: dict[str, ActiveGeneration] = {}
 
 
+class DevicePresenceTracker:
+    def __init__(self, *, timeout_seconds: int = 30):
+        self._lock = Lock()
+        self._timeout = timedelta(seconds=timeout_seconds)
+        self._last_seen: dict[str, datetime] = {}
+
+    def mark(self, device_id: Optional[str]) -> None:
+        if not device_id:
+            return
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            self._last_seen[str(device_id)] = now
+            self._prune_locked(now)
+
+    def snapshot(self) -> dict[str, datetime]:
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            self._prune_locked(now)
+            return dict(self._last_seen)
+
+    def is_connected(self, device_id: Optional[str]) -> bool:
+        if not device_id:
+            return False
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            self._prune_locked(now)
+            last_seen = self._last_seen.get(str(device_id))
+        return last_seen is not None and (now - last_seen) <= self._timeout
+
+    def _prune_locked(self, now: datetime) -> None:
+        expired = [
+            device_id
+            for device_id, last_seen in self._last_seen.items()
+            if (now - last_seen) > self._timeout
+        ]
+        for device_id in expired:
+            self._last_seen.pop(device_id, None)
+
+
 class ApiStats:
     def __init__(self):
         self._lock = Lock()
@@ -183,6 +222,7 @@ class ApiStats:
 
 
 api_stats = ApiStats()
+device_presence = DevicePresenceTracker(timeout_seconds=30)
 
 
 def _extract_bearer_token(auth_header: Optional[str]) -> str:
@@ -199,6 +239,7 @@ def require_token(authorization: Optional[str] = Header(default=None)) -> TokenR
     record = token_store.validate(token_value)
     if record is None:
         raise HTTPException(status_code=401, detail="Bearer token ongeldig of verlopen")
+    device_presence.mark(record.device_id)
     return record
 
 
@@ -646,6 +687,7 @@ def api_signon(req: SignOnRequest):
     if device.password != req.password:
         raise HTTPException(status_code=401, detail="Onjuiste gebruikersnaam of wachtwoord")
     issued = token_store.issue_token(device.id, device.user_name)
+    device_presence.mark(device.id)
     return {"token": issued.token, "expires_at": issued.expires_at}
 
 
@@ -1012,7 +1054,13 @@ async def api_ask_cancel(req: ChatCancelRequest, record: TokenRecord = Depends(r
 
 @app.get("/devices", response_model=list[Device])
 def list_devices(_: TokenRecord = Depends(require_admin_token)):
-    return devices_repo.list_devices()
+    presence = device_presence.snapshot()
+    devices = devices_repo.list_devices()
+    for device in devices:
+        last_seen = presence.get(device.id)
+        device.is_connected = last_seen is not None
+        device.last_seen_at = last_seen
+    return devices
 
 
 @app.post("/devices", response_model=Device)

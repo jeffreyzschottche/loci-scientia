@@ -1,11 +1,12 @@
 from functools import partial
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -36,46 +37,50 @@ class DeviceCard(QFrame):
         self.setStyleSheet(
             "QFrame#DeviceCard { background:#ffffff; border:1px solid #e5e7eb; border-radius:20px; }"
         )
+        self.setMinimumWidth(240)
+        self.setMaximumWidth(280)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 14, 20, 14)
-        layout.setSpacing(16)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
 
         info = QVBoxLayout()
         info.setSpacing(4)
 
         name_label = QLabel(device.get("device_name") or t("devices_unknown_device"))
+        name_label.setWordWrap(True)
         name_label.setStyleSheet("font-size:18px; font-weight:700;")
         info.addWidget(name_label)
 
+        status_label = QLabel(self._status_text())
+        status_label.setStyleSheet(self._status_style())
+        info.addWidget(status_label)
+
         info.addWidget(self._line_with_icon("👤", device.get("user_name", "")))
         info.addWidget(self._line_with_icon("✉️", device.get("email", "")))
-        info.addWidget(self._line_with_icon("☎️", device.get("phone", "")))
 
         actions = QHBoxLayout()
         actions.setSpacing(6)
         edit_btn = QPushButton(t("edit"))
         edit_btn.setCursor(Qt.PointingHandCursor)
         edit_btn.setStyleSheet(
-            "QPushButton { border:1px solid #d4d4d8; border-radius:20px; padding:6px 16px; }"
+            "QPushButton { border:1px solid #d4d4d8; border-radius:18px; padding:6px 14px; text-align:center; }"
             "QPushButton:hover { border-color:#111111; }"
         )
-        edit_btn.setFixedHeight(40)
+        edit_btn.setFixedHeight(36)
         delete_btn = QPushButton(t("delete"))
         delete_btn.setCursor(Qt.PointingHandCursor)
         delete_btn.setStyleSheet(
-            "QPushButton { background:#111111; color:#ffffff; border-radius:20px; padding:6px 16px; }"
-            "QPushButton:hover { background:#facc15; color:#050505; }"
+            "QPushButton { background:#facc15; color:#050505; border:none; border-radius:18px; padding:6px 14px; text-align:center; font-weight:600; }"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
         )
-        delete_btn.setFixedHeight(40)
+        delete_btn.setFixedHeight(36)
         edit_btn.clicked.connect(partial(on_edit, device))
         delete_btn.clicked.connect(partial(on_delete, device))
         actions.addWidget(edit_btn)
         actions.addWidget(delete_btn)
-        actions.addStretch(1)
-        info.addLayout(actions)
-
-        layout.addLayout(info, 1)
+        layout.addLayout(info)
+        layout.addLayout(actions)
 
     def _line_with_icon(self, icon: str, text: str) -> QWidget:
         row = QHBoxLayout()
@@ -90,6 +95,22 @@ class DeviceCard(QFrame):
         container = QWidget()
         container.setLayout(row)
         return container
+
+    def _status_text(self) -> str:
+        return t("devices_connected") if self.device.get("is_connected") else t("devices_not_connected")
+
+    def _status_style(self) -> str:
+        if self.device.get("is_connected"):
+            return (
+                "color:#16a34a; font-size:12px; font-weight:700; "
+                "background:#f0fdf4; border:1px solid #bbf7d0; border-radius:999px; "
+                "padding:4px 10px;"
+            )
+        return (
+            "color:#6b7280; font-size:12px; font-weight:700; "
+            "background:#f3f4f6; border:1px solid #e5e7eb; border-radius:999px; "
+            "padding:4px 10px;"
+        )
 
 
 class DevicesPage(QWidget):
@@ -127,9 +148,11 @@ class DevicesPage(QWidget):
         )
         self.list_container = QWidget()
         self.list_container.setStyleSheet("background: transparent;")
-        self.list_layout = QVBoxLayout(self.list_container)
+        self.list_layout = QGridLayout(self.list_container)
         self.list_layout.setContentsMargins(0, 0, 0, 0)
-        self.list_layout.setSpacing(12)
+        self.list_layout.setHorizontalSpacing(16)
+        self.list_layout.setVerticalSpacing(16)
+        self.list_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.scroll_area.setWidget(self.list_container)
         layout.addWidget(self.scroll_area, 1)
 
@@ -138,6 +161,10 @@ class DevicesPage(QWidget):
         layout.addWidget(self.count_label, 0, Qt.AlignLeft)
 
         self.devices: list[dict] = []
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setInterval(5000)
+        self._refresh_timer.timeout.connect(self._reload_devices)
+        self._refresh_timer.start()
         self._reload_devices()
 
         register_language_change_callback(self._update_translations)
@@ -156,16 +183,68 @@ class DevicesPage(QWidget):
                 widget.deleteLater()
 
         if not self.devices:
-            placeholder = QLabel(t("devices_no_devices_found"))
-            placeholder.setStyleSheet("color:#9ca3af; font-style:italic;")
-            placeholder.setAlignment(Qt.AlignCenter)
-            placeholder.setMinimumHeight(160)
-            self.list_layout.addWidget(placeholder)
+            empty_wrap = QWidget()
+            empty_layout = QHBoxLayout(empty_wrap)
+            empty_layout.setContentsMargins(0, 24, 0, 0)
+            empty_layout.setSpacing(0)
+
+            add_first_card = QPushButton()
+            add_first_card.setCursor(Qt.PointingHandCursor)
+            add_first_card.setFixedSize(230, 230)
+            add_first_card.setStyleSheet(
+                "QPushButton {"
+                "  background:#ffffff;"
+                "  border:1px solid #e5e7eb;"
+                "  border-radius:28px;"
+                "}"
+                "QPushButton:hover { border-color:#facc15; background:#fffdf5; }"
+            )
+            add_first_card.clicked.connect(self._open_add_dialog)
+
+            card_layout = QVBoxLayout(add_first_card)
+            card_layout.setContentsMargins(24, 24, 24, 24)
+            card_layout.setSpacing(12)
+            card_layout.addStretch(1)
+
+            plus_label = QLabel("+")
+            plus_label.setAlignment(Qt.AlignCenter)
+            plus_label.setStyleSheet("font-size:64px; font-weight:300; color:#111111;")
+            card_layout.addWidget(plus_label)
+
+            title = QLabel(t("devices_empty_title"))
+            title.setAlignment(Qt.AlignCenter)
+            title.setWordWrap(True)
+            title.setStyleSheet("font-size:18px; font-weight:700; color:#111111;")
+            card_layout.addWidget(title)
+
+            subtitle = QLabel(t("devices_empty_subtitle"))
+            subtitle.setAlignment(Qt.AlignCenter)
+            subtitle.setWordWrap(True)
+            subtitle.setStyleSheet("font-size:13px; color:#6b7280;")
+            card_layout.addWidget(subtitle)
+            card_layout.addStretch(1)
+
+            empty_layout.addWidget(add_first_card, 0, Qt.AlignLeft | Qt.AlignTop)
+            empty_layout.addStretch(1)
+            self.list_layout.addWidget(empty_wrap, 0, 0)
         else:
-            for device in self.devices:
+            columns = self._grid_columns()
+            for idx, device in enumerate(self.devices):
                 card = DeviceCard(device, self._open_edit_dialog, self._confirm_delete)
-                self.list_layout.addWidget(card)
-            self.list_layout.addStretch(1)
+                row = idx // columns
+                col = idx % columns
+                self.list_layout.addWidget(card, row, col)
+            for col in range(columns):
+                self.list_layout.setColumnStretch(col, 1)
+
+    def _grid_columns(self) -> int:
+        viewport_width = self.scroll_area.viewport().width() if self.scroll_area else self.width()
+        return max(1, min(5, viewport_width // 250))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.devices:
+            self._render_devices()
 
     def _reload_devices(self) -> None:
         try:
@@ -200,22 +279,45 @@ class DevicesPage(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_area.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
         dialog.card_layout.addWidget(scroll_area)
         form_host = QWidget()
+        form_host.setStyleSheet("background:#ffffff;")
         scroll_area.setWidget(form_host)
         form = QFormLayout(form_host)
         form.setRowWrapPolicy(QFormLayout.WrapAllRows)
-        form.setContentsMargins(28, 24, 28, 24)
-        form.setSpacing(6)
-        form.setVerticalSpacing(14)
+        form.setContentsMargins(32, 26, 32, 28)
+        form.setSpacing(8)
+        form.setVerticalSpacing(16)
+        form.setLabelAlignment(Qt.AlignLeft)
         user_name_edit = QLineEdit()
         email_edit = QLineEdit()
         password_edit = QLineEdit()
         password_edit.setEchoMode(QLineEdit.Password)
         confirm_edit = QLineEdit()
         confirm_edit.setEchoMode(QLineEdit.Password)
-        phone_edit = QLineEdit()
         device_name_edit = QLineEdit()
+
+        for widget in [
+            user_name_edit,
+            email_edit,
+            password_edit,
+            confirm_edit,
+            device_name_edit,
+        ]:
+            widget.setStyleSheet(
+                "QLineEdit {"
+                "  background:#ffffff;"
+                "  border:1px solid #d4d4d8;"
+                "  border-radius:18px;"
+                "  padding:10px 14px;"
+                "  min-height:38px;"
+                "}"
+                "QLineEdit:focus { border-color:#facc15; }"
+            )
 
         password_row = QHBoxLayout()
         password_row.setContentsMargins(0, 0, 0, 0)
@@ -223,7 +325,7 @@ class DevicesPage(QWidget):
         toggle_btn = QPushButton(t("devices_show"))
         toggle_btn.setCheckable(True)
         toggle_btn.setStyleSheet(
-            "QPushButton { background:#f3f4f6; color:#0f172a; min-width:70px; min-height:36px; border-radius:18px; font-size:12px; }"
+            "QPushButton { background:#f3f4f6; color:#0f172a; min-width:78px; min-height:36px; border-radius:18px; font-size:12px; text-align:center; }"
             "QPushButton:hover { background:#e5e7eb; }"
         )
 
@@ -247,14 +349,12 @@ class DevicesPage(QWidget):
             email_edit.setText(device.get("email", ""))
             password_edit.setText(device.get("password", ""))
             confirm_edit.setText(device.get("password", ""))
-            phone_edit.setText(device.get("phone", ""))
             device_name_edit.setText(device.get("device_name", ""))
 
         form.addRow(t("devices_username"), user_name_edit)
         form.addRow(t("devices_email"), email_edit)
         form.addRow(t("devices_password"), password_container)
         form.addRow(t("devices_repeat_password"), confirm_edit)
-        form.addRow(t("devices_phone"), phone_edit)
         form.addRow(t("devices_device_name"), device_name_edit)
 
         btn_row = QHBoxLayout()
@@ -263,10 +363,32 @@ class DevicesPage(QWidget):
         cancel_btn = QPushButton(t("cancel"))
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.setFixedSize(120, 36)
+        cancel_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border:none;"
+            "  border-radius:18px;"
+            "  text-align:center;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         cancel_btn.clicked.connect(dialog.reject)
         save_btn = QPushButton(t("save"))
         save_btn.setCursor(Qt.PointingHandCursor)
         save_btn.setFixedSize(120, 36)
+        save_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border:none;"
+            "  border-radius:18px;"
+            "  text-align:center;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
         save_btn.clicked.connect(dialog.accept)
         btn_row.addWidget(cancel_btn)
         btn_row.addWidget(save_btn)
@@ -300,7 +422,6 @@ class DevicesPage(QWidget):
             "user_name": user_name,
             "email": email_edit.text().strip(),
             "password": password,
-            "phone": phone_edit.text().strip(),
             "device_name": device_name,
         }
 

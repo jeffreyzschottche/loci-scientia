@@ -135,7 +135,7 @@ class OverlayDialog(QDialog):
 
         # Close X button top-right
         close_row = QHBoxLayout()
-        close_row.setContentsMargins(0, 8, 12, 0)
+        close_row.setContentsMargins(0, 12, 18, 0)
         close_row.addStretch(1)
         self._close_btn = QPushButton("\u2715")
         self._close_btn.setObjectName("OverlayCloseBtn")

@@ -32,6 +32,22 @@ TRANSLATIONS = {
         "nl": "Sluiten",
         "en": "Close",
     },
+    "power_dialog_title": {
+        "nl": "App bedienen",
+        "en": "App controls",
+    },
+    "power_dialog_message": {
+        "nl": "Wil je de AITJE-app afsluiten of opnieuw opstarten?",
+        "en": "Do you want to close or restart the AITJE app?",
+    },
+    "power_dialog_shutdown": {
+        "nl": "Afsluiten",
+        "en": "Shut down",
+    },
+    "power_dialog_restart": {
+        "nl": "Opnieuw opstarten",
+        "en": "Restart",
+    },
 
     # ============================================
     # SIDEBAR
@@ -161,8 +177,8 @@ TRANSLATIONS = {
         "en": "Real-time overview of network and system status",
     },
     "page_subtitle_devices": {
-        "nl": "Beheer verbonden apparaten en gebruikersaccounts voor het systeem",
-        "en": "Manage connected devices and user accounts for the system",
+        "nl": "Beheer verbonden apparaten en gebruikersaccounts",
+        "en": "Manage connected devices and user accounts",
     },
     "page_subtitle_settings": {
         "nl": "Beheer de systeeminstellingen en voorkeuren voor AITJE OS",
@@ -388,6 +404,14 @@ TRANSLATIONS = {
         "nl": "Geen apparaten gevonden.",
         "en": "No devices found.",
     },
+    "devices_empty_title": {
+        "nl": "Maak je eerste device aan",
+        "en": "Create your first device",
+    },
+    "devices_empty_subtitle": {
+        "nl": "Voeg een account toe dat via de API kan verbinden.",
+        "en": "Add an account that can connect through the API.",
+    },
     "devices_edit_device": {
         "nl": "Apparaat bewerken",
         "en": "Edit Device",
@@ -447,6 +471,14 @@ TRANSLATIONS = {
     "devices_could_not_delete": {
         "nl": "Device kon niet worden verwijderd:",
         "en": "Device could not be deleted:",
+    },
+    "devices_connected": {
+        "nl": "Status: Verbonden",
+        "en": "Status: Connected",
+    },
+    "devices_not_connected": {
+        "nl": "Status: Niet verbonden",
+        "en": "Status: Not connected",
     },
 
     # ============================================

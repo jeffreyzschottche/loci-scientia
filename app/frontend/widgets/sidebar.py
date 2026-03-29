@@ -13,8 +13,8 @@ class Sidebar(QWidget):
         ("chat", "💬", "nav_chat"),
         ("kb", "📚", "nav_knowledge_bank"),
         ("net", "🌐", "nav_network"),
-        ("devices", "📱", "nav_devices"),
-        ("settings", "⚡", "nav_settings"),
+        ("devices", "👥", "nav_devices"),
+        ("settings", "⚙️", "nav_settings"),
     ]
 
     def __init__(self):
@@ -22,8 +22,8 @@ class Sidebar(QWidget):
         self.setObjectName("Sidebar")
         self.setFixedHeight(52)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 6, 16, 6)
-        layout.setSpacing(18)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(12)
 
         self.buttons: dict[str, QPushButton] = {}
         self._button_labels: dict[str, QLabel] = {}
@@ -34,8 +34,8 @@ class Sidebar(QWidget):
             btn.setCursor(Qt.PointingHandCursor)
             btn.setMinimumHeight(40)
             btn_layout = QHBoxLayout(btn)
-            btn_layout.setContentsMargins(20, 8, 20, 8)
-            btn_layout.setSpacing(10)
+            btn_layout.setContentsMargins(16, 8, 16, 8)
+            btn_layout.setSpacing(8)
             btn_layout.addStretch(1)
             icon_label = QLabel(icon)
             icon_label.setFixedWidth(18)
@@ -66,7 +66,7 @@ class Sidebar(QWidget):
         for key, label in self._button_labels.items():
             metrics = QFontMetrics(label.font())
             label_width = metrics.horizontalAdvance(label.text())
-            button_width = max(168, label_width + 18 + 10 + 40)
+            button_width = max(148, label_width + 18 + 8 + 32)
             self.buttons[key].setMinimumWidth(button_width)
 
     def _on_nav(self, key: str):

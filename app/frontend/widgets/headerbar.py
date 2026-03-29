@@ -7,11 +7,85 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from ..translations import t, get_current_language, set_language, register_language_change_callback
+from .dialog_style import COMPACT_DIALOG_HEIGHT, COMPACT_DIALOG_WIDTH, OverlayDialog
+
+
+class PowerDialog(OverlayDialog):
+    action_requested = Signal(str)
+    DIALOG_WIDTH = max(COMPACT_DIALOG_WIDTH, 560)
+    DIALOG_HEIGHT = COMPACT_DIALOG_HEIGHT
+
+    def __init__(self, parent=None):
+        super().__init__(parent, width=self.DIALOG_WIDTH, height=self.DIALOG_HEIGHT)
+        self.setWindowTitle(t("power_dialog_title"))
+
+        title = QLabel(t("power_dialog_title"))
+        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #111111;")
+        self.card_layout.addWidget(title)
+
+        description = QLabel(t("power_dialog_message"))
+        description.setWordWrap(True)
+        description.setStyleSheet("font-size: 14px; font-weight: 500; color: #6b7280; line-height: 1.4;")
+        self.card_layout.addWidget(description)
+
+        self.card_layout.addStretch(1)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(12)
+
+        cancel_btn = self._build_button(t("cancel"), variant="secondary")
+        cancel_btn.clicked.connect(self.reject)
+        actions.addWidget(cancel_btn, 1)
+
+        shutdown_btn = self._build_button(t("power_dialog_shutdown"))
+        shutdown_btn.clicked.connect(lambda: self._emit_action("shutdown"))
+        actions.addWidget(shutdown_btn, 1)
+
+        restart_btn = self._build_button(t("power_dialog_restart"))
+        restart_btn.clicked.connect(lambda: self._emit_action("restart"))
+        actions.addWidget(restart_btn, 1)
+
+        self.card_layout.addLayout(actions)
+
+    def _emit_action(self, action: str) -> None:
+        self.action_requested.emit(action)
+        self.accept()
+
+    @staticmethod
+    def _build_button(text: str, *, variant: str = "primary") -> QPushButton:
+        button = QPushButton(text)
+        button.setCursor(Qt.PointingHandCursor)
+        button.setMinimumHeight(52)
+        button.setMinimumWidth(150)
+        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        base_style = (
+            "QPushButton {"
+            "  border-radius: 18px;"
+            "  padding: 10px 20px;"
+            "  font-size: 13px;"
+            "  font-weight: 700;"
+            "  text-align: center;"
+            "}"
+        )
+        if variant == "secondary":
+            button.setStyleSheet(
+                base_style
+                + "QPushButton { background: #f3f4f6; color: #111111; border: 1px solid #e5e7eb; }"
+                + "QPushButton:hover { background: #e5e7eb; border-color: #d1d5db; }"
+            )
+        else:
+            button.setStyleSheet(
+                base_style
+                + "QPushButton { background: #facc15; color: #050505; border: 1px solid #facc15; }"
+                + "QPushButton:hover { background: #111111; color: #facc15; border-color: #111111; }"
+            )
+        return button
 
 
 class LanguageSelectorButton(QPushButton):
@@ -70,9 +144,38 @@ class LanguageSelectorButton(QPushButton):
         self._update_display()
 
 
+class PowerButton(QPushButton):
+    """Circular power button using a unicode power symbol."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("HeaderPowerButton")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedSize(33, 33)
+        self.setText("⏻")
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setToolTip(t("power_dialog_title"))
+        self.setStyleSheet(
+            "QPushButton {"
+            "  background-color: #facc15;"
+            "  color: #111111;"
+            "  border: 0;"
+            "  border-radius: 16px;"
+            "  font-size: 21px;"
+            "  font-weight: 700;"
+            "  padding: 0;"
+            "  text-align: center;"
+            "}"
+            "QPushButton:hover { background-color: #fcd34d; }"
+            "QPushButton:pressed { background-color: #eab308; }"
+        )
+
+
 class HeaderBar(QWidget):
     home_requested = Signal()
     language_changed = Signal(str)
+    shutdown_requested = Signal()
+    restart_requested = Signal()
 
     def __init__(self, title: str, subtitle: Optional[str] = None):
         super().__init__()
@@ -125,6 +228,10 @@ class HeaderBar(QWidget):
         self.status.setObjectName("HeaderStatus")
         self._update_online_text()
         right_layout.addWidget(self.status, 0, Qt.AlignVCenter)
+
+        self.power_btn = PowerButton()
+        self.power_btn.clicked.connect(self._show_power_dialog)
+        right_layout.addWidget(self.power_btn, 0, Qt.AlignVCenter)
 
         self.lang_selector = LanguageSelectorButton()
         self.lang_selector.language_changed.connect(self._on_language_changed)
@@ -196,3 +303,14 @@ class HeaderBar(QWidget):
     def set_online(self, online: bool):
         self._is_online = online
         self._update_online_text()
+
+    def _show_power_dialog(self) -> None:
+        dialog = PowerDialog(self.window())
+        dialog.action_requested.connect(self._handle_power_action)
+        dialog.exec()
+
+    def _handle_power_action(self, action: str) -> None:
+        if action == "shutdown":
+            self.shutdown_requested.emit()
+        elif action == "restart":
+            self.restart_requested.emit()
