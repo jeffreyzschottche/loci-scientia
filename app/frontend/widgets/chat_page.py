@@ -390,6 +390,8 @@ class AssistantMessageWidget(QWidget):
 
 
 class ChatPage(QWidget):
+    open_settings_tab_requested = Signal(str)
+
     def __init__(self, ws_client):
         super().__init__()
         self.ws_client = ws_client
@@ -432,6 +434,37 @@ class ChatPage(QWidget):
         thinking_wrap_layout.addWidget(self.thinking_btn, 0, Qt.AlignVCenter)
         controls.addWidget(self.thinking_toggle_wrap, 0, Qt.AlignLeft)
         controls.addStretch(1)
+
+        self.focus_mode_wrap = QWidget()
+        focus_mode_layout = QHBoxLayout(self.focus_mode_wrap)
+        focus_mode_layout.setContentsMargins(0, 0, 0, 0)
+        focus_mode_layout.setSpacing(10)
+
+        self.focus_mode_label = QLabel()
+        self.focus_mode_label.setStyleSheet("color:#6b7280; font-weight:700;")
+        focus_mode_layout.addWidget(self.focus_mode_label, 0, Qt.AlignVCenter)
+
+        self.change_focus_mode_btn = QPushButton()
+        self.change_focus_mode_btn.setCursor(Qt.PointingHandCursor)
+        self.change_focus_mode_btn.setText(t("chat_change_focus_mode"))
+        self.change_focus_mode_btn.setStyleSheet(
+            "QPushButton {"
+            "  background-color:#facc15;"
+            "  border:1px solid #facc15;"
+            "  border-style:solid;"
+            "  border-radius:20px;"
+            "  padding:8px 18px;"
+            "  color:#111111;"
+            "  font-weight:700;"
+            "  text-align:center;"
+            "}"
+            "QPushButton:hover { background-color:#111111; color:#facc15; border-color:#111111; }"
+        )
+        self.change_focus_mode_btn.setFixedHeight(40)
+        self.change_focus_mode_btn.clicked.connect(self._open_focus_mode_settings)
+        focus_mode_layout.addWidget(self.change_focus_mode_btn, 0, Qt.AlignVCenter)
+        controls.addWidget(self.focus_mode_wrap, 0, Qt.AlignRight)
+
         self.new_chat_btn = QPushButton(t("chat_start_new"))
         self.new_chat_btn.setCursor(Qt.PointingHandCursor)
         self.new_chat_btn.setStyleSheet(
@@ -451,6 +484,7 @@ class ChatPage(QWidget):
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
         self._sync_thinking_button()
+        self._sync_focus_mode_status()
 
         self.history_card = QFrame()
         self.history_card.setObjectName("ChatWrapper")
@@ -527,7 +561,9 @@ class ChatPage(QWidget):
     def _update_translations(self) -> None:
         """Update UI elements when language changes."""
         self.new_chat_btn.setText(t("chat_start_new"))
+        self.change_focus_mode_btn.setText(t("chat_change_focus_mode"))
         self._sync_thinking_button()
+        self._sync_focus_mode_status()
         self.input.setPlaceholderText(t("chat_placeholder"))
         self._sync_send_button()
         if self.empty_label:
@@ -545,6 +581,21 @@ class ChatPage(QWidget):
     def _toggle_thinking(self, checked: bool) -> None:
         self.thinking_enabled = checked
         self._sync_thinking_button()
+
+    def _display_focus_mode(self) -> str:
+        self.selected_mode = self._load_focus_mode()
+        return self.selected_mode or t("chat_mode_default")
+
+    def _sync_focus_mode_status(self) -> None:
+        self.focus_mode_label.setText(
+            t("chat_current_mode_label", mode=self._display_focus_mode())
+        )
+
+    def _open_focus_mode_settings(self) -> None:
+        self.open_settings_tab_requested.emit("advanced")
+
+    def on_page_shown(self) -> None:
+        self._sync_focus_mode_status()
 
     def _sync_thinking_button(self) -> None:
         if self.thinking_btn.isChecked() != self.thinking_enabled:

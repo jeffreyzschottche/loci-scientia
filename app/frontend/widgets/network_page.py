@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
+import platform
 from pathlib import Path
 
 import psutil
 import requests
-from PySide6.QtCore import Qt, QProcess, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -111,6 +112,8 @@ class SparklineWidget(QWidget):
 
 
 class NetworkStatusPage(QWidget):
+    open_settings_tab_requested = Signal(str)
+
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -126,7 +129,7 @@ class NetworkStatusPage(QWidget):
             ("active_users", "network_active_users", "network_customers_apps"),
             ("avg_response", "network_avg_response_time", "network_avg_wait_time"),
         ]:
-            card, metric_label, caption_label, heading_label, chart_widget = self._build_stat_card(
+            card, metric_label, caption_label, heading_label, chart_widget, _ = self._build_stat_card(
                 t(heading_key), t("network_na"), t(caption_key), with_chart=True
             )
             self._stat_headings[key] = {"heading_key": heading_key, "caption_key": caption_key, "heading_label": heading_label}
@@ -151,8 +154,8 @@ class NetworkStatusPage(QWidget):
             ("cpu_now", "network_cpu_now", "network_cpu_caption"),
             ("power_now", "network_power_now", "network_power_caption"),
         ]:
-            card, metric_label, caption_label, heading_label, _ = self._build_stat_card(
-                t(heading_key), t("network_na"), t(caption_key), with_chart=False
+            card, metric_label, caption_label, heading_label, _, usage_bar = self._build_stat_card(
+                t(heading_key), t("network_na"), t(caption_key), with_chart=False, with_usage_bar=True
             )
             self._resource_headings[key] = {
                 "heading_key": heading_key,
@@ -162,35 +165,10 @@ class NetworkStatusPage(QWidget):
             self.resource_cards[key] = {
                 "metric": metric_label,
                 "caption": caption_label,
+                "bar": usage_bar,
             }
             resources_row.addWidget(card)
         layout.addLayout(resources_row)
-
-        self._performance_card = self._card()
-        performance_layout = QVBoxLayout(self._performance_card)
-        performance_layout.setContentsMargins(20, 18, 20, 18)
-        performance_layout.setSpacing(14)
-
-        self._performance_title = QLabel(t("network_performance_title"))
-        self._performance_title.setStyleSheet("font-size:16px; font-weight:800; color:#111111;")
-        performance_layout.addWidget(self._performance_title)
-
-        self._performance_caption = QLabel(t("network_performance_caption"))
-        self._performance_caption.setStyleSheet("color:#6b7280; font-size:12px;")
-        self._performance_caption.setWordWrap(True)
-        performance_layout.addWidget(self._performance_caption)
-
-        self._performance_bars: dict[str, dict[str, QWidget | QLabel]] = {}
-        for key, label_key in [
-            ("ram", "network_ram_now"),
-            ("cpu", "network_cpu_now"),
-            ("power", "network_power_now"),
-        ]:
-            row = self._build_usage_bar(t(label_key))
-            self._performance_bars[key] = row
-            performance_layout.addLayout(row["layout"])
-
-        layout.addWidget(self._performance_card)
 
         layout.addStretch(1)
 
@@ -226,29 +204,38 @@ class NetworkStatusPage(QWidget):
         self._resource_heading.setText(t("network_resources_title"))
         for key, data in self._resource_headings.items():
             data["heading_label"].setText(t(data["heading_key"]))
-        self._performance_title.setText(t("network_performance_title"))
-        self._performance_caption.setText(t("network_performance_caption"))
         self._update_stats([])
         self._update_resource_stats()
 
-    def _build_stat_card(self, title: str, value: str, caption: str, *, with_chart: bool):
+    def _build_stat_card(self, title: str, value: str, caption: str, *, with_chart: bool, with_usage_bar: bool = False):
         card = self._card()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(20, 16, 20, 16)
         card_layout.setSpacing(8)
         heading = QLabel(title)
         heading.setStyleSheet("color:#6b7280; letter-spacing:0.2em; font-size:11px;")
+        if with_usage_bar:
+            heading.setFixedHeight(20)
+            heading.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         metric = QLabel(value)
         metric.setStyleSheet("font-size:32px; font-weight:800;")
+        if with_usage_bar:
+            metric.setMinimumWidth(230)
+            metric.setFixedHeight(60)
+            metric.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         chart = SparklineWidget() if with_chart else None
+        usage_bar = self._build_inline_usage_bar() if with_usage_bar else None
         detail = QLabel(caption)
         detail.setStyleSheet("color:#6b7280; font-size:12px;")
+        detail.setWordWrap(True)
         card_layout.addWidget(heading)
         card_layout.addWidget(metric)
         if chart is not None:
             card_layout.addWidget(chart)
+        if usage_bar is not None:
+            card_layout.addWidget(usage_bar["track"])
         card_layout.addWidget(detail)
-        return card, metric, detail, heading, chart
+        return card, metric, detail, heading, chart, usage_bar
 
     @staticmethod
     def _card():
@@ -256,17 +243,7 @@ class NetworkStatusPage(QWidget):
         card.setObjectName("Card")
         return card
 
-    def _build_usage_bar(self, label: str) -> dict[str, QWidget | QLabel]:
-        layout = QGridLayout()
-        layout.setHorizontalSpacing(12)
-        layout.setVerticalSpacing(4)
-
-        title = QLabel(label)
-        title.setStyleSheet("font-weight:700; color:#111111;")
-        value = QLabel(t("network_na"))
-        value.setStyleSheet("font-weight:700; color:#111111;")
-        value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-
+    def _build_inline_usage_bar(self) -> dict[str, QWidget]:
         track = QFrame()
         track.setFixedHeight(10)
         track.setStyleSheet("background:#f3f4f6; border-radius:5px;")
@@ -279,28 +256,18 @@ class NetworkStatusPage(QWidget):
         track_layout.addWidget(fill, 0)
         track_layout.addStretch(1)
 
-        detail = QLabel("")
-        detail.setStyleSheet("color:#6b7280; font-size:12px;")
-        detail.setWordWrap(True)
-
-        layout.addWidget(title, 0, 0)
-        layout.addWidget(value, 0, 1)
-        layout.addWidget(track, 1, 0, 1, 2)
-        layout.addWidget(detail, 2, 0, 1, 2)
-
         return {
-            "layout": layout,
-            "title": title,
-            "value": value,
             "track": track,
             "fill": fill,
-            "detail": detail,
         }
 
-    def _set_usage_bar(self, key: str, percent: float | None, value_text: str, detail_text: str) -> None:
-        bar = self._performance_bars[key]
+    def _set_usage_bar(self, key: str, percent: float | None) -> None:
+        bar = self.resource_cards[key]["bar"]
+        assert isinstance(bar, dict)
         safe_percent = 0 if percent is None else max(0, min(100, int(percent)))
-        track_width = 280
+        track = bar["track"]
+        assert isinstance(track, QFrame)
+        track_width = max(40, track.width() if track.width() > 0 else 260)
         fill_width = max(8, int(track_width * (safe_percent / 100))) if percent is not None else 8
         fill = bar["fill"]
         assert isinstance(fill, QFrame)
@@ -313,12 +280,6 @@ class NetworkStatusPage(QWidget):
             fill.setStyleSheet("background:#f59e0b; border-radius:5px;")
         else:
             fill.setStyleSheet("background:#facc15; border-radius:5px;")
-        value = bar["value"]
-        detail = bar["detail"]
-        assert isinstance(value, QLabel)
-        assert isinstance(detail, QLabel)
-        value.setText(value_text)
-        detail.setText(detail_text)
 
     def _update_stats(self, routes: list[dict]):
         def fmt_int(value: int) -> str:
@@ -473,6 +434,63 @@ class NetworkStatusPage(QWidget):
     def _device_power_now_watts(self) -> float | None:
         return self._linux_power_now_watts()
 
+    @staticmethod
+    def _battery_info() -> dict[str, object] | None:
+        try:
+            battery = psutil.sensors_battery()
+        except Exception:
+            battery = None
+        if battery is None:
+            return None
+        return {
+            "percent": float(battery.percent),
+            "plugged": bool(battery.power_plugged),
+        }
+
+    @staticmethod
+    def _linux_power_source() -> str | None:
+        base = Path("/sys/class/power_supply")
+        if not base.exists():
+            return None
+        found_battery = False
+        for entry in base.iterdir():
+            try:
+                type_value = (entry / "type").read_text(encoding="utf-8").strip().lower()
+            except OSError:
+                continue
+            if type_value == "battery":
+                found_battery = True
+                continue
+            if type_value not in {"mains", "usb", "usb_c", "usb_pd"}:
+                continue
+            try:
+                online = (entry / "online").read_text(encoding="utf-8").strip()
+            except OSError:
+                online = ""
+            if online == "1":
+                if type_value == "mains":
+                    return t("network_power_source_ac")
+                if type_value in {"usb", "usb_c", "usb_pd"}:
+                    return t("network_power_source_usb")
+        if found_battery:
+            return t("network_power_source_battery")
+        return None
+
+    @staticmethod
+    def _generic_power_source(battery: dict[str, object] | None) -> str:
+        system_name = platform.system().lower()
+        if system_name == "linux":
+            source = NetworkStatusPage._linux_power_source()
+            if source:
+                return source
+        if battery is None:
+            return t("network_power_source_unknown")
+        return (
+            t("network_power_source_ac")
+            if bool(battery.get("plugged"))
+            else t("network_power_source_battery")
+        )
+
     def _update_resource_stats(self) -> None:
         memory = psutil.virtual_memory()
         cpu_percent = psutil.cpu_percent(interval=None)
@@ -482,12 +500,32 @@ class NetworkStatusPage(QWidget):
         cpu_caption = t("network_cpu_caption")
 
         watts = self._device_power_now_watts()
-        if watts is None:
-            power_label = t("network_na")
-            power_caption = t("network_power_unavailable")
-        else:
+        battery = self._battery_info()
+        if battery is not None:
+            power_label = f"{int(round(float(battery['percent'])))}%"
+        elif watts is not None:
             power_label = f"{watts:.1f} W".replace(".", ",")
-            power_caption = t("network_power_live")
+        else:
+            power_label = t("network_na")
+
+        charging_text = t("network_power_plugged_yes") if battery and bool(battery.get("plugged")) else (
+            t("network_power_plugged_no") if battery else t("network_power_unknown_short")
+        )
+        battery_text = (
+            f"{int(round(float(battery['percent'])))}%"
+            if battery is not None
+            else t("network_power_no_battery")
+        )
+        source_text = self._generic_power_source(battery)
+        watt_text = f"{watts:.1f} W".replace(".", ",") if watts is not None else t("network_power_unknown_short")
+        power_caption = "\n".join(
+            [
+                t("network_power_battery_line", value=battery_text),
+                t("network_power_plugged_line", value=charging_text),
+                t("network_power_source_line", value=source_text),
+                t("network_power_live_line", value=watt_text),
+            ]
+        )
 
         self.resource_cards["ram_now"]["metric"].setText(ram_label)
         self.resource_cards["ram_now"]["caption"].setText(ram_caption)
@@ -495,10 +533,12 @@ class NetworkStatusPage(QWidget):
         self.resource_cards["cpu_now"]["caption"].setText(cpu_caption)
         self.resource_cards["power_now"]["metric"].setText(power_label)
         self.resource_cards["power_now"]["caption"].setText(power_caption)
-        self._set_usage_bar("ram", memory.percent, ram_label, ram_caption)
-        self._set_usage_bar("cpu", cpu_percent, cpu_label, cpu_caption)
+        self._set_usage_bar("ram_now", memory.percent)
+        self._set_usage_bar("cpu_now", cpu_percent)
         power_percent = None if watts is None else min(100.0, (watts / 65.0) * 100.0)
-        self._set_usage_bar("power", power_percent, power_label, power_caption)
+        if battery is not None:
+            power_percent = float(battery["percent"])
+        self._set_usage_bar("power_now", power_percent)
 
     def _fetch_stats(self):
         try:
@@ -545,10 +585,4 @@ class NetworkStatusPage(QWidget):
         return {}
 
     def _open_wifi_settings(self):
-        if QProcess.startDetached("iwgtk"):
-            return
-        if QProcess.startDetached("x-terminal-emulator", ["-e", "nmtui"]):
-            return
-        if QProcess.startDetached("gnome-terminal", ["--", "nmtui"]):
-            return
-        QProcess.startDetached("xterm", ["-e", "nmtui"])
+        self.open_settings_tab_requested.emit("wifi")

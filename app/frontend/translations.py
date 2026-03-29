@@ -89,36 +89,36 @@ TRANSLATIONS = {
     # BOOT SCREEN
     # ============================================
     "boot_starting": {
-        "nl": "Lokale AI wordt opgestart...",
+        "nl": "Starting local AI...",
         "en": "Starting local AI...",
     },
     "boot_loading_neural": {
-        "nl": "Neurale netwerken laden...",
+        "nl": "Loading neural networks...",
         "en": "Loading neural networks...",
     },
     "boot_preparing_api": {
-        "nl": "API endpoints voorbereiden...",
+        "nl": "Preparing API endpoints...",
         "en": "Preparing API endpoints...",
     },
     "boot_syncing_devices": {
-        "nl": "Devices synchroniseren...",
+        "nl": "Synchronizing devices...",
         "en": "Synchronizing devices...",
     },
     "boot_almost_ready": {
-        "nl": "Bijna klaar...",
+        "nl": "Almost ready...",
         "en": "Almost ready...",
     },
     "boot_welcome": {
-        "nl": "Welkom! ✓",
+        "nl": "Welcome! ✓",
         "en": "Welcome! ✓",
     },
     "boot_title": {
-        "nl": "AITJE ontwaakt...",
-        "en": "AITJE is waking up...",
+        "nl": "Aitje is waking up",
+        "en": "Aitje is waking up",
     },
     "boot_subtitle": {
-        "nl": "De antwoorden van het universum worden lokaal opgestart.",
-        "en": "The answers of the universe are starting up locally.",
+        "nl": "",
+        "en": "",
     },
 
     # ============================================
@@ -181,8 +181,8 @@ TRANSLATIONS = {
         "en": "Manage connected devices and user accounts",
     },
     "page_subtitle_settings": {
-        "nl": "Beheer de systeeminstellingen en voorkeuren voor AITJE OS",
-        "en": "Manage system settings and preferences for AITJE OS",
+        "nl": "Beheer de systeeminstellingen en voorkeuren",
+        "en": "Manage system settings and preferences",
     },
 
     # ============================================
@@ -237,8 +237,100 @@ TRANSLATIONS = {
         "en": "System",
     },
     "settings_tab_advanced": {
-        "nl": "Geavanceerd",
-        "en": "Advanced",
+        "nl": "Chat Voorkeuren",
+        "en": "Chat Preferences",
+    },
+    "settings_tab_ssh": {
+        "nl": "SSH Support",
+        "en": "SSH Support",
+    },
+    "settings_tab_wifi": {
+        "nl": "Wifi",
+        "en": "WiFi",
+    },
+    "settings_wifi_title": {
+        "nl": "Wifi configuratie",
+        "en": "WiFi configuration",
+    },
+    "settings_wifi_intro": {
+        "nl": "Beheer en bekijk hier de wifi-instellingen van AITJE.",
+        "en": "Manage and view AITJE's WiFi settings here.",
+    },
+    "settings_wifi_status_loading": {
+        "nl": "Wifi-informatie laden...",
+        "en": "Loading WiFi information...",
+    },
+    "settings_wifi_open": {
+        "nl": "Open wifi-instellingen",
+        "en": "Open WiFi settings",
+    },
+    "settings_wifi_open_failed": {
+        "nl": "Kon geen systeemscherm openen voor wifi-instellingen op dit apparaat.",
+        "en": "Could not open the system WiFi settings on this device.",
+    },
+    "settings_wifi_info_unavailable": {
+        "nl": "Wifi-informatie is momenteel niet beschikbaar.",
+        "en": "WiFi information is currently unavailable.",
+    },
+    "settings_wifi_connected": {
+        "nl": "Verbonden",
+        "en": "Connected",
+    },
+    "settings_wifi_not_connected": {
+        "nl": "Niet verbonden",
+        "en": "Not connected",
+    },
+    "settings_wifi_platform": {
+        "nl": "Platform",
+        "en": "Platform",
+    },
+    "settings_wifi_state": {
+        "nl": "Status",
+        "en": "Status",
+    },
+    "settings_wifi_ssid": {
+        "nl": "Netwerk",
+        "en": "Network",
+    },
+    "settings_wifi_interface": {
+        "nl": "Interface",
+        "en": "Interface",
+    },
+    "settings_wifi_signal": {
+        "nl": "Signaal",
+        "en": "Signal",
+    },
+    "settings_wifi_security": {
+        "nl": "Beveiliging",
+        "en": "Security",
+    },
+    "settings_wifi_channel": {
+        "nl": "Kanaal",
+        "en": "Channel",
+    },
+    "settings_wifi_ipv4": {
+        "nl": "IPv4",
+        "en": "IPv4",
+    },
+    "settings_wifi_ipv6": {
+        "nl": "IPv6",
+        "en": "IPv6",
+    },
+    "settings_wifi_gateway": {
+        "nl": "Gateway",
+        "en": "Gateway",
+    },
+    "settings_wifi_mac": {
+        "nl": "MAC-adres",
+        "en": "MAC address",
+    },
+    "settings_wifi_bssid": {
+        "nl": "BSSID",
+        "en": "BSSID",
+    },
+    "settings_wifi_note": {
+        "nl": "Opmerking",
+        "en": "Note",
     },
     "settings_timezone": {
         "nl": "Tijdzone",
@@ -247,6 +339,70 @@ TRANSLATIONS = {
     "settings_language": {
         "nl": "Taal",
         "en": "Language",
+    },
+    "settings_application_language": {
+        "nl": "Application Language",
+        "en": "Application Language",
+    },
+    "settings_response_language": {
+        "nl": "AITJE reactietaal",
+        "en": "AITJE response language",
+    },
+    "settings_today": {
+        "nl": "Datum van vandaag",
+        "en": "Today's date",
+    },
+    "settings_system_information": {
+        "nl": "Systeeminformatie",
+        "en": "System information",
+    },
+    "settings_device_prefix": {
+        "nl": "Device prefix",
+        "en": "Device prefix",
+    },
+    "settings_device_number": {
+        "nl": "Device nummer",
+        "en": "Device number",
+    },
+    "settings_backend_url": {
+        "nl": "Backend URL",
+        "en": "Backend URL",
+    },
+    "settings_backend_port": {
+        "nl": "Backend poort",
+        "en": "Backend port",
+    },
+    "settings_backend_bind_host": {
+        "nl": "Backend bind host",
+        "en": "Backend bind host",
+    },
+    "settings_api_routes_port": {
+        "nl": "API routes poort",
+        "en": "API routes port",
+    },
+    "settings_admin_users": {
+        "nl": "Admin gebruikers",
+        "en": "Admin users",
+    },
+    "settings_admin_device_id": {
+        "nl": "Admin device ID",
+        "en": "Admin device ID",
+    },
+    "settings_ollama_base_url": {
+        "nl": "Ollama base URL",
+        "en": "Ollama base URL",
+    },
+    "settings_ollama_model_label": {
+        "nl": "Ollama model",
+        "en": "Ollama model",
+    },
+    "settings_qdrant_devices_path": {
+        "nl": "Qdrant devices pad",
+        "en": "Qdrant devices path",
+    },
+    "settings_not_set": {
+        "nl": "Niet ingesteld",
+        "en": "Not set",
     },
     "settings_duration": {
         "nl": "Duur",
@@ -269,8 +425,8 @@ TRANSLATIONS = {
         "en": "Loading available models...",
     },
     "settings_support_hint": {
-        "nl": "Schakel alleen in met expliciete toestemming van de klant. We starten tijdelijk een Tailscale-verbinding voor support en sluiten automatisch.",
-        "en": "Enable only with explicit customer permission. We temporarily start a Tailscale connection for support and close automatically.",
+        "nl": "Schakel dit alleen in overleg met het AITJE support team in. We starten tijdelijk een Tailscale-verbinding voor support en sluiten automatisch.",
+        "en": "Only enable this in coordination with the AITJE support team. We temporarily start a Tailscale connection for support and close automatically.",
     },
     "settings_support_status_loading": {
         "nl": "Support status laden...",
@@ -292,9 +448,141 @@ TRANSLATIONS = {
         "nl": "Kon taal niet opslaan:",
         "en": "Could not save language:",
     },
+    "settings_could_not_save_response_language": {
+        "nl": "Kon AITJE-reactietaal niet opslaan:",
+        "en": "Could not save AITJE response language:",
+    },
+    "settings_could_not_save_today": {
+        "nl": "Kon datum van vandaag niet opslaan:",
+        "en": "Could not save today's date:",
+    },
+    "settings_could_not_save_system_preferences": {
+        "nl": "Kon systeemvoorkeuren niet opslaan:",
+        "en": "Could not save system preferences:",
+    },
     "settings_could_not_save_focus_mode": {
         "nl": "Kon focus mode niet opslaan:",
         "en": "Could not save focus mode:",
+    },
+    "settings_save": {
+        "nl": "Opslaan",
+        "en": "Save",
+    },
+    "settings_reset": {
+        "nl": "Terugzetten",
+        "en": "Reset",
+    },
+    "settings_new_focus_mode": {
+        "nl": "Nieuwe focus mode",
+        "en": "New focus mode",
+    },
+    "settings_add_focus_mode": {
+        "nl": "Focus mode toevoegen",
+        "en": "Add focus mode",
+    },
+    "settings_edit_focus_mode": {
+        "nl": "Bewerk eigen prompt",
+        "en": "Edit custom prompt",
+    },
+    "settings_view_focus_mode": {
+        "nl": "Bekijk prompt",
+        "en": "View prompt",
+    },
+    "settings_delete": {
+        "nl": "Verwijderen",
+        "en": "Delete",
+    },
+    "settings_delete_focus_mode": {
+        "nl": "Focus mode verwijderen",
+        "en": "Delete focus mode",
+    },
+    "settings_delete_focus_mode_confirm": {
+        "nl": "Weet je zeker dat je de focus mode '{mode}' wilt verwijderen?",
+        "en": "Are you sure you want to delete the focus mode '{mode}'?",
+    },
+    "settings_focus_mode_default_info": {
+        "nl": "Geen vaste template geselecteerd. AITJE gebruikt dan de standaard assistentprompt.",
+        "en": "No fixed template selected. AITJE will use the default assistant prompt.",
+    },
+    "settings_focus_mode_developer_info": {
+        "nl": "Developer mode stuurt AITJE naar technische, concrete en direct uitvoerbare antwoorden met expliciete aannames.",
+        "en": "Developer mode steers AITJE toward technical, concrete, implementation-ready answers with explicit assumptions.",
+    },
+    "settings_focus_mode_finance_info": {
+        "nl": "Finance mode legt cijfers, aannames, risico's en berekeningen duidelijk uit zonder te doen alsof het financieel advies is.",
+        "en": "Finance mode explains numbers, assumptions, risks, and calculations clearly without posing as financial advice.",
+    },
+    "settings_focus_mode_law_info": {
+        "nl": "Law mode houdt antwoorden neutraal, wijst op jurisdictie en maakt helder onderscheid tussen informatie en juridisch advies.",
+        "en": "Law mode keeps answers neutral, flags jurisdiction issues, and clearly separates information from legal advice.",
+    },
+    "settings_focus_mode_child_info": {
+        "nl": "Child mode vereenvoudigt taalgebruik, houdt antwoorden vriendelijk en vermijdt onnodig complexe of gevoelige details.",
+        "en": "Child mode simplifies language, keeps answers friendly, and avoids unnecessarily complex or sensitive detail.",
+    },
+    "settings_focus_mode_custom_info": {
+        "nl": "Eigen prompt actief. Preview: {prompt}",
+        "en": "Custom prompt active. Preview: {prompt}",
+    },
+    "settings_focus_mode_custom_info_empty": {
+        "nl": "Eigen prompt actief, maar het templatebestand lijkt leeg.",
+        "en": "Custom prompt active, but the template file appears empty.",
+    },
+    "settings_focus_mode_builtin_locked": {
+        "nl": "Deze ingebouwde template is alleen-lezen. Maak een eigen focus mode om hem aan te passen.",
+        "en": "This built-in template is read-only. Create your own focus mode to customize it.",
+    },
+    "settings_focus_mode_custom_editable": {
+        "nl": "Deze eigen focus mode kun je hier bewerken of verwijderen.",
+        "en": "You can edit or delete this custom focus mode here.",
+    },
+    "settings_focus_mode_default_locked": {
+        "nl": "Selecteer een focus mode of maak een nieuwe om een eigen prompt te gebruiken.",
+        "en": "Select a focus mode or create a new one to use a custom prompt.",
+    },
+    "settings_focus_mode_default_prompt_preview": {
+        "nl": "De standaardmodus gebruikt de algemene AITJE assistentprompt uit de backend als er geen specifieke focus mode actief is.",
+        "en": "Default mode uses the general AITJE assistant prompt from the backend when no specific focus mode is active.",
+    },
+    "settings_focus_mode_builtin_name_error": {
+        "nl": "Deze naam is gereserveerd voor een ingebouwde focus mode.",
+        "en": "That name is reserved for a built-in focus mode.",
+    },
+    "settings_focus_mode_validation_error": {
+        "nl": "Vul zowel een naam als een prompt-template in.",
+        "en": "Please provide both a name and a prompt template.",
+    },
+    "settings_focus_mode_dialog_title": {
+        "nl": "Eigen focus mode",
+        "en": "Custom focus mode",
+    },
+    "settings_focus_mode_dialog_builtin_title": {
+        "nl": "Ingebouwde focus mode: {mode}",
+        "en": "Built-in focus mode: {mode}",
+    },
+    "settings_focus_mode_dialog_intro": {
+        "nl": "Maak of wijzig hier een eigen prompt-template. Deze wordt opgeslagen in prompt_templates en toegevoegd aan de focus mode lijst.",
+        "en": "Create or edit your own prompt template here. It will be stored in prompt_templates and added to the focus mode list.",
+    },
+    "settings_focus_mode_dialog_builtin_intro": {
+        "nl": "Dit is een ingebouwde template. Je kunt hem bekijken, maar niet direct wijzigen. Maak een eigen variant als je wilt afwijken.",
+        "en": "This is a built-in template. You can inspect it, but not edit it directly. Create a custom variant if you want to change it.",
+    },
+    "settings_focus_mode_name": {
+        "nl": "Naam",
+        "en": "Name",
+    },
+    "settings_focus_mode_name_placeholder": {
+        "nl": "Bijvoorbeeld: Sales of Support Coach",
+        "en": "For example: Sales or Support Coach",
+    },
+    "settings_focus_mode_prompt": {
+        "nl": "Prompt-template",
+        "en": "Prompt template",
+    },
+    "settings_model_description_empty": {
+        "nl": "Kies een model om de beschrijving te zien.",
+        "en": "Choose a model to see its description.",
     },
     "settings_backend_not_reachable": {
         "nl": "Backend niet bereikbaar; lokaal modellenlijstje geladen.",
@@ -657,24 +945,24 @@ TRANSLATIONS = {
         "en": "System usage",
     },
     "network_ram_now": {
-        "nl": "RAM NU",
-        "en": "RAM NOW",
+        "nl": "RAM VERBRUIK",
+        "en": "RAM USAGE",
     },
     "network_ram_caption": {
         "nl": "Actueel geheugenverbruik ({percent}% van het systeem).",
         "en": "Current memory usage ({percent}% of system memory).",
     },
     "network_cpu_now": {
-        "nl": "CPU NU",
-        "en": "CPU NOW",
+        "nl": "CPU VERBRUIK",
+        "en": "CPU USAGE",
     },
     "network_cpu_caption": {
         "nl": "Huidige systeembelasting.",
         "en": "Current system load.",
     },
     "network_power_now": {
-        "nl": "STROOM NU",
-        "en": "POWER NOW",
+        "nl": "STROOMVERBRUIK",
+        "en": "POWER USAGE",
     },
     "network_power_caption": {
         "nl": "Live wattage van het apparaat.",
@@ -687,6 +975,54 @@ TRANSLATIONS = {
     "network_power_unavailable": {
         "nl": "Geen live powersensor gevonden. Voor exact verbruik is Linux power telemetry of een slimme meter nodig.",
         "en": "No live power sensor found. Exact usage requires Linux power telemetry or a smart meter.",
+    },
+    "network_power_battery_line": {
+        "nl": "Batterij: {value}",
+        "en": "Battery: {value}",
+    },
+    "network_power_plugged_line": {
+        "nl": "Aan lader: {value}",
+        "en": "Charging: {value}",
+    },
+    "network_power_source_line": {
+        "nl": "Stroombron: {value}",
+        "en": "Power source: {value}",
+    },
+    "network_power_live_line": {
+        "nl": "Live verbruik: {value}",
+        "en": "Live usage: {value}",
+    },
+    "network_power_plugged_yes": {
+        "nl": "Ja",
+        "en": "Yes",
+    },
+    "network_power_plugged_no": {
+        "nl": "Nee",
+        "en": "No",
+    },
+    "network_power_source_ac": {
+        "nl": "Netstroom",
+        "en": "AC power",
+    },
+    "network_power_source_usb": {
+        "nl": "USB-C / USB-voeding",
+        "en": "USB-C / USB power",
+    },
+    "network_power_source_battery": {
+        "nl": "Batterij",
+        "en": "Battery",
+    },
+    "network_power_source_unknown": {
+        "nl": "Onbekend",
+        "en": "Unknown",
+    },
+    "network_power_no_battery": {
+        "nl": "Geen batterij gedetecteerd",
+        "en": "No battery detected",
+    },
+    "network_power_unknown_short": {
+        "nl": "Onbekend",
+        "en": "Unknown",
     },
     "network_performance_title": {
         "nl": "Hoe AITJE nu draait",
@@ -1185,6 +1521,14 @@ TRANSLATIONS = {
         "nl": "Focus mode:",
         "en": "Focus mode:",
     },
+    "chat_current_mode_label": {
+        "nl": "Current mode: {mode}",
+        "en": "Current mode: {mode}",
+    },
+    "chat_change_focus_mode": {
+        "nl": "Wijzig focus mode",
+        "en": "Change focus mode",
+    },
     "chat_error_prefix": {
         "nl": "[fout]",
         "en": "[error]",
@@ -1502,8 +1846,8 @@ TRANSLATIONS = {
         "en": "Model",
     },
     "settings_remote_support": {
-        "nl": "Remote support (Tailscale)",
-        "en": "Remote support (Tailscale)",
+        "nl": "Remote support van AITJE",
+        "en": "Remote support from AITJE",
     },
 
     # ============================================

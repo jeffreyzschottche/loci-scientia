@@ -87,6 +87,40 @@ class RoundedProgressBar(QProgressBar):
             painter.fillPath(fill_path, QColor("#facc15"))
 
 
+class BootDotsLoader(QWidget):
+    """Triangular three-dot loading indicator next to the boot title."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._phase = 0
+        self.setFixedSize(40, 35)
+        self._timer = QTimer(self)
+        self._timer.setInterval(333)
+        self._timer.timeout.connect(self._advance)
+        self._timer.start()
+
+    def _advance(self) -> None:
+        self._phase = (self._phase + 1) % 3
+        self.update()
+
+    def paintEvent(self, event):  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        diameter = 12
+        positions = [(14, 2), (0, 22), (28, 22)]
+        intensity_sets = [
+            [1.0, 0.18, 0.45],
+            [0.45, 1.0, 0.18],
+            [0.18, 0.45, 1.0],
+        ]
+        painter.setPen(Qt.NoPen)
+        for (x, y), intensity in zip(positions, intensity_sets[self._phase]):
+            color = QColor("#111111")
+            color.setAlphaF(intensity)
+            painter.setBrush(color)
+            painter.drawEllipse(x, y, diameter, diameter)
+
+
 class BootScreen(QWidget):
     """Animated splash screen that mimics the AITJE loading state from the Figma design."""
 
@@ -158,15 +192,25 @@ class BootScreen(QWidget):
         hero_widget = self._build_hero_widget(logo_path)
         center.addWidget(hero_widget, 0, Qt.AlignCenter)
 
+        title_row = QHBoxLayout()
+        title_row.setSpacing(12)
+        title_row.setAlignment(Qt.AlignCenter)
+
         title = QLabel(t("boot_title"))
         title.setObjectName("BootTitle")
-        title.setAlignment(Qt.AlignCenter)
-        center.addWidget(title)
+        title_row.addWidget(title, 0, Qt.AlignVCenter)
 
-        subtitle = QLabel(t("boot_subtitle"))
-        subtitle.setObjectName("BootSubtitle")
-        subtitle.setAlignment(Qt.AlignCenter)
-        center.addWidget(subtitle)
+        self.title_loader = BootDotsLoader()
+        title_row.addWidget(self.title_loader, 0, Qt.AlignVCenter)
+
+        center.addLayout(title_row)
+
+        subtitle_text = t("boot_subtitle").strip()
+        if subtitle_text:
+            subtitle = QLabel(subtitle_text)
+            subtitle.setObjectName("BootSubtitle")
+            subtitle.setAlignment(Qt.AlignCenter)
+            center.addWidget(subtitle)
 
         outer.addLayout(center)
 
@@ -345,6 +389,8 @@ class MainWindow(QMainWindow):
             "devices": DevicesPage(),
             "settings": SettingsPage(),
         }
+        self.pages["chat"].open_settings_tab_requested.connect(self._open_settings_tab)
+        self.pages["net"].open_settings_tab_requested.connect(self._open_settings_tab)
         self.content_scroll = QScrollArea()
         self.content_scroll.setWidgetResizable(True)
         self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -399,6 +445,9 @@ class MainWindow(QMainWindow):
         for name, page in self.pages.items():
             page.setVisible(name == key)
         self._current_page_key = key
+        current_page = self.pages.get(key)
+        if current_page is not None and hasattr(current_page, "on_page_shown"):
+            current_page.on_page_shown()
         self._update_page_header()
 
     def _update_page_header(self):
@@ -424,6 +473,13 @@ class MainWindow(QMainWindow):
     def _go_home(self):
         self.sidebar.set_current("chat")
         self.show_page("chat")
+
+    def _open_settings_tab(self, tab_key: str) -> None:
+        self.sidebar.set_current("settings")
+        self.show_page("settings")
+        settings_page = self.pages["settings"]
+        if hasattr(settings_page, "open_tab"):
+            settings_page.open_tab(tab_key)
 
     def _shutdown_app(self) -> None:
         self._restart_on_close = False

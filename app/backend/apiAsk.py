@@ -3,12 +3,14 @@ import binascii
 import io
 import logging
 import math
+import os
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
+from zoneinfo import ZoneInfo
 import httpx
 
 from .devices_repo import DevicesRepository
@@ -650,6 +652,75 @@ def _prompt_template(mode: Optional[str] = None) -> str:
     return t("prompt_default_template")
 
 
+def _read_env_value(key: str) -> Optional[str]:
+    env_value = os.environ.get(key)
+    if env_value:
+        return env_value.strip()
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return None
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        if name.strip() != key:
+            continue
+        value = value.strip()
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        return value.strip()
+    return None
+
+
+def _resolve_timezone_name() -> str:
+    return _read_env_value("TIMEZONE") or "UTC"
+
+
+def _resolve_today_in_timezone(timezone_name: str) -> datetime:
+    try:
+        tzinfo = ZoneInfo(timezone_name)
+    except Exception:
+        tzinfo = timezone.utc
+        timezone_name = "UTC"
+    configured_today = _read_env_value("AITJE_TODAY_DATE")
+    if configured_today:
+        try:
+            parsed_date = datetime.fromisoformat(configured_today)
+            return parsed_date.replace(tzinfo=tzinfo)
+        except ValueError:
+            pass
+    return datetime.now(tzinfo)
+
+
+def _resolve_language_label(value: Optional[str]) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized.startswith("en"):
+        return "English"
+    return "Nederlands"
+
+
+def _system_prompt_lines() -> list[str]:
+    timezone_name = _resolve_timezone_name()
+    today = _resolve_today_in_timezone(timezone_name)
+    response_language = _resolve_language_label(_read_env_value("AITJE_RESPONSE_LANGUAGE"))
+    application_language = _resolve_language_label(_read_env_value("LANGUAGE"))
+    weekday_name = today.strftime("%A")
+    return [
+        "> system configuration:",
+        f"- Application language: {application_language}",
+        f"- Preferred response language: {response_language}",
+        f"- Timezone: {timezone_name}",
+        f"- Configured current date: {today.strftime('%Y-%m-%d')}",
+        f"- Configured current weekday: {weekday_name}",
+        "- Use the preferred response language by default unless the user explicitly asks for another language.",
+    ]
+
+
 def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]:
     if not history:
         return []
@@ -702,6 +773,8 @@ def build_augmented_prompt_with_details(
 ) -> tuple[str, Dict[str, List]]:
     """Build augmented prompt AND return context details for logging."""
     base_lines: list[str] = []
+    base_lines.extend(_system_prompt_lines())
+    base_lines.append("")
 
     history_lines = _format_history_lines(history)
     if history_lines:
@@ -709,7 +782,7 @@ def build_augmented_prompt_with_details(
         base_lines.extend(history_lines)
         base_lines.append("")
 
-    base_lines.append(f"Huidige vraag: {user_prompt.strip()}")
+    base_lines.append(f"{t('current_question')} {user_prompt.strip()}")
     if images_count > 0:
         base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
     document_lines = _format_document_context_lines(documents)

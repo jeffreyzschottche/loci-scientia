@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QRect, Qt, Signal
@@ -134,6 +135,7 @@ class LanguageSelectorButton(QPushButton):
         else:
             self._current_lang = "nl"
             os.environ["LANGUAGE"] = "nl-NL"
+        self._persist_language(os.environ["LANGUAGE"])
         set_language(self._current_lang)
         self._update_display()
         self.language_changed.emit(self._current_lang)
@@ -142,6 +144,38 @@ class LanguageSelectorButton(QPushButton):
         """Refresh the display from current language setting."""
         self._current_lang = get_current_language()
         self._update_display()
+
+    @staticmethod
+    def _env_file_path() -> Path:
+        return Path(__file__).resolve().parents[3] / ".env"
+
+    def _persist_language(self, value: str) -> None:
+        path = self._env_file_path()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            lines = []
+        updated = False
+        new_lines: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                new_lines.append(line)
+                continue
+            name, _ = line.split("=", 1)
+            if name.strip() == "LANGUAGE":
+                new_lines.append(f"LANGUAGE={value}")
+                updated = True
+            else:
+                new_lines.append(line)
+        if not updated:
+            if new_lines and new_lines[-1].strip():
+                new_lines.append("")
+            new_lines.append(f"LANGUAGE={value}")
+        try:
+            path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        except OSError:
+            pass
 
 
 class PowerButton(QPushButton):
