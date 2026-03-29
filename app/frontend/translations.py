@@ -621,24 +621,24 @@ TRANSLATIONS = {
         "en": "TOTAL TODAY",
     },
     "network_api_usage": {
-        "nl": "Hoe vaak de API is gebruikt.",
-        "en": "How often the API was used.",
+        "nl": "Aantal API-aanroepen vandaag.",
+        "en": "Number of API requests today.",
     },
     "network_active_users": {
         "nl": "ACTIEVE GEBRUIKERS",
         "en": "ACTIVE USERS",
     },
     "network_customers_apps": {
-        "nl": "Aantal klanten of apps vandaag.",
-        "en": "Number of customers or apps today.",
+        "nl": "Unieke gebruikers die vandaag actief waren.",
+        "en": "Unique users active today.",
     },
     "network_avg_response_time": {
         "nl": "GEM. REACTIETIJD",
         "en": "AVG. RESPONSE TIME",
     },
     "network_avg_wait_time": {
-        "nl": "Gemiddelde wachttijd.",
-        "en": "Average wait time.",
+        "nl": "Gemiddelde tijd tot AITJE volledig heeft geantwoord.",
+        "en": "Average time until AITJE fully completed its response.",
     },
     "network_na": {
         "nl": "n.v.t.",

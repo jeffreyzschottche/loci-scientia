@@ -52,9 +52,7 @@ class DeviceCard(QFrame):
         name_label.setStyleSheet("font-size:18px; font-weight:700;")
         info.addWidget(name_label)
 
-        status_label = QLabel(self._status_text())
-        status_label.setStyleSheet(self._status_style())
-        info.addWidget(status_label)
+        info.addWidget(self._build_status_badge())
 
         info.addWidget(self._line_with_icon("👤", device.get("user_name", "")))
         info.addWidget(self._line_with_icon("✉️", device.get("email", "")))
@@ -96,20 +94,38 @@ class DeviceCard(QFrame):
         container.setLayout(row)
         return container
 
+    def _build_status_badge(self) -> QWidget:
+        badge = QFrame()
+        badge.setStyleSheet(self._status_style())
+        badge_layout = QHBoxLayout(badge)
+        badge_layout.setContentsMargins(14, 6, 14, 6)
+        badge_layout.setSpacing(0)
+
+        label = QLabel(self._status_text())
+        label.setStyleSheet("background: transparent; border: none;")
+        badge_layout.addWidget(label, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        return badge
+
     def _status_text(self) -> str:
         return t("devices_connected") if self.device.get("is_connected") else t("devices_not_connected")
 
     def _status_style(self) -> str:
         if self.device.get("is_connected"):
             return (
-                "color:#16a34a; font-size:12px; font-weight:700; "
-                "background:#f0fdf4; border:1px solid #bbf7d0; border-radius:999px; "
-                "padding:4px 10px;"
+                "QFrame {"
+                "  background:#f0fdf4;"
+                "  border:1px solid #bbf7d0;"
+                "  border-radius:14px;"
+                "}"
+                "QLabel { color:#16a34a; font-size:12px; font-weight:700; }"
             )
         return (
-            "color:#6b7280; font-size:12px; font-weight:700; "
-            "background:#f3f4f6; border:1px solid #e5e7eb; border-radius:999px; "
-            "padding:4px 10px;"
+            "QFrame {"
+            "  background:#f3f4f6;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:14px;"
+            "}"
+            "QLabel { color:#6b7280; font-size:12px; font-weight:700; }"
         )
 
 

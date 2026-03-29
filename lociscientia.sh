@@ -556,6 +556,12 @@ fi
 BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_BIND_HOST" --port "$BACKEND_PORT")
 backend_log="$PROJECT_ROOT/backend.log"
 
+if pgrep -f "uvicorn app.backend.main:app" >/dev/null 2>&1; then
+    echo "⚠️  bestaand uvicorn backend-proces gevonden, stoppen…"
+    pkill -f "uvicorn app.backend.main:app" >/dev/null 2>&1 || true
+    sleep 1
+fi
+
 if lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     backend_pids="$(lsof -ti:"$BACKEND_PORT" -sTCP:LISTEN)"
     for pid in $backend_pids; do

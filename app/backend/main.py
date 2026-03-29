@@ -102,6 +102,10 @@ last_prompt_at: Optional[datetime] = None
 last_idle_summary_at: Optional[datetime] = None
 
 SUMMARY_POLL_SECONDS = 60
+STATS_HISTORY_MAX_SAMPLES = 50
+API_STATS_MODE = "interactive_v1"
+API_STATS_PATH = Path(__file__).resolve().parents[2] / "devices_db" / "api_stats_snapshot.json"
+STATS_HISTORY_PATH = Path(__file__).resolve().parents[2] / "devices_db" / "api_stats_history.json"
 
 
 class ActiveGeneration:
@@ -165,13 +169,57 @@ class DevicePresenceTracker:
 
 
 class ApiStats:
-    def __init__(self):
+    def __init__(self, state_path: Path):
         self._lock = Lock()
+        self._state_path = state_path
         self._day = datetime.now(timezone.utc).date()
         self._requests_today = 0
         self._latency_total_ms = 0.0
         self._latency_count = 0
         self._active_ids: set[str] = set()
+        self._load_state()
+
+    def _load_state(self) -> None:
+        try:
+            raw = self._state_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return
+        except OSError:
+            return
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(payload, dict):
+            return
+        if payload.get("mode") != API_STATS_MODE:
+            return
+        day_raw = payload.get("date")
+        if isinstance(day_raw, str):
+            try:
+                self._day = datetime.fromisoformat(day_raw).date()
+            except ValueError:
+                self._day = datetime.now(timezone.utc).date()
+        self._requests_today = int(payload.get("requests_today") or 0)
+        self._latency_total_ms = float(payload.get("latency_total_ms") or 0.0)
+        self._latency_count = int(payload.get("latency_count") or 0)
+        active_ids = payload.get("active_ids") or []
+        if isinstance(active_ids, list):
+            self._active_ids = {str(item) for item in active_ids if str(item).strip()}
+
+    def _persist_locked(self) -> None:
+        self._state_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "mode": API_STATS_MODE,
+            "date": self._day.isoformat(),
+            "requests_today": self._requests_today,
+            "latency_total_ms": round(self._latency_total_ms, 3),
+            "latency_count": self._latency_count,
+            "active_ids": sorted(self._active_ids),
+        }
+        tmp = self._state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        tmp.replace(self._state_path)
 
     def _rollover(self, now: datetime) -> None:
         today = now.date()
@@ -182,26 +230,33 @@ class ApiStats:
         self._latency_total_ms = 0.0
         self._latency_count = 0
         self._active_ids.clear()
+        self._persist_locked()
 
-    def record(self, path: str, auth_header: Optional[str], duration_ms: float) -> None:
-        if not path.startswith("/api/v1/"):
-            return
+    def begin_interaction(self, token_value: Optional[str]) -> None:
         now = datetime.now(timezone.utc)
-        token_value = None
-        if auth_header:
-            scheme, _, value = auth_header.partition(" ")
-            if scheme.lower() == "bearer" and value.strip():
-                token_value = value.strip()
-            else:
-                token_value = auth_header.strip()
         with self._lock:
             self._rollover(now)
             self._requests_today += 1
-            self._latency_total_ms += duration_ms
-            self._latency_count += 1
             if token_value:
                 token_hash = hashlib.sha256(token_value.encode("utf-8")).hexdigest()[:16]
                 self._active_ids.add(token_hash)
+            self._persist_locked()
+
+    def finish_interaction(self, duration_ms: float) -> None:
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            self._rollover(now)
+            self._latency_total_ms += duration_ms
+            self._latency_count += 1
+            self._persist_locked()
+            avg = self._latency_total_ms / self._latency_count if self._latency_count else None
+            snapshot = {
+                "date": self._day.isoformat(),
+                "requests_today": self._requests_today,
+                "active_users_today": len(self._active_ids),
+                "avg_response_ms": round(avg, 1) if avg is not None else None,
+            }
+        api_stats_history.append(snapshot)
 
     def snapshot(self) -> dict:
         now = datetime.now(timezone.utc)
@@ -221,7 +276,76 @@ class ApiStats:
             }
 
 
-api_stats = ApiStats()
+class ApiStatsHistory:
+    def __init__(self, history_path: Path, *, max_samples: int = STATS_HISTORY_MAX_SAMPLES):
+        self._lock = Lock()
+        self._history_path = history_path
+        self._max_samples = max(1, int(max_samples))
+        self._samples: list[dict] = self._load()
+
+    def _load(self) -> list[dict]:
+        try:
+            raw = self._history_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return []
+        except OSError:
+            return []
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(payload, dict) and payload.get("mode") != API_STATS_MODE:
+            return []
+        items = payload.get("samples") if isinstance(payload, dict) else payload
+        if not isinstance(items, list):
+            items = []
+        normalized: list[dict] = []
+        for item in items[-self._max_samples:]:
+            if not isinstance(item, dict):
+                continue
+            timestamp = item.get("timestamp")
+            if not isinstance(timestamp, str):
+                continue
+            normalized.append(
+                {
+                    "timestamp": timestamp,
+                    "requests_today": int(item.get("requests_today") or 0),
+                    "active_users_today": int(item.get("active_users_today") or 0),
+                    "avg_response_ms": int(round(float(item.get("avg_response_ms") or 0))),
+                }
+            )
+        return normalized
+
+    def _persist_locked(self) -> None:
+        self._history_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"mode": API_STATS_MODE, "samples": self._samples}
+        tmp = self._history_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        tmp.replace(self._history_path)
+
+    def append(self, snapshot: dict) -> None:
+        sample = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "requests_today": int(snapshot.get("requests_today") or 0),
+            "active_users_today": int(snapshot.get("active_users_today") or 0),
+            "avg_response_ms": int(round(float(snapshot.get("avg_response_ms") or 0))),
+        }
+        with self._lock:
+            self._samples.append(sample)
+            self._samples = self._samples[-self._max_samples:]
+            self._persist_locked()
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            samples = list(self._samples)
+        return {
+            "max_samples": self._max_samples,
+            "samples": samples,
+        }
+
+
+api_stats = ApiStats(API_STATS_PATH)
+api_stats_history = ApiStatsHistory(STATS_HISTORY_PATH, max_samples=STATS_HISTORY_MAX_SAMPLES)
 device_presence = DevicePresenceTracker(timeout_seconds=30)
 
 
@@ -261,24 +385,6 @@ def _empty_sync_state() -> dict:
         "stats": None,
         "synced_at": None,
     }
-
-
-@app.middleware("http")
-async def collect_api_stats(request: Request, call_next):
-    start = time.perf_counter()
-    try:
-        response = await call_next(request)
-        return response
-    finally:
-        duration_ms = (time.perf_counter() - start) * 1000
-        try:
-            api_stats.record(
-                request.url.path,
-                request.headers.get("authorization"),
-                duration_ms,
-            )
-        except Exception:  # pragma: no cover - best effort
-            pass
 
 
 def _mark_prompt_activity() -> None:
@@ -373,21 +479,20 @@ async def _idle_summary_loop() -> None:
 async def start_idle_summary_task() -> None:
     global summary_task
     if settings.chat_summary_idle_minutes <= 0:
-        return
-    if summary_task is None or summary_task.done():
+        summary_task = None
+    elif summary_task is None or summary_task.done():
         summary_task = asyncio.create_task(_idle_summary_loop())
 
 
 @app.on_event("shutdown")
 async def stop_idle_summary_task() -> None:
     global summary_task
-    if summary_task is None:
-        return
-    summary_task.cancel()
-    try:
-        await summary_task
-    except asyncio.CancelledError:
-        pass
+    if summary_task is not None:
+        summary_task.cancel()
+        try:
+            await summary_task
+        except asyncio.CancelledError:
+            pass
 
 
 @app.get("/health")
@@ -398,6 +503,11 @@ def health():
 @app.get("/api/stats")
 def api_stats_snapshot(_: TokenRecord = Depends(require_admin_token)):
     return api_stats.snapshot()
+
+
+@app.get("/api/stats/history")
+def api_stats_history_snapshot(_: TokenRecord = Depends(require_admin_token)):
+    return api_stats_history.snapshot()
 
 
 async def _pull_ollama_model(model: str) -> None:
@@ -694,6 +804,8 @@ def api_signon(req: SignOnRequest):
 @app.post("/api/v1/ask")
 async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     _mark_prompt_activity()
+    started = time.perf_counter()
+    api_stats.begin_interaction(record.token)
 
     try:
         documents = normalize_documents(req.documents)
@@ -767,6 +879,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
     log_api_request(log_entry)
 
     chat_history.append(history_key, "assistant", message)
+    api_stats.finish_interaction((time.perf_counter() - started) * 1000)
     return response
 
 
@@ -793,6 +906,7 @@ async def sse_stream_generator(
     images: Optional[list[str]] = None,
 ):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
+    started = time.perf_counter()
 
     images = images if images is not None else normalize_images(req.images)
 
@@ -972,7 +1086,8 @@ async def sse_stream_generator(
     log_entry.error = error_message
     log_api_request(log_entry)
 
-    # Send final done event
+    # Finalize latency before the terminal done event is sent.
+    api_stats.finish_interaction((time.perf_counter() - started) * 1000)
     event_data = json.dumps(
         {
             "done": True,
@@ -988,6 +1103,7 @@ async def sse_stream_generator(
 async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require_token)):
     """Stream SSE response with queue position and token-by-token LLM output."""
     _mark_prompt_activity()
+    api_stats.begin_interaction(record.token)
 
     try:
         documents = normalize_documents(req.documents)

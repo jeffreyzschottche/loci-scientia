@@ -240,7 +240,7 @@ def ask_yes_no_dialog(
     *,
     default_to_no: bool = True,
 ) -> bool:
-    dialog, layout = _base_dialog(parent, title, text)
+    dialog, layout = _base_dialog(parent, title, text, compact=True)
     layout.addStretch(1)
     buttons = QHBoxLayout()
     buttons.setSpacing(12)
