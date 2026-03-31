@@ -30,10 +30,12 @@ from .apiAsk import (
     ParsedDocument,
     build_ollama_generate_payload,
     build_augmented_prompt_with_details,
+    collect_prompt_images,
     estimate_prompt_tokens,
     generate_conversation_id,
     generate_request_id,
     handle_ask,
+    history_documents_from_parsed,
     log_api_request,
     log_prompt,
     normalize_documents,
@@ -401,15 +403,6 @@ def _history_key(record: TokenRecord, conversation_id: Optional[str]) -> str:
 
 def _format_prompt_for_history(prompt: str, images_count: int, documents_count: int = 0) -> str:
     clean = (prompt or "").strip()
-    if not clean:
-        return clean
-    tags: list[str] = []
-    if images_count > 0:
-        tags.append(f"Afbeeldingen: {images_count}")
-    if documents_count > 0:
-        tags.append(f"Documenten: {documents_count}")
-    if tags:
-        return f"{clean}\n[{'; '.join(tags)}]"
     return clean
 
 
@@ -828,6 +821,8 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         history_key,
         "user",
         _format_prompt_for_history(req.prompt, len(images), len(documents)),
+        images=images,
+        documents=history_documents_from_parsed(documents),
     )
 
     # Generate IDs for tracking
@@ -908,13 +903,14 @@ async def sse_stream_generator(
     """Generate SSE events for queue countdown and token streaming from Ollama."""
     started = time.perf_counter()
 
-    images = images if images is not None else normalize_images(req.images)
+    current_images = images if images is not None else normalize_images(req.images)
+    prompt_images = collect_prompt_images(history, current_images=current_images)
 
     # Build prompt with details for logging
     logged_prompt, context_details = build_augmented_prompt_with_details(
         req.prompt,
         history=history,
-        images_count=len(images),
+        images_count=len(current_images),
         documents=documents,
         mode=req.mode,
     )
@@ -936,7 +932,7 @@ async def sse_stream_generator(
         mode=req.mode,
         new_chat=req.new_chat,
         history_length=len(history) if history else 0,
-        images_count=len(images),
+        images_count=len(current_images),
         documents_count=len(documents),
         context_devices=context_details.get("devices", []),
         context_knowledge=context_details.get("knowledge", []),
@@ -963,7 +959,7 @@ async def sse_stream_generator(
     ollama_payload = build_ollama_generate_payload(
         final_prompt,
         stream=True,
-        images=images,
+        images=prompt_images,
         thinking=req.thinking,
     )
 
@@ -1126,6 +1122,8 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
         history_key,
         "user",
         _format_prompt_for_history(req.prompt, len(images), len(documents)),
+        images=images,
+        documents=history_documents_from_parsed(documents),
     )
 
     # Generate IDs for tracking
