@@ -47,6 +47,7 @@ from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
 from .kennisbank_sync import read_sync_state, sync_kennisbank
 from .knowledge_library import get_library_overview, load_document_detail
+from .cloudflare_tunnel import get_cloudflare_tunnel_status
 from .schemas import (
     BearerTokenResponse,
     ChatCancelRequest,
@@ -497,7 +498,10 @@ async def stop_idle_summary_task() -> None:
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "cloudflared": get_cloudflare_tunnel_status(),
+    }
 
 
 @app.get("/api/stats")

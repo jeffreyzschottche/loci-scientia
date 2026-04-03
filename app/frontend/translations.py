@@ -425,8 +425,8 @@ TRANSLATIONS = {
         "en": "Loading available models...",
     },
     "settings_support_hint": {
-        "nl": "Schakel dit alleen in overleg met het AITJE support team in. We starten tijdelijk een Tailscale-verbinding voor support en sluiten automatisch.",
-        "en": "Only enable this in coordination with the AITJE support team. We temporarily start a Tailscale connection for support and close automatically.",
+        "nl": "Schakel dit alleen in overleg met het AITJE support team in. De Cloudflare Tunnel blijft actief voor beheer, maar SSH-support wordt hier tijdelijk aan- en uitgezet.",
+        "en": "Only enable this in coordination with the AITJE support team. The Cloudflare Tunnel stays online for management, while SSH support is toggled here temporarily.",
     },
     "settings_support_status_loading": {
         "nl": "Support status laden...",
@@ -1846,8 +1846,8 @@ TRANSLATIONS = {
         "en": "Model",
     },
     "settings_remote_support": {
-        "nl": "Remote support van AITJE",
-        "en": "Remote support from AITJE",
+        "nl": "Remote support via Cloudflare",
+        "en": "Remote support via Cloudflare",
     },
 
     # ============================================

@@ -80,29 +80,39 @@ Clients op hetzelfde netwerk kunnen dan altijd `http://aitje-2.local:8000/...` b
 
 ---
 
-## 🧩 Remote support (Tailscale)
+## 🧩 Remote access (Cloudflare Tunnel + Access)
 
-Voor remote support zonder open poorten kun je Tailscale gebruiken. Het device maakt zelf een
-uitgaande verbinding; de UI zet dit tijdelijk aan/uit via de support-knop.
+Remote toegang loopt nu via een host-level `cloudflared` service. Het device opent alleen een
+uitgaande tunnel; er hoeven geen inbound poorten open te staan. De webinterface blijft via de
+tunnel beschikbaar en de support-knop in de UI zet alleen de SSH-ingress tijdelijk aan/uit.
 
-**1) Installeer Tailscale op het device**
-
-Volg de officiële installatie-instructies voor Debian 13.
-
-**2) Zet env vars in `.env`**
+**1) Zet env vars in `.env`**
 
 ```env
-SUPPORT_SSH_HOOK=./scripts/support_tailscale_hook.sh
-TAILSCALE_AUTHKEY=tskey-xxxxxxxxxxxxxxxxxxxx
-TAILSCALE_HOSTNAME=aitje-2
-TAILSCALE_TAGS=tag:support
-TAILSCALE_ENABLE_SSH=1
-TAILSCALE_EPHEMERAL=1
+CF_TUNNEL_TOKEN=<cloudflare-tunnel-token>
+CF_DEVICE_ID=klant-001
+CF_DOMAIN=aitje.nl
+CF_SSH_PORT=22
+CF_WEB_PORT=8000
+CF_TUNNEL_ENABLED=true
 ```
+
+**2) Run provisioning**
+
+`./lociscientia.sh` installeert `cloudflared` via het officiële Cloudflare apt repository,
+registreert de service met `cloudflared service install <token>` en verwijdert eventuele oude
+Tailscale services/packages.
 
 **3) Gebruik de UI**
 
-Ga naar `Instellingen > Geavanceerd > Remote support (Tailscale)` en schakel tijdelijk in.
+Ga naar `Instellingen > Geavanceerd > Remote support via Cloudflare` om SSH tijdelijk open te zetten.
+
+**4) Handmatige Cloudflare-stappen**
+
+- Maak per device een tunnel in Cloudflare Zero Trust en lever het tunnel token aan via `CF_TUNNEL_TOKEN`.
+- Configureer publieke hostnames voor `${CF_DEVICE_ID}.${CF_DOMAIN}` en `ssh-${CF_DEVICE_ID}.${CF_DOMAIN}`.
+- Maak Cloudflare Access policies voor de webapp en voor SSH (`cloudflared access ssh` / browser-based Zero Trust auth).
+- Controleer dat DNS records naar de juiste tunnel wijzen. Bij remotely managed tunnels gebeurt dit meestal via het dashboard.
 
 ---
 

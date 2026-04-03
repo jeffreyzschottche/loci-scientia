@@ -1,0 +1,14 @@
+[Unit]
+Description=AITJE Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/cloudflared
+ExecStart=/usr/local/bin/cloudflared_service.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

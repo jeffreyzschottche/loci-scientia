@@ -19,6 +19,12 @@ else
     DEVICE_HOSTNAME="${DEVICE_NAME_PREFIX}-${DEVICE_NUMBER}"
 fi
 DEVICE_MDNS="${DEVICE_MDNS:-${DEVICE_HOSTNAME}.local}"
+CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-${AITJE_TUNNEL_TOKEN:-}}"
+CF_DEVICE_ID="${CF_DEVICE_ID:-${AITJE_DEVICE_ID:-${DEVICE_HOSTNAME}}}"
+CF_DOMAIN="${CF_DOMAIN:-${AITJE_DOMAIN:-aitje.nl}}"
+CF_SSH_PORT="${CF_SSH_PORT:-22}"
+CF_WEB_PORT="${CF_WEB_PORT:-8000}"
+CF_TUNNEL_ENABLED="${CF_TUNNEL_ENABLED:-true}"
 ORIGINAL_HOSTNAME=""
 ORIGINAL_LOCAL_HOSTNAME=""
 ORIGINAL_COMPUTER_NAME=""
@@ -238,80 +244,173 @@ EOF
     esac
 }
 
-should_setup_tailscale() {
-    if [ -z "${SUPPORT_SSH_HOOK:-}" ]; then
-        return 1
+run_with_sudo() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    else
+        sudo "$@"
     fi
-    case "$SUPPORT_SSH_HOOK" in
-        *support_tailscale_hook.sh)
-            return 0
-            ;;
-    esac
-    return 1
 }
 
-install_tailscale() {
+should_setup_cloudflared() {
+    local enabled
+    enabled="$(printf '%s' "${CF_TUNNEL_ENABLED}" | tr '[:upper:]' '[:lower:]')"
+    if [ "$enabled" != "true" ]; then
+        echo "ℹ️  Cloudflare Tunnel overgeslagen: CF_TUNNEL_ENABLED=${CF_TUNNEL_ENABLED}"
+        return 1
+    fi
+    return 0
+}
+
+validate_cloudflare_tunnel() {
+    if [ -z "${CF_TUNNEL_TOKEN:-}" ]; then
+        echo "❌ CF_TUNNEL_TOKEN ontbreekt; kan Cloudflare Tunnel niet configureren."
+        exit 1
+    fi
+    if [ -z "${CF_DEVICE_ID:-}" ]; then
+        echo "❌ CF_DEVICE_ID ontbreekt; kan Cloudflare Tunnel niet configureren."
+        exit 1
+    fi
+}
+
+install_cloudflared() {
+    local distro_codename=""
+
     case "$DEVICE_PLATFORM" in
         linux|jetson)
             ;;
         *)
-            echo "⚠️  Tailscale setup alleen ondersteund op Linux."
+            echo "⚠️  Cloudflare Tunnel setup alleen ondersteund op Linux."
             return 1
             ;;
     esac
-    if command -v tailscale >/dev/null 2>&1; then
-        echo "✅ Tailscale is al geïnstalleerd"
+    if command -v cloudflared >/dev/null 2>&1; then
+        echo "✅ cloudflared is al geïnstalleerd"
         return 0
     fi
     if ! command -v curl >/dev/null 2>&1; then
-        echo "⚠️  curl ontbreekt; Tailscale installatie overslaan."
+        echo "⚠️  curl ontbreekt; cloudflared installatie overslaan."
         return 1
     fi
     if [ "${HAVE_SUDO:-0}" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
-        echo "⚠️  Geen sudo/root; Tailscale installatie overslaan."
+        echo "⚠️  Geen sudo/root; cloudflared installatie overslaan."
         return 1
     fi
-    echo "📦 Tailscale installeren..."
-    if [ "$(id -u)" -eq 0 ]; then
-        curl -fsSL https://tailscale.com/install.sh | sh
-    else
-        sudo sh -c "curl -fsSL https://tailscale.com/install.sh | sh"
+
+    distro_codename="$(lsb_release -cs 2>/dev/null || true)"
+    if [ -z "$distro_codename" ] && [ -f /etc/os-release ]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        distro_codename="${VERSION_CODENAME:-}"
     fi
-    echo "✅ Tailscale geïnstalleerd"
+    if [ -z "$distro_codename" ]; then
+        echo "⚠️  Kon Linux codenaam niet bepalen; cloudflared installatie overslaan."
+        return 1
+    fi
+
+    echo "📦 cloudflared installeren via officieel Cloudflare apt repository..."
+    curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+        | run_with_sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+    printf 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared %s main\n' "$distro_codename" \
+        | run_with_sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null
+    run_with_sudo apt-get update
+    run_with_sudo apt-get install -y cloudflared
+
+    if ! command -v cloudflared >/dev/null 2>&1; then
+        echo "❌ cloudflared installatie lijkt mislukt."
+        return 1
+    fi
+    echo "✅ cloudflared geïnstalleerd"
     return 0
 }
 
-start_tailscaled() {
-    if ! command -v tailscaled >/dev/null 2>&1; then
-        return 1
-    fi
-    if pgrep -x tailscaled >/dev/null 2>&1; then
-        echo "✅ tailscaled draait al"
+ensure_sshd_config_line() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+
+    if grep -Eq "^[[:space:]]*${key}[[:space:]]+${value}([[:space:]]*(#.*)?)?$" "$file"; then
         return 0
     fi
-    if command -v systemctl >/dev/null 2>&1; then
-        if [ "${HAVE_SUDO:-0}" -eq 1 ]; then
-            sudo systemctl enable tailscaled >/dev/null 2>&1 || true
-            sudo systemctl restart tailscaled >/dev/null 2>&1 || true
-        elif [ "$(id -u)" -eq 0 ]; then
-            systemctl enable tailscaled >/dev/null 2>&1 || true
-            systemctl restart tailscaled >/dev/null 2>&1 || true
-        else
-            echo "⚠️  Geen sudo/root; tailscaled niet gestart."
-            return 1
-        fi
-        sleep 1
-        return 0
-    fi
-    echo "⏳ tailscaled starten..."
-    if [ "$(id -u)" -eq 0 ]; then
-        tailscaled >/dev/null 2>&1 &
+
+    if grep -Eq "^[[:space:]]*#?[[:space:]]*${key}[[:space:]]+" "$file"; then
+        run_with_sudo sed -i -E "s|^[[:space:]]*#?[[:space:]]*${key}[[:space:]]+.*$|${key} ${value}|" "$file"
     else
-        echo "⚠️  Geen sudo/root; tailscaled niet gestart."
+        printf '%s %s\n' "$key" "$value" | run_with_sudo tee -a "$file" >/dev/null
+    fi
+}
+
+configure_ssh_hardening() {
+    local sshd_config="/etc/ssh/sshd_config"
+    if [ ! -f "$sshd_config" ]; then
+        echo "⚠️  $sshd_config niet gevonden; SSH hardening overgeslagen."
         return 1
     fi
-    sleep 1
+
+    echo "🔐 SSH hardening toepassen..."
+    ensure_sshd_config_line "Port" "${CF_SSH_PORT}" "$sshd_config"
+    ensure_sshd_config_line "PubkeyAuthentication" "yes" "$sshd_config"
+    ensure_sshd_config_line "PasswordAuthentication" "no" "$sshd_config"
+    ensure_sshd_config_line "PermitRootLogin" "no" "$sshd_config"
+    run_with_sudo systemctl restart ssh || run_with_sudo systemctl restart sshd
     return 0
+}
+
+configure_cloudflared_service() {
+    if ! command -v cloudflared >/dev/null 2>&1; then
+        return 1
+    fi
+    if [ "${HAVE_SUDO:-0}" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; cloudflared service niet geconfigureerd."
+        return 1
+    fi
+
+    if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^cloudflared\.service'; then
+        echo "ℹ️  Bestaande cloudflared service gevonden; bestaande registratie blijft behouden."
+    else
+        echo "🛠  cloudflared systemd service registreren..."
+        run_with_sudo cloudflared service install "${CF_TUNNEL_TOKEN}"
+    fi
+
+    run_with_sudo systemctl enable cloudflared
+    run_with_sudo systemctl start cloudflared
+    if command -v systemctl >/dev/null 2>&1 && ! systemctl is-active --quiet cloudflared; then
+        echo "❌ cloudflared service is niet actief na start."
+        return 1
+    fi
+
+    echo "✅ cloudflared service actief"
+    echo "🌐 Verwachte hostnames: ${CF_DEVICE_ID}.${CF_DOMAIN} en ssh-${CF_DEVICE_ID}.${CF_DOMAIN}"
+    echo "🔌 Lokale doelpoorten: SSH ${CF_SSH_PORT}, web ${CF_WEB_PORT}"
+    return 0
+}
+
+remove_legacy_tailscale() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    if [ "${HAVE_SUDO:-0}" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; oude Tailscale installatie niet verwijderd."
+        return 0
+    fi
+    echo "🧹 Oude Tailscale configuratie opruimen..."
+    if command -v systemctl >/dev/null 2>&1; then
+        if [ "$(id -u)" -eq 0 ]; then
+            systemctl stop tailscaled >/dev/null 2>&1 || true
+            systemctl disable tailscaled >/dev/null 2>&1 || true
+        else
+            sudo systemctl stop tailscaled >/dev/null 2>&1 || true
+            sudo systemctl disable tailscaled >/dev/null 2>&1 || true
+        fi
+    fi
+    if command -v apt-get >/dev/null 2>&1 && dpkg -s tailscale >/dev/null 2>&1; then
+        if [ "$(id -u)" -eq 0 ]; then
+            apt-get remove -y tailscale >/dev/null 2>&1 || true
+        else
+            sudo apt-get remove -y tailscale >/dev/null 2>&1 || true
+        fi
+    fi
 }
 
 configure_hostname() {
@@ -377,6 +476,7 @@ configure_hostname() {
 detect_platform
 echo "🖥  Gedetecteerd platform: ${DEVICE_PLATFORM}"
 export DEVICE_NAME_PREFIX DEVICE_NUMBER DEVICE_HOSTNAME DEVICE_MDNS DEVICE_PLATFORM
+export CF_DEVICE_ID CF_DOMAIN CF_SSH_PORT CF_WEB_PORT CF_TUNNEL_ENABLED
 
 case "$DEVICE_PLATFORM" in
     linux|jetson|macos)
@@ -474,14 +574,20 @@ echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="
 echo
 
-if should_setup_tailscale; then
-    echo "=== Tailscale Setup ==="
-    if install_tailscale; then
-        start_tailscaled || echo "⚠️  Kon tailscaled niet starten."
+if should_setup_cloudflared; then
+    echo "=== Cloudflare Tunnel Setup ==="
+    validate_cloudflare_tunnel
+    if install_cloudflared; then
+        if configure_cloudflared_service; then
+            configure_ssh_hardening || echo "⚠️  SSH hardening kon niet volledig worden toegepast."
+            remove_legacy_tailscale
+        else
+            echo "⚠️  cloudflared is geïnstalleerd, maar de host-service kon niet volledig worden geconfigureerd."
+        fi
     else
-        echo "⚠️  Tailscale niet beschikbaar; support werkt niet."
+        echo "⚠️  cloudflared niet beschikbaar; remote access werkt niet."
     fi
-    echo "======================="
+    echo "==============================="
     echo
 fi
 
@@ -522,7 +628,7 @@ PY
     fi
 fi
 BACKEND_BIND_HOST="${BACKEND_BIND_HOST:-0.0.0.0}"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
+BACKEND_PORT="${BACKEND_PORT:-${CF_WEB_PORT:-8000}}"
 if [ -z "${BACKEND_HTTP:-}" ] || [[ "$BACKEND_HTTP" == http://127.0.0.1* ]] || [[ "$BACKEND_HTTP" == http://localhost* ]]; then
     BACKEND_HTTP="http://$BACKEND_HOST:$BACKEND_PORT"
 fi
