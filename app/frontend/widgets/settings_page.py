@@ -116,6 +116,7 @@ class SettingsPage(QWidget):
         self._support_enable: QPushButton | None = None
         self._support_disable: QPushButton | None = None
         self._support_duration: QComboBox | None = None
+        self._support_last_payload: dict[str, object] | None = None
         self._wifi_status: QLabel | None = None
         self._wifi_open_button: QPushButton | None = None
         self._wifi_last_info: dict[str, str] | None = None
@@ -141,8 +142,11 @@ class SettingsPage(QWidget):
         self._builtin_modes = {"Developer", "Finance", "Law", "Child"}
         self._system_loading = False
         self._support_active = False
-        self._support_duration_keys = ["settings_30_min", "settings_1_hour", "settings_4_hours"]
-        self._support_duration_values = [30, 60, 240]
+        self._support_duration_keys = ["settings_30_min", "settings_1_hour", "settings_2_hours"]
+        self._support_duration_values = [30, 60, 120]
+        self._support_refresh_timer = QTimer(self)
+        self._support_refresh_timer.setInterval(30000)
+        self._support_refresh_timer.timeout.connect(self._load_support_status)
         self._wifi_refresh_timer = QTimer(self)
         self._wifi_refresh_timer.setInterval(15000)
         self._wifi_refresh_timer.timeout.connect(self._refresh_wifi_status)
@@ -167,6 +171,7 @@ class SettingsPage(QWidget):
         QTimer.singleShot(0, self._load_models)
         QTimer.singleShot(0, self._load_support_status)
         QTimer.singleShot(0, self._refresh_wifi_status)
+        self._support_refresh_timer.start()
         self._wifi_refresh_timer.start()
 
     def _system_tab(self) -> QWidget:
@@ -1431,7 +1436,7 @@ class SettingsPage(QWidget):
 
     def _fetch_support_status(self) -> dict:
         resp = requests.get(
-            f"{BACKEND_HTTP}/api/v1/support/ssh",
+            f"{BACKEND_HTTP}/api/support/tunnel",
             timeout=6,
             headers=self._auth_headers(),
         )
@@ -1469,9 +1474,9 @@ class SettingsPage(QWidget):
         self._apply_support_state(payload)
 
     def _post_support_enable(self, duration: int) -> dict:
-        payload = {"duration_minutes": duration}
+        payload = {"action": "open", "duration_minutes": duration}
         resp = requests.post(
-            f"{BACKEND_HTTP}/api/v1/support/ssh/enable",
+            f"{BACKEND_HTTP}/api/support/tunnel",
             json=payload,
             timeout=10,
             headers=self._auth_headers(),
@@ -1507,7 +1512,8 @@ class SettingsPage(QWidget):
 
     def _post_support_disable(self) -> dict:
         resp = requests.post(
-            f"{BACKEND_HTTP}/api/v1/support/ssh/disable",
+            f"{BACKEND_HTTP}/api/support/tunnel",
+            json={"action": "close"},
             timeout=10,
             headers=self._auth_headers(),
         )
@@ -1528,34 +1534,42 @@ class SettingsPage(QWidget):
         return str(exc)
 
     def _apply_support_state(self, payload: dict) -> None:
+        self._support_last_payload = dict(payload)
         active = bool(payload.get("active"))
-        session_id = payload.get("session_id")
+        port = payload.get("port")
         expires_at = self._format_support_timestamp(payload.get("expires_at"))
-        last_error = payload.get("last_error")
+        remaining = self._format_support_remaining(payload.get("expires_at"))
+        error = payload.get("error")
         self._support_active = active
         if self._support_status:
             if active:
-                parts = [t("settings_active")]
-                if expires_at:
-                    parts.append(f"{t('settings_until')} {expires_at}")
-                if session_id:
-                    parts.append(f"({t('settings_session')} {session_id})")
-                self._support_status.setText(" ".join(parts))
+                self._support_status.setText(
+                    t(
+                        "settings_support_active_message",
+                        port=port if port is not None else "-",
+                        expires_at=expires_at or "-",
+                        remaining=remaining or t("settings_support_expiring_now"),
+                    )
+                )
             else:
-                message = t("settings_disabled")
-                if last_error:
-                    message = f"{message} ({t('settings_last_error')} {last_error})"
+                message = t("settings_support_inactive_message")
+                if error:
+                    message = f"{message} {error}"
                 self._support_status.setText(message)
         if self._support_enable:
             self._support_enable.setEnabled(not active)
         if self._support_disable:
             self._support_disable.setEnabled(active)
+        if self._support_duration:
+            self._support_duration.setEnabled(not active)
 
     def _set_support_busy(self, busy: bool, message: str | None = None) -> None:
         if self._support_enable:
             self._support_enable.setEnabled(not busy and not self._support_active)
         if self._support_disable:
             self._support_disable.setEnabled(not busy and self._support_active)
+        if self._support_duration:
+            self._support_duration.setEnabled(not busy and not self._support_active)
         if message and self._support_status:
             self._support_status.setText(message)
 
@@ -1588,10 +1602,16 @@ class SettingsPage(QWidget):
             self._duration_label.setText(t("settings_duration"))
         if hasattr(self, "_support_hint"):
             self._support_hint.setText(t("settings_support_hint"))
+        if hasattr(self, "_support_duration") and self._support_duration:
+            for idx, key in enumerate(self._support_duration_keys):
+                if idx < self._support_duration.count():
+                    self._support_duration.setItemText(idx, t(key))
         if hasattr(self, "_support_enable"):
             self._support_enable.setText(t("settings_enable_support"))
         if hasattr(self, "_support_disable"):
             self._support_disable.setText(t("settings_stop_support"))
+        if hasattr(self, "_support_status") and self._support_status and self._support_last_payload is not None:
+            self._apply_support_state(self._support_last_payload)
         if hasattr(self, "_ollama_apply"):
             self._ollama_apply.setText(t("settings_use"))
         if hasattr(self, "_ollama_reset") and self._ollama_reset:
@@ -1662,6 +1682,27 @@ class SettingsPage(QWidget):
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone().strftime("%d-%m %H:%M")
+
+    @staticmethod
+    def _format_support_remaining(value: str | None) -> str:
+        if not value:
+            return ""
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return ""
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        remaining_seconds = int((parsed - datetime.now(timezone.utc)).total_seconds())
+        if remaining_seconds <= 0:
+            return ""
+        total_minutes = max(1, remaining_seconds // 60)
+        hours, minutes = divmod(total_minutes, 60)
+        if hours and minutes:
+            return t("settings_support_remaining_hours_minutes", hours=hours, minutes=minutes)
+        if hours:
+            return t("settings_support_remaining_hours", hours=hours)
+        return t("settings_support_remaining_minutes", minutes=total_minutes)
 
 
 class ModelSwitchSignals(QObject):

@@ -57,11 +57,11 @@ from .schemas import (
     DevicePatch,
     OllamaModelRequest,
     SignOnRequest,
-    SupportAccessRequest,
-    SupportAccessStatus,
+    SupportTunnelRequest,
+    SupportTunnelStatus,
 )
 from .settings import settings
-from .support_access import SupportAccessError, SupportAccessManager
+from .support_tunnel import SupportTunnelError, SupportTunnelManager
 
 logger = logging.getLogger(__name__)
 ENV_FILE_PATH = Path(
@@ -91,7 +91,7 @@ devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
 chat_history = ChatHistoryStore(max_items=20)
 ollama_switch_lock = asyncio.Lock()
-support_access = SupportAccessManager()
+support_tunnel = SupportTunnelManager(env_path=ENV_FILE_PATH)
 admin_tokens = AdminTokenManager(
     token_store=token_store,
     admin_usernames=settings.admin_usernames,
@@ -660,39 +660,22 @@ async def set_ollama_model_stream(
     )
 
 
-@app.get("/api/v1/support/ssh", response_model=SupportAccessStatus)
-def support_access_status(_: TokenRecord = Depends(require_admin_token)):
-    return support_access.status().to_response()
+@app.get("/api/support/tunnel", response_model=SupportTunnelStatus)
+def support_tunnel_status(_: TokenRecord = Depends(require_admin_token)):
+    return support_tunnel.status().to_response()
 
 
-@app.post("/api/v1/support/ssh/enable", response_model=SupportAccessStatus)
-def support_access_enable(
-    req: SupportAccessRequest,
-    record: TokenRecord = Depends(require_admin_token),
+@app.post("/api/support/tunnel", response_model=SupportTunnelStatus)
+def support_tunnel_action(
+    req: SupportTunnelRequest,
+    _: TokenRecord = Depends(require_admin_token),
 ):
     try:
-        state = support_access.enable(
-            duration_minutes=req.duration_minutes,
-            public_key=req.public_key,
-            ticket=req.ticket,
-            requested_by=record.user_name,
-        )
-    except SupportAccessError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    return state.to_response()
-
-
-@app.post("/api/v1/support/ssh/disable", response_model=SupportAccessStatus)
-def support_access_disable(
-    record: TokenRecord = Depends(require_admin_token),
-):
-    try:
-        state = support_access.disable(
-            requested_by=record.user_name,
-            reason="manual",
-            force=False,
-        )
-    except SupportAccessError as exc:
+        if req.action == "open":
+            state = support_tunnel.open(duration_minutes=req.duration_minutes or 60)
+        else:
+            state = support_tunnel.close()
+    except SupportTunnelError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return state.to_response()
 

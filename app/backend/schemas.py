@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class ChatMessage(BaseModel):
@@ -81,16 +81,21 @@ class ChatResetRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 
-class SupportAccessRequest(BaseModel):
-    duration_minutes: int = 60
-    public_key: Optional[str] = None
-    ticket: Optional[str] = None
+class SupportTunnelRequest(BaseModel):
+    action: Literal["open", "close"]
+    duration_minutes: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_action(self) -> "SupportTunnelRequest":
+        if self.action == "open" and self.duration_minutes not in {30, 60, 120}:
+            raise ValueError("duration_minutes moet 30, 60 of 120 zijn bij action=open.")
+        if self.action == "close":
+            self.duration_minutes = None
+        return self
 
 
-class SupportAccessStatus(BaseModel):
+class SupportTunnelStatus(BaseModel):
     active: bool
-    enabled_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
-    session_id: Optional[str] = None
-    requested_by: Optional[str] = None
-    last_error: Optional[str] = None
+    port: Optional[int] = None
+    error: Optional[str] = None

@@ -26,7 +26,6 @@ promptlog.log
 *.pmtiles
 
 ollama.pid
-support_access.json
 
 kennisbank_repo/
 kennisbank_cache.db

@@ -80,29 +80,12 @@ Clients op hetzelfde netwerk kunnen dan altijd `http://aitje-2.local:8000/...` b
 
 ---
 
-## 🧩 Remote support (Tailscale)
+## 🧩 Remote support
 
-Voor remote support zonder open poorten kun je Tailscale gebruiken. Het device maakt zelf een
-uitgaande verbinding; de UI zet dit tijdelijk aan/uit via de support-knop.
+Remote support loopt nu on-demand via een reverse SSH-tunnel met `autossh` naar een Hetzner jump server.
+De tunnel staat standaard uit en wordt alleen tijdelijk geopend vanuit de UI.
 
-**1) Installeer Tailscale op het device**
-
-Volg de officiële installatie-instructies voor Debian 13.
-
-**2) Zet env vars in `.env`**
-
-```env
-SUPPORT_SSH_HOOK=./scripts/support_tailscale_hook.sh
-TAILSCALE_AUTHKEY=tskey-xxxxxxxxxxxxxxxxxxxx
-TAILSCALE_HOSTNAME=aitje-2
-TAILSCALE_TAGS=tag:support
-TAILSCALE_ENABLE_SSH=1
-TAILSCALE_EPHEMERAL=1
-```
-
-**3) Gebruik de UI**
-
-Ga naar `Instellingen > Geavanceerd > Remote support (Tailscale)` en schakel tijdelijk in.
+De volledige setup staat in [docs/remote-support.md](/home/kees/Documents/loci-scientia/docs/remote-support.md).
 
 ---
 

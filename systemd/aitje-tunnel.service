@@ -1,0 +1,22 @@
+[Unit]
+Description=AITJE remote support tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aitje
+EnvironmentFile=/home/aitje/loci-scientia/.env
+ExecStart=/usr/bin/autossh -M 0 -N \
+  -o "ServerAliveInterval 30" \
+  -o "ServerAliveCountMax 3" \
+  -o "StrictHostKeyChecking accept-new" \
+  -o "ExitOnForwardFailure yes" \
+  -i ${TUNNEL_KEY_PATH} \
+  -R ${TUNNEL_PORT}:localhost:22 \
+  ${TUNNEL_USER}@${JUMP_SERVER_IP}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

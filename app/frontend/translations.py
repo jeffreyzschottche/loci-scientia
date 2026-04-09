@@ -241,8 +241,8 @@ TRANSLATIONS = {
         "en": "Chat Preferences",
     },
     "settings_tab_ssh": {
-        "nl": "SSH Support",
-        "en": "SSH Support",
+        "nl": "Remote support",
+        "en": "Remote support",
     },
     "settings_tab_wifi": {
         "nl": "Wifi",
@@ -416,17 +416,17 @@ TRANSLATIONS = {
         "nl": "1 uur",
         "en": "1 hour",
     },
-    "settings_4_hours": {
-        "nl": "4 uur",
-        "en": "4 hours",
+    "settings_2_hours": {
+        "nl": "2 uur",
+        "en": "2 hours",
     },
     "settings_loading_models": {
         "nl": "Beschikbare modellen laden...",
         "en": "Loading available models...",
     },
     "settings_support_hint": {
-        "nl": "Schakel dit alleen in overleg met het AITJE support team in. We starten tijdelijk een Tailscale-verbinding voor support en sluiten automatisch.",
-        "en": "Only enable this in coordination with the AITJE support team. We temporarily start a Tailscale connection for support and close automatically.",
+        "nl": "Schakel dit alleen in overleg met het AITJE support team in. We openen tijdelijk een reverse SSH-tunnel en sluiten die automatisch na afloop van de gekozen duur.",
+        "en": "Only enable this in coordination with the AITJE support team. We temporarily open a reverse SSH tunnel and close it automatically after the selected duration.",
     },
     "settings_support_status_loading": {
         "nl": "Support status laden...",
@@ -625,8 +625,8 @@ TRANSLATIONS = {
         "en": "Enable remote support",
     },
     "settings_enable_remote_support_confirm": {
-        "nl": "Dit opent tijdelijke SSH-toegang voor support. Schakel alleen in met expliciete toestemming. Doorgaan?",
-        "en": "This opens temporary SSH access for support. Enable only with explicit permission. Continue?",
+        "nl": "Dit opent tijdelijke remote support via een reverse SSH-tunnel. Schakel alleen in met expliciete toestemming. Doorgaan?",
+        "en": "This opens temporary remote support through a reverse SSH tunnel. Enable only with explicit permission. Continue?",
     },
     "settings_activating_support": {
         "nl": "Ondersteuning activeren...",
@@ -651,6 +651,30 @@ TRANSLATIONS = {
     "settings_active": {
         "nl": "Actief",
         "en": "Active",
+    },
+    "settings_support_active_message": {
+        "nl": "Actief op poort {port}. Sluit automatisch om {expires_at} ({remaining}).",
+        "en": "Active on port {port}. Closes automatically at {expires_at} ({remaining}).",
+    },
+    "settings_support_inactive_message": {
+        "nl": "Remote support staat uit.",
+        "en": "Remote support is off.",
+    },
+    "settings_support_remaining_minutes": {
+        "nl": "nog {minutes} min",
+        "en": "{minutes} min remaining",
+    },
+    "settings_support_remaining_hours": {
+        "nl": "nog {hours} uur",
+        "en": "{hours} hour(s) remaining",
+    },
+    "settings_support_remaining_hours_minutes": {
+        "nl": "nog {hours} uur {minutes} min",
+        "en": "{hours} hour(s) {minutes} min remaining",
+    },
+    "settings_support_expiring_now": {
+        "nl": "verloopt nu",
+        "en": "expiring now",
     },
     "settings_until": {
         "nl": "tot",

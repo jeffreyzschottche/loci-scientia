@@ -1,0 +1,1 @@
+aitje ALL=(root) NOPASSWD: /usr/bin/systemctl start aitje-tunnel, /usr/bin/systemctl stop aitje-tunnel, /usr/bin/systemctl is-active aitje-tunnel, /usr/bin/systemd-run *
