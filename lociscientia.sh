@@ -385,6 +385,23 @@ configure_cloudflared_service() {
     return 0
 }
 
+warn_support_hook_status() {
+    if [ -n "${SUPPORT_SSH_HOOK:-}" ]; then
+        if [ -x "${SUPPORT_SSH_HOOK}" ]; then
+            echo "✅ SUPPORT_SSH_HOOK geconfigureerd: ${SUPPORT_SSH_HOOK}"
+        else
+            echo "⚠️  SUPPORT_SSH_HOOK=${SUPPORT_SSH_HOOK}, maar het script is niet uitvoerbaar."
+            echo "⚠️  De knop voor remote support zal falen tot dit is hersteld."
+        fi
+        return 0
+    fi
+
+    echo "⚠️  SUPPORT_SSH_HOOK ontbreekt; remote support via de UI/API zal 501 geven."
+    echo "ℹ️  Volg CLOUDLFLARE_SETUP.md om scripts/support_cloudflare_hook.sh te installeren"
+    echo "   en zet daarna SUPPORT_SSH_HOOK in .env."
+    return 0
+}
+
 remove_legacy_tailscale() {
     case "$DEVICE_PLATFORM" in
         linux|jetson) ;;
@@ -581,6 +598,7 @@ if should_setup_cloudflared; then
         if configure_cloudflared_service; then
             configure_ssh_hardening || echo "⚠️  SSH hardening kon niet volledig worden toegepast."
             remove_legacy_tailscale
+            warn_support_hook_status
         else
             echo "⚠️  cloudflared is geïnstalleerd, maar de host-service kon niet volledig worden geconfigureerd."
         fi

@@ -1252,6 +1252,10 @@ class SettingsPage(QWidget):
             return {"Authorization": f"Bearer {BACKEND_BEARER_TOKEN}"}
         return {}
 
+    def _show_error_dialog_later(self, title: str, text: str, *, compact: bool = False) -> None:
+        # Avoid opening a nested modal dialog from inside a running asyncio task.
+        QTimer.singleShot(0, lambda: show_error_dialog(self, title, text, compact=compact))
+
     def _load_models(self) -> None:
         if not self._ollama_combo or not self._ollama_status:
             return
@@ -1459,11 +1463,17 @@ class SettingsPage(QWidget):
             )
         except requests.HTTPError as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, t("error"), self._support_error_message(exc))
+            message = self._support_error_message(exc)
+            if self._support_status:
+                self._support_status.setText(message)
+            self._show_error_dialog_later(t("error"), message)
             return
         except Exception as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, t("error"), str(exc))
+            message = str(exc)
+            if self._support_status:
+                self._support_status.setText(message)
+            self._show_error_dialog_later(t("error"), message)
             return
         self._set_support_busy(False)
         self._apply_support_state(payload)
@@ -1496,11 +1506,17 @@ class SettingsPage(QWidget):
             payload = await asyncio.to_thread(self._post_support_disable)
         except requests.HTTPError as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, t("error"), self._support_error_message(exc))
+            message = self._support_error_message(exc)
+            if self._support_status:
+                self._support_status.setText(message)
+            self._show_error_dialog_later(t("error"), message)
             return
         except Exception as exc:
             self._set_support_busy(False)
-            show_error_dialog(self, t("error"), str(exc))
+            message = str(exc)
+            if self._support_status:
+                self._support_status.setText(message)
+            self._show_error_dialog_later(t("error"), message)
             return
         self._set_support_busy(False)
         self._apply_support_state(payload)
