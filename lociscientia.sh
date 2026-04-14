@@ -256,20 +256,113 @@ ensure_remote_support_dependencies() {
     fi
     local missing_packages=()
     local package=""
-    for package in autossh openssh-client; do
+    for package in autossh openssh-client openssh-server; do
         if ! dpkg -s "$package" >/dev/null 2>&1; then
             missing_packages+=("$package")
         fi
     done
     if [ "${#missing_packages[@]}" -eq 0 ]; then
         echo "✅ Remote support dependencies zijn al geïnstalleerd"
+    else
+        echo "📦 Remote support dependencies installeren: ${missing_packages[*]}"
+        if [ "$(id -u)" -eq 0 ]; then
+            apt-get install -y "${missing_packages[@]}"
+        else
+            sudo apt-get install -y "${missing_packages[@]}"
+        fi
+    fi
+
+    if command -v systemctl >/dev/null 2>&1 && dpkg -s openssh-server >/dev/null 2>&1; then
+        if [ "$(id -u)" -eq 0 ]; then
+            systemctl enable ssh >/dev/null 2>&1 || true
+            systemctl restart ssh >/dev/null 2>&1 || true
+        else
+            sudo systemctl enable ssh >/dev/null 2>&1 || true
+            sudo systemctl restart ssh >/dev/null 2>&1 || true
+        fi
+    fi
+}
+
+ensure_remote_support_service() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; aitje-tunnel systemd service wordt niet automatisch geïnstalleerd."
         return 0
     fi
-    echo "📦 Remote support dependencies installeren: ${missing_packages[*]}"
-    if [ "$(id -u)" -eq 0 ]; then
-        apt-get install -y "${missing_packages[@]}"
+
+    local service_template="$PROJECT_ROOT/systemd/aitje-tunnel.service"
+    local sudoers_template="$PROJECT_ROOT/sudoers/aitje-tunnel"
+    local install_dir="/etc/systemd/system"
+    local install_path="$install_dir/aitje-tunnel.service"
+    local sudoers_dir="/etc/sudoers.d"
+    local sudoers_path="$sudoers_dir/aitje-tunnel"
+    local tmp_service
+    tmp_service="$(mktemp)"
+
+    local visudo_bin=""
+    if command -v visudo >/dev/null 2>&1; then
+        visudo_bin="$(command -v visudo)"
+    elif [ -x /usr/sbin/visudo ]; then
+        visudo_bin="/usr/sbin/visudo"
+    elif [ -x /sbin/visudo ]; then
+        visudo_bin="/sbin/visudo"
     else
-        sudo apt-get install -y "${missing_packages[@]}"
+        echo "⚠️  visudo niet gevonden; sudoers-regel wordt niet automatisch gevalideerd/geïnstalleerd."
+    fi
+
+    sed "s#__PROJECT_ROOT__#$PROJECT_ROOT#g" "$service_template" >"$tmp_service"
+
+    local service_changed=0
+    if [ ! -f "$install_path" ] || ! cmp -s "$tmp_service" "$install_path"; then
+        echo "🔧 aitje-tunnel systemd service installeren/updaten..."
+        if [ "$(id -u)" -eq 0 ]; then
+            install -D -m 0644 "$tmp_service" "$install_path"
+        else
+            sudo install -D -m 0644 "$tmp_service" "$install_path"
+        fi
+        service_changed=1
+    else
+        echo "✅ aitje-tunnel systemd service is al up-to-date"
+    fi
+    rm -f "$tmp_service"
+
+    local sudoers_changed=0
+    if [ -d "$sudoers_dir" ] && [ -n "$visudo_bin" ]; then
+        if [ ! -f "$sudoers_path" ] || ! cmp -s "$sudoers_template" "$sudoers_path"; then
+            echo "🔧 sudoers-regel voor aitje-tunnel installeren/updaten..."
+            local tmp_sudoers
+            tmp_sudoers="$(mktemp)"
+            cp "$sudoers_template" "$tmp_sudoers"
+            if [ "$(id -u)" -eq 0 ]; then
+                "$visudo_bin" -cf "$tmp_sudoers" >/dev/null
+                install -D -m 0440 "$tmp_sudoers" "$sudoers_path"
+            else
+                "$visudo_bin" -cf "$tmp_sudoers" >/dev/null
+                sudo install -D -m 0440 "$tmp_sudoers" "$sudoers_path"
+            fi
+            rm -f "$tmp_sudoers"
+            sudoers_changed=1
+        else
+            echo "✅ sudoers-regel voor aitje-tunnel is al up-to-date"
+        fi
+    elif [ ! -d "$sudoers_dir" ]; then
+        echo "⚠️  /etc/sudoers.d ontbreekt; sudoers-regel niet geïnstalleerd."
+    fi
+
+    if [ "$service_changed" -eq 1 ] || [ "$sudoers_changed" -eq 1 ]; then
+        echo "♻️  systemd configuratie herladen..."
+        if [ "$(id -u)" -eq 0 ]; then
+            systemctl daemon-reload
+        else
+            sudo systemctl daemon-reload
+        fi
     fi
 }
 
@@ -429,6 +522,7 @@ echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
 ensure_wifi_ui
 ensure_remote_support_dependencies
+ensure_remote_support_service
 configure_hostname
 echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="

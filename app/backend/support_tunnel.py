@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -189,6 +190,17 @@ class SupportTunnelManager:
                 status_code=500,
             )
 
+    def _require_local_ssh_server(self) -> None:
+        try:
+            with socket.create_connection(("127.0.0.1", 22), timeout=2):
+                return
+        except OSError as exc:
+            raise SupportTunnelError(
+                "Lokale SSH-server is niet bereikbaar op 127.0.0.1:22. "
+                "Installeer/start openssh-server op dit apparaat voordat je remote support activeert.",
+                status_code=500,
+            ) from exc
+
     def _sudo_prefix(self) -> list[str]:
         if os.geteuid() == 0:
             return []
@@ -240,10 +252,10 @@ class SupportTunnelManager:
         return result.returncode == 0 and result.stdout.strip() == "active"
 
     def _schedule_stop(self, duration_minutes: int) -> None:
+        self._cancel_pending_stop()
         self._run_root_command(
             "/usr/bin/systemd-run",
             f"--unit={self.timer_unit}",
-            "--replace",
             f"--on-active={duration_minutes}m",
             "/usr/bin/systemctl",
             "stop",
@@ -251,13 +263,13 @@ class SupportTunnelManager:
         )
 
     def _cancel_pending_stop(self) -> None:
-        self._run_root_command(
-            "/usr/bin/systemd-run",
-            f"--unit={self.timer_unit}",
-            "--replace",
-            "--on-active=1s",
-            "/usr/bin/true",
-        )
+        for unit_name in (self.timer_unit, f"{self.timer_unit}.timer", f"{self.timer_unit}.service"):
+            self._run_root_command(
+                "/usr/bin/systemctl",
+                "stop",
+                unit_name,
+                allowed_returncodes=(0, 5),
+            )
 
     def status(self) -> SupportTunnelState:
         state = self._load_state()
@@ -273,6 +285,7 @@ class SupportTunnelManager:
             allowed = ", ".join(str(value) for value in sorted(self.allowed_durations))
             raise SupportTunnelError(f"Duur moet een van deze waarden zijn: {allowed}.")
         self._require_runtime_tools(need_timer=True)
+        self._require_local_ssh_server()
         config = self._read_config(require_complete=True)
         if config is None:
             raise SupportTunnelError("Remote support configuratie ontbreekt.")

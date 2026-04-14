@@ -3,6 +3,11 @@ import asyncio
 import sys
 from typing import Optional
 
+_boot_video_mode = os.environ.get("LOCI_BOOT_VIDEO", "auto").strip().lower()
+_boot_video_enabled = _boot_video_mode in {"1", "true", "yes", "on"}
+if _boot_video_mode == "auto":
+    _boot_video_enabled = sys.platform not in {"linux", "linux2"}
+
 from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtGui import (
     QBrush,
@@ -15,11 +20,17 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
 )
-try:
-    from PySide6.QtCore import QUrl
-    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
-    from PySide6.QtMultimediaWidgets import QVideoWidget
-except Exception:  # pragma: no cover - optional multimedia support
+if _boot_video_enabled:
+    try:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+        from PySide6.QtMultimediaWidgets import QVideoWidget
+    except Exception:  # pragma: no cover - optional multimedia support
+        QAudioOutput = None
+        QMediaPlayer = None
+        QUrl = None
+        QVideoWidget = None
+else:  # pragma: no cover - boot video disabled by platform/env
     QAudioOutput = None
     QMediaPlayer = None
     QUrl = None

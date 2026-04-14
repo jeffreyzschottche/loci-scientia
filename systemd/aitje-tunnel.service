@@ -6,15 +6,15 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=aitje
-EnvironmentFile=/home/aitje/loci-scientia/.env
-ExecStart=/usr/bin/autossh -M 0 -N \
+WorkingDirectory=__PROJECT_ROOT__
+ExecStart=/bin/bash -lc 'source "__PROJECT_ROOT__/.env"; exec /usr/bin/autossh -M 0 -N \
   -o "ServerAliveInterval 30" \
   -o "ServerAliveCountMax 3" \
   -o "StrictHostKeyChecking accept-new" \
   -o "ExitOnForwardFailure yes" \
-  -i ${TUNNEL_KEY_PATH} \
-  -R ${TUNNEL_PORT}:localhost:22 \
-  ${TUNNEL_USER}@${JUMP_SERVER_IP}
+  -i "$TUNNEL_KEY_PATH" \
+  -R "$TUNNEL_PORT:localhost:22" \
+  "$TUNNEL_USER@$JUMP_SERVER_IP"'
 Restart=on-failure
 RestartSec=10
 
