@@ -305,15 +305,11 @@ class InsightsController extends Controller
     private function fetchDocumentsForExport(int $userId, ?string $category = null, ?string $versionTag = null): Collection
     {
         return Document::where('user_id', $userId)
-            ->whereNull('parent_id')
             ->where('status', 'formatted')
             ->when($category, fn ($q) => $q->where('category', $category))
             ->when($versionTag, fn ($q) => $q->where('version_tag', $versionTag))
             ->with([
                 'sections.chunks',
-                'sections.outgoingRelations.targetSection.document',
-                'outgoingRelations.targetDocument',
-                'children',
             ])
             ->orderBy('position')
             ->get();

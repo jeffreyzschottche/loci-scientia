@@ -55,13 +55,9 @@ class GitSyncService
     private function fetchDocuments(User $user): Collection
     {
         return Document::where('user_id', $user->id)
-            ->whereNull('parent_id')
             ->where('status', 'formatted')
             ->with([
                 'sections.chunks',
-                'sections.outgoingRelations.targetSection.document',
-                'outgoingRelations.targetDocument',
-                'children',
             ])
             ->orderBy('position')
             ->get();

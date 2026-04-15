@@ -1136,10 +1136,6 @@ TRANSLATIONS = {
         "nl": "Embeddings",
         "en": "Embeddings",
     },
-    "kb_vector_progress_relations": {
-        "nl": "Relaties",
-        "en": "Relations",
-    },
     "kb_optimal": {
         "nl": "Optimaal",
         "en": "Optimal",
@@ -1149,8 +1145,8 @@ TRANSLATIONS = {
         "en": "Knowledge Bank Documents",
     },
     "kb_documents_subtitle": {
-        "nl": "Bekijk documenten en open per document direct de gekoppelde relaties.",
-        "en": "Review documents and open their related items directly.",
+        "nl": "Bekijk documenten in de kennisbank.",
+        "en": "Review documents in the knowledge base.",
     },
     "kb_documents_search_placeholder": {
         "nl": "Zoek in documenten...",
@@ -1179,10 +1175,6 @@ TRANSLATIONS = {
     "kb_tab_documents": {
         "nl": "Documenten",
         "en": "Documents",
-    },
-    "kb_tab_relations": {
-        "nl": "Relaties",
-        "en": "Relations",
     },
     "kb_document": {
         "nl": "Document",
@@ -1336,30 +1328,6 @@ TRANSLATIONS = {
     "kb_table_content_date": {
         "nl": "Datum",
         "en": "Date",
-    },
-    "kb_table_relations": {
-        "nl": "Relaties",
-        "en": "Relations",
-    },
-    "kb_relations_title": {
-        "nl": "Document relaties",
-        "en": "Document relations",
-    },
-    "kb_relations_for": {
-        "nl": "Relaties voor {document}",
-        "en": "Relations for {document}",
-    },
-    "kb_relations_target": {
-        "nl": "Doel",
-        "en": "Target",
-    },
-    "kb_relations_type": {
-        "nl": "Type",
-        "en": "Type",
-    },
-    "kb_relations_none": {
-        "nl": "Geen relaties gevonden",
-        "en": "No relations found",
     },
 
     # ============================================

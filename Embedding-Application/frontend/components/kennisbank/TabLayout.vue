@@ -24,15 +24,6 @@
               {{ translate('Bibliotheek', 'Library') }}
             </NuxtLink>
             <NuxtLink
-              to="/kennisbank/relations"
-              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
-              :class="isActive('/kennisbank/relations')
-                ? 'bg-loci-yellow text-loci-black-deep'
-                : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
-            >
-              {{ translate('Relaties', 'Relations') }}
-            </NuxtLink>
-            <NuxtLink
               to="/kennisbank/priorities"
               class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
               :class="isActive('/kennisbank/priorities')
