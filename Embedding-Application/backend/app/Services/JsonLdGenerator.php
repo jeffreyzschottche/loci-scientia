@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Document;
 use App\Models\DocumentSection;
 use App\Models\DocumentChunk;
-use App\Models\DocumentRelation;
-use App\Models\SectionRelation;
 use App\Support\JsonLd\DocumentSerializer;
 use App\Support\JsonLd\SectionSerializer;
 use App\Support\JsonLd\ChunkSerializer;
@@ -52,9 +50,8 @@ class JsonLdGenerator
     public function generateManifest(?string $category = null, ?string $versionTag = null): array
     {
         $query = Document::query()
-            ->whereNull('parent_id') // Only root documents
             ->where('status', 'formatted')
-            ->with(['sections.chunks', 'children', 'outgoingRelations.targetDocument']);
+            ->with(['sections.chunks']);
 
         if ($category) {
             $query->where('category', $category);
@@ -90,63 +87,7 @@ class JsonLdGenerator
             ],
             'hasPart' => $documents->map(fn ($doc) => $this->forDocument($doc, true, true))->all(),
             'statistics' => $this->generateStatistics($documents),
-            'documentRelations' => $this->generateRelationsGraph($documents),
         ];
-    }
-
-    /**
-     * Generate a graph representation of all document relations.
-     */
-    private function generateRelationsGraph(Collection $documents): array
-    {
-        $relations = [];
-
-        foreach ($documents as $doc) {
-            foreach ($doc->outgoingRelations as $relation) {
-                $targetDoc = $relation->targetDocument;
-                if (!$targetDoc) {
-                    continue;
-                }
-
-                $relations[] = [
-                    '@type' => 'LinkRole',
-                    'source' => "doc:{$doc->doc_id}",
-                    'target' => "doc:{$targetDoc->doc_id}",
-                    'linkRelationship' => $relation->relation_type,
-                    'description' => DocumentRelation::labelFor($relation->relation_type),
-                ];
-            }
-        }
-
-        return $relations;
-    }
-
-    private function generateSectionRelationsGraph(Collection $documents): array
-    {
-        $relations = [];
-
-        foreach ($documents as $document) {
-            foreach ($document->sections as $section) {
-                foreach ($section->outgoingRelations as $relation) {
-                    $targetSection = $relation->targetSection;
-                    $targetDocument = $targetSection?->document;
-
-                    if (! $targetSection || ! $targetDocument) {
-                        continue;
-                    }
-
-                    $relations[] = [
-                        '@type' => 'LinkRole',
-                        'source' => "sec:{$document->doc_id}#{$section->slug}",
-                        'target' => "sec:{$targetDocument->doc_id}#{$targetSection->slug}",
-                        'linkRelationship' => $relation->relation_type,
-                        'description' => SectionRelation::types()[$relation->relation_type] ?? $relation->relation_type,
-                    ];
-                }
-            }
-        }
-
-        return $relations;
     }
 
     /**
@@ -195,8 +136,6 @@ class JsonLdGenerator
         $files['manifest.json'] = $this->generateManifestFromDocuments($documents);
         $files['model.json'] = $modelMeta;
         $files['statistics.json'] = $this->generateStatistics($documents);
-        $files['relations/documents.json'] = $this->generateRelationsGraph($documents);
-        $files['relations/sections.json'] = $this->generateSectionRelationsGraph($documents);
 
         $documentsByCategory = $documents->groupBy(fn ($doc) => $doc->category ?? 'uncategorized');
         foreach ($documentsByCategory as $category => $group) {
@@ -255,8 +194,6 @@ class JsonLdGenerator
     public function generateTree(?int $userId = null): array
     {
         $query = Document::query()
-            ->whereNull('parent_id')
-            ->with('children')
             ->orderBy('position');
 
         if ($userId) {

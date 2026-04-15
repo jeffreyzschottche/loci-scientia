@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import type {
   Document,
   DocumentSection,
-  DocumentRelation,
   TreeNode,
   KennisbankStats,
   Export,
@@ -12,12 +11,8 @@ import type {
   SectionResponse,
   StatsResponse,
   StatusResponse,
-  RelationTypesResponse,
   ExportsResponse,
   CategoriesResponse,
-  GraphNode,
-  GraphEdge,
-  GraphResponse,
   PriorityCategoriesResponse,
   PriorityUpdate,
 } from '~/types/Kennisbank';
@@ -30,19 +25,12 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
   const selectedSection = ref<DocumentSection | null>(null);
   const stats = ref<KennisbankStats | null>(null);
   const categories = ref<Record<string, number>>({});
-  const relationTypes = ref<Record<string, string>>({});
-  const documentRelationTypes = ref<Record<string, string>>({});
   const exports = ref<Export[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
   // Upload state
   const uploadProgress = ref<Map<number, StatusResponse>>(new Map());
-
-  // Graph state (for mindmap)
-  const graphNodes = ref<GraphNode[]>([]);
-  const graphEdges = ref<GraphEdge[]>([]);
-  const graphCategories = ref<Record<string, string[]>>({});
 
   // Priority state
   const priorityCategories = ref<Record<string, Document[]>>({});
@@ -70,7 +58,6 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     category?: string;
     version_tag?: string;
     description?: string;
-    parent_id?: number;
   } = {}) {
     const formData = new FormData();
     formData.append('file', file);
@@ -78,7 +65,6 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     if (metadata.category) formData.append('category', metadata.category);
     if (metadata.version_tag) formData.append('version_tag', metadata.version_tag);
     if (metadata.description) formData.append('description', metadata.description);
-    if (metadata.parent_id) formData.append('parent_id', String(metadata.parent_id));
 
     const response = await api.post<DocumentResponse>('/documents', formData);
     documents.value.unshift(response.document);
@@ -150,42 +136,6 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     return response.section;
   }
 
-  async function moveDocument(documentId: number, parentId: number | null, position?: number) {
-    const response = await api.patch<{ document: Document }>(`/library/documents/${documentId}/move`, {
-      parent_id: parentId,
-      position,
-    });
-    updateDocumentInState(response.document);
-    await fetchTree(); // Refresh tree
-    return response.document;
-  }
-
-  async function addRelation(sectionId: number, targetSectionId: number, relationType: string) {
-    const response = await api.post<{ relation: any }>(`/library/sections/${sectionId}/relations`, {
-      target_section_id: targetSectionId,
-      relation_type: relationType,
-    });
-    // Refresh section to get updated relations
-    if (selectedSection.value?.id === sectionId) {
-      await fetchSection(sectionId);
-    }
-    return response.relation;
-  }
-
-  async function removeRelation(relationId: number) {
-    await api.delete(`/library/relations/${relationId}`);
-    // Refresh current section if selected
-    if (selectedSection.value) {
-      await fetchSection(selectedSection.value.id);
-    }
-  }
-
-  async function fetchRelationTypes() {
-    const response = await api.get<RelationTypesResponse>('/library/relation-types');
-    relationTypes.value = response.types;
-    return response.types;
-  }
-
   async function searchSections(query: string, category?: string) {
     const params = new URLSearchParams({ query });
     if (category) params.append('category', category);
@@ -236,49 +186,6 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     return response.exports;
   }
 
-  // Actions - Document Relations (Mindmap)
-  async function fetchGraph() {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      const response = await api.get<GraphResponse>('/relations/graph');
-      graphNodes.value = response.nodes;
-      graphEdges.value = response.edges;
-      graphCategories.value = response.categories;
-      return response;
-    } catch (e: any) {
-      error.value = e.message;
-      throw e;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  async function fetchDocumentRelationTypes() {
-    const response = await api.get<RelationTypesResponse>('/relations/types');
-    documentRelationTypes.value = response.types;
-    return response.types;
-  }
-
-  async function createDocumentRelation(
-    sourceDocumentId: number,
-    targetDocumentId: number,
-    relationType: string
-  ) {
-    const response = await api.post<{ relation: DocumentRelation }>('/relations', {
-      source_document_id: sourceDocumentId,
-      target_document_id: targetDocumentId,
-      relation_type: relationType,
-    });
-    await fetchGraph(); // Refresh graph
-    return response.relation;
-  }
-
-  async function deleteDocumentRelation(relationId: number) {
-    await api.delete(`/relations/${relationId}`);
-    await fetchGraph(); // Refresh graph
-  }
-
   // Actions - Priorities
   async function fetchPriorities() {
     isLoading.value = true;
@@ -305,7 +212,7 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
 
   async function bulkUpdatePriorities(priorities: PriorityUpdate[]) {
     await api.post('/priorities/bulk', { priorities });
-    await fetchPriorities(); // Refresh
+    await fetchPriorities();
   }
 
   // Helper
@@ -329,15 +236,10 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     selectedSection,
     stats,
     categories,
-    relationTypes,
-    documentRelationTypes,
     exports,
     isLoading,
     error,
     uploadProgress,
-    graphNodes,
-    graphEdges,
-    graphCategories,
     priorityCategories,
 
     // Actions
@@ -352,10 +254,6 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     fetchSection,
     updateDocument,
     updateSection,
-    moveDocument,
-    addRelation,
-    removeRelation,
-    fetchRelationTypes,
     searchSections,
     fetchStats,
     fetchCategories,
@@ -364,11 +262,6 @@ export const useKennisbankStore = defineStore('kennisbank', () => {
     createExport,
     fetchExports,
     clearSelection,
-    // Graph/Relations
-    fetchGraph,
-    fetchDocumentRelationTypes,
-    createDocumentRelation,
-    deleteDocumentRelation,
     // Priorities
     fetchPriorities,
     updateDocumentPriority,

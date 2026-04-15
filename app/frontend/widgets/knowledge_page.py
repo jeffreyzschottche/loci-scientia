@@ -175,7 +175,6 @@ class KnowledgePage(QWidget):
 
         self._documents_data: list[dict] = []
         self._filtered_documents_data: list[dict] = []
-        self._relations_map: dict[str, list[dict]] = {}
         self._sync_state: dict | None = None
         self._preview_cache: dict[str, dict] = {}
         self._latest_stats: dict | None = None
@@ -220,7 +219,6 @@ class KnowledgePage(QWidget):
         vector_labels = [
             t("kb_vector_progress_storage"),
             t("kb_vector_progress_embeddings"),
-            t("kb_vector_progress_relations"),
         ]
         for idx, label in enumerate(self._vector_entry_labels):
             if idx < len(vector_labels):
@@ -229,8 +227,6 @@ class KnowledgePage(QWidget):
             if idx == 0:
                 label.setText("0 GB / 0 GB")
             elif idx == 1:
-                label.setText("0 / 0 docs")
-            elif idx == 2:
                 label.setText("0 / 0 docs")
 
         if self._documents_title_label:
@@ -445,7 +441,6 @@ class KnowledgePage(QWidget):
         rows = [
             t("kb_vector_progress_storage"),
             t("kb_vector_progress_embeddings"),
-            t("kb_vector_progress_relations"),
         ]
         for label_text in rows:
             block = QVBoxLayout()
@@ -638,7 +633,6 @@ class KnowledgePage(QWidget):
             return
 
         self._documents_data = data.get("documents", []) or []
-        self._relations_map = data.get("relations", {}) or {}
         self._filtered_documents_data = list(self._documents_data)
         self._populate_documents_table()
         if self._latest_stats is not None or self._latest_qdrant is not None:
@@ -786,28 +780,22 @@ class KnowledgePage(QWidget):
             int((stats or {}).get("document_count") or 0),
         )
         total_chunks = int((stats or {}).get("chunk_count") or 0)
-        docs_with_relations = sum(1 for doc in self._documents_data if self._relations_map.get(doc.get("doc_id", "")))
         qdrant_size_bytes = self._directory_size(_knowledge_embedded_path())
         disk_total, disk_used, disk_free = self._disk_usage(_knowledge_embedded_path())
         model = (stats or {}).get("model", {}).get("model") if stats else None
 
-        if len(self._vector_progress_bars) >= 3:
+        if len(self._vector_progress_bars) >= 2:
             storage_pct = int((disk_used / disk_total) * 100) if disk_total else 0
             possible_chunks = self._estimated_possible_units(qdrant_size_bytes, disk_free, total_chunks)
             embeddings_pct = int((total_chunks / possible_chunks) * 100) if possible_chunks else 0
-            relations_pct = int((docs_with_relations / total_docs) * 100) if total_docs else 0
             self._vector_progress_bars[0].setValue(max(0, min(100, storage_pct)))
             self._vector_progress_bars[1].setValue(max(0, min(100, embeddings_pct)))
-            self._vector_progress_bars[2].setValue(max(0, min(100, relations_pct)))
-        if len(self._vector_value_summary_labels) >= 3:
+        if len(self._vector_value_summary_labels) >= 2:
             self._vector_value_summary_labels[0].setText(
                 f"{self._format_gb(disk_used)} / {self._format_gb(disk_total)}"
             )
             self._vector_value_summary_labels[1].setText(
                 f"{total_chunks} / {self._estimated_possible_units(qdrant_size_bytes, disk_free, total_chunks)} chunks"
-            )
-            self._vector_value_summary_labels[2].setText(
-                f"{docs_with_relations} / {total_docs} docs"
             )
 
         if self._sync_meta_label:

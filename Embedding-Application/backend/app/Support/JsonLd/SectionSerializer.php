@@ -3,7 +3,6 @@
 namespace App\Support\JsonLd;
 
 use App\Models\DocumentSection;
-use App\Models\SectionRelation;
 
 class SectionSerializer
 {
@@ -14,7 +13,7 @@ class SectionSerializer
     /**
      * Serialize a section to JSON-LD format.
      */
-    public function serialize(DocumentSection $section, bool $includeChunks = false, bool $includeRelations = true): array
+    public function serialize(DocumentSection $section, bool $includeChunks = false): array
     {
         $document = $section->document;
 
@@ -30,15 +29,6 @@ class SectionSerializer
             ],
         ];
 
-        // Add relations
-        if ($includeRelations) {
-            $relations = $this->serializeRelations($section);
-            if (!empty($relations)) {
-                $jsonLd['relatedLink'] = $relations;
-            }
-        }
-
-        // Add chunks if requested
         if ($includeChunks) {
             $chunks = $section->chunks()->orderBy('chunk_index')->get();
             if ($chunks->isNotEmpty()) {
@@ -46,35 +36,11 @@ class SectionSerializer
             }
         }
 
-        // Add metadata if present
         if ($section->metadata) {
             $jsonLd['additionalProperty'] = $this->serializeMetadata($section->metadata);
         }
 
         return $jsonLd;
-    }
-
-    /**
-     * Serialize section relations.
-     */
-    private function serializeRelations(DocumentSection $section): array
-    {
-        $relations = [];
-
-        // Outgoing relations
-        foreach ($section->outgoingRelations as $relation) {
-            $targetSection = $relation->targetSection;
-            $targetDocument = $targetSection->document;
-
-            $relations[] = [
-                '@type' => 'LinkRole',
-                '@id' => "sec:{$targetDocument->doc_id}#{$targetSection->slug}",
-                'linkRelationship' => $relation->relation_type,
-                'name' => $targetSection->title,
-            ];
-        }
-
-        return $relations;
     }
 
     /**

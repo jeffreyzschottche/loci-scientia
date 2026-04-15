@@ -12,7 +12,6 @@ export type ProcessingStage =
 export interface Document {
   id: number;
   user_id: number;
-  parent_id: number | null;
   position: number;
   priority: number;
   doc_id: string;
@@ -34,11 +33,7 @@ export interface Document {
   processing_progress: number;
   created_at: string;
   updated_at: string;
-  children?: Document[];
-  parent?: Document | null;
   sections?: DocumentSection[];
-  outgoing_relations?: DocumentRelation[];
-  incoming_relations?: DocumentRelation[];
 }
 
 // Section
@@ -53,8 +48,6 @@ export interface DocumentSection {
   created_at: string;
   updated_at: string;
   chunks?: DocumentChunk[];
-  outgoing_relations?: SectionRelation[];
-  incoming_relations?: SectionRelation[];
 }
 
 // Chunk
@@ -70,56 +63,6 @@ export interface DocumentChunk {
   metadata: Record<string, any> | null;
   created_at: string;
   updated_at: string;
-}
-
-// Section Relation
-export interface SectionRelation {
-  id: number;
-  source_section_id: number;
-  target_section_id: number;
-  relation_type: string;
-  metadata: Record<string, any> | null;
-  created_at: string;
-  updated_at: string;
-  source_section?: DocumentSection;
-  target_section?: DocumentSection;
-}
-
-// Document Relation (for mindmap)
-export interface DocumentRelation {
-  id: number;
-  source_document_id: number;
-  target_document_id: number;
-  relation_type: string;
-  metadata: Record<string, any> | null;
-  created_at: string;
-  updated_at: string;
-  source_document?: Document;
-  target_document?: Document;
-}
-
-// Graph data for mindmap visualization
-export interface GraphNode {
-  id: string;
-  doc_id: string;
-  title: string;
-  category: string | null;
-  position: number;
-  priority: number;
-}
-
-export interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  relation_type: string;
-  label: string;
-}
-
-export interface GraphResponse {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  categories: Record<string, string[]>;
 }
 
 // Priority management
@@ -204,10 +147,6 @@ export interface StatusResponse {
   is_ready: boolean;
   has_failed: boolean;
   error: string | null;
-}
-
-export interface RelationTypesResponse {
-  types: Record<string, string>;
 }
 
 export interface ExportsResponse {

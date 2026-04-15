@@ -3,7 +3,6 @@
 namespace App\Support\JsonLd;
 
 use App\Models\Document;
-use App\Models\DocumentRelation;
 
 class DocumentSerializer
 {
@@ -27,7 +26,6 @@ class DocumentSerializer
             'dateModified' => $document->updated_at->toIso8601String(),
         ];
 
-        // Add optional fields
         if ($document->description) {
             $jsonLd['description'] = $document->description;
         }
@@ -52,37 +50,13 @@ class DocumentSerializer
             $jsonLd['inLanguage'] = $document->language;
         }
 
-        // Add hierarchy info
-        if ($document->parent_id) {
-            $jsonLd['isPartOf'] = [
-                '@id' => "doc:{$document->parent->doc_id}",
-            ];
-        }
-
-        // Add children if any
-        $children = $document->children;
-        if ($children->isNotEmpty()) {
-            $jsonLd['hasPart'] = $children->map(fn ($child) => [
-                '@type' => 'Article',
-                '@id' => "doc:{$child->doc_id}",
-                'name' => $child->title,
-            ])->all();
-        }
-
-        // Add sections
         if ($includeSections) {
             $sections = $document->sections()->orderBy('order_index')->get();
             if ($sections->isNotEmpty()) {
-                // Replace hasPart with sections if no children
-                if ($children->isEmpty()) {
-                    $jsonLd['hasPart'] = $this->sectionSerializer->serializeMany($sections, $includeChunks);
-                } else {
-                    $jsonLd['mainEntity'] = $this->sectionSerializer->serializeMany($sections, $includeChunks);
-                }
+                $jsonLd['hasPart'] = $this->sectionSerializer->serializeMany($sections, $includeChunks);
             }
         }
 
-        // Add priority
         if ($document->priority > 0) {
             $jsonLd['position'] = $document->priority;
             $additionalProperties = $jsonLd['additionalProperty'] ?? [];
@@ -94,14 +68,6 @@ class DocumentSerializer
             $jsonLd['additionalProperty'] = $additionalProperties;
         }
 
-        // Add document-level relations
-        $document->loadMissing('outgoingRelations.targetDocument');
-        $relations = $this->serializeDocumentRelations($document);
-        if (!empty($relations)) {
-            $jsonLd['relatedLink'] = $relations;
-        }
-
-        // Add metadata
         if ($document->metadata) {
             $metadataProps = $this->serializeMetadata($document->metadata);
             $jsonLd['additionalProperty'] = array_merge(
@@ -111,31 +77,6 @@ class DocumentSerializer
         }
 
         return $jsonLd;
-    }
-
-    /**
-     * Serialize document-level relations as LinkRole objects.
-     */
-    private function serializeDocumentRelations(Document $document): array
-    {
-        $relations = [];
-
-        foreach ($document->outgoingRelations as $relation) {
-            $targetDoc = $relation->targetDocument;
-            if (!$targetDoc) {
-                continue;
-            }
-
-            $relations[] = [
-                '@type' => 'LinkRole',
-                '@id' => "doc:{$targetDoc->doc_id}",
-                'linkRelationship' => $relation->relation_type,
-                'name' => $targetDoc->title,
-                'description' => DocumentRelation::labelFor($relation->relation_type),
-            ];
-        }
-
-        return $relations;
     }
 
     /**
@@ -152,11 +93,6 @@ class DocumentSerializer
 
         if ($document->category) {
             $jsonLd['articleSection'] = $document->category;
-        }
-
-        $children = $document->children;
-        if ($children->isNotEmpty()) {
-            $jsonLd['hasPart'] = $children->map(fn ($child) => $this->serializeTree($child))->all();
         }
 
         return $jsonLd;

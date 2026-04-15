@@ -76,39 +76,8 @@ def _load_sqlite_documents() -> List[Dict[str, Any]]:
     return documents
 
 
-def _load_document_relations() -> Dict[str, List[Dict[str, Any]]]:
-    relations_dir = _knowledge_base_root() / "relations"
-    rel_file = relations_dir / "documents.json"
-    if not rel_file.exists():
-        return {}
-
-    try:
-        data = _read_json(rel_file)
-    except json.JSONDecodeError:
-        return {}
-
-    relations: Dict[str, List[Dict[str, Any]]] = {}
-    entries = data if isinstance(data, list) else data.get("relations", [])
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        source = _strip_doc_prefix(entry.get("source"))
-        target = _strip_doc_prefix(entry.get("target"))
-        if not source or not target:
-            continue
-        relations.setdefault(source, []).append(
-            {
-                "target": target,
-                "relationship": entry.get("linkRelationship"),
-                "description": entry.get("description"),
-            }
-        )
-    return relations
-
-
 def get_library_overview() -> Dict[str, Any]:
     documents = _load_sqlite_documents()
-    relations = _load_document_relations()
 
     categories: Dict[str, Dict[str, Any]] = {}
     for doc in documents:
@@ -125,7 +94,6 @@ def get_library_overview() -> Dict[str, Any]:
     return {
         "documents": documents,
         "categories": list(categories.values()),
-        "relations": relations,
     }
 
 

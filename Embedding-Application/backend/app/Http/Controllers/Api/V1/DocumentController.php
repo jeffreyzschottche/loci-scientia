@@ -39,8 +39,6 @@ class DocumentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $documents = Document::where('user_id', $request->user()->id)
-            ->whereNull('parent_id') // Only root documents
-            ->with('children')
             ->orderBy('position')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -61,7 +59,6 @@ class DocumentController extends Controller
             'content_date' => 'nullable|date',
             'language' => 'nullable|string|max:10',
             'description' => 'nullable|string|max:1000',
-            'parent_id' => 'nullable|exists:documents,id',
         ]);
 
         $file = $request->file('file');
@@ -96,7 +93,6 @@ class DocumentController extends Controller
 
         $document = Document::create([
             'user_id' => $request->user()->id,
-            'parent_id' => $request->input('parent_id'),
             'doc_id' => $docId,
             'title' => $request->input('title', $originalName),
             'category' => $request->input('category'),
@@ -135,7 +131,7 @@ class DocumentController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $document->load(['sections.chunks', 'children', 'parent']);
+        $document->load(['sections.chunks']);
 
         return response()->json(['document' => $document]);
     }

@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\LibraryController;
 use App\Http\Controllers\Api\V1\InsightsController;
 use App\Http\Controllers\Api\V1\KennisbankController;
-use App\Http\Controllers\Api\V1\RelationController;
 use App\Http\Controllers\Api\V1\PriorityController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,17 +41,12 @@ Route::prefix('v1')->group(function () {
         Route::prefix('library')->group(function () {
             Route::get('/tree', [LibraryController::class, 'tree']);
             Route::get('/search', [LibraryController::class, 'search']);
-            Route::get('/relation-types', [LibraryController::class, 'relationTypes']);
 
             Route::get('/documents/{document}', [LibraryController::class, 'document']);
             Route::patch('/documents/{document}', [LibraryController::class, 'updateDocument']);
-            Route::patch('/documents/{document}/move', [LibraryController::class, 'moveDocument']);
 
             Route::get('/sections/{section}', [LibraryController::class, 'section']);
             Route::patch('/sections/{section}', [LibraryController::class, 'updateSection']);
-            Route::post('/sections/{section}/relations', [LibraryController::class, 'addRelation']);
-
-            Route::delete('/relations/{relation}', [LibraryController::class, 'removeRelation']);
         });
 
         // Insights API
@@ -66,14 +60,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/exports', [InsightsController::class, 'createExport']);
             Route::get('/exports', [InsightsController::class, 'listExports']);
             Route::get('/exports/{export}/download', [InsightsController::class, 'downloadExport']);
-        });
-
-        // Document Relations API (for mindmap)
-        Route::prefix('relations')->group(function () {
-            Route::get('/graph', [RelationController::class, 'graph']);
-            Route::get('/types', [RelationController::class, 'types']);
-            Route::post('/', [RelationController::class, 'store']);
-            Route::delete('/{relation}', [RelationController::class, 'destroy']);
         });
 
         // Priority API
