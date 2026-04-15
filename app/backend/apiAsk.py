@@ -15,7 +15,7 @@ import httpx
 
 from .devices_repo import DevicesRepository
 from .knowledge_repository import KnowledgeRepository
-from .schemas import ChatMessage, ChatRequest, Device, PromptDocument
+from .schemas import ChatMessage, ChatRequest, Device, HistoryDocument, PromptDocument
 from .settings import settings
 from .translations import t
 
@@ -46,6 +46,9 @@ MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_DOCUMENT_BYTES = 12 * 1024 * 1024
 MAX_DOCUMENT_CHARS = 40_000
 MAX_TOTAL_DOCUMENT_CHARS = 100_000
+MAX_HISTORY_DOCUMENT_CHARS = 12_000
+MAX_HISTORY_DOCUMENT_CHARS_PER_DOC = 4_000
+MAX_HISTORY_IMAGES = 8
 THINKING_MODEL_MARKERS = (
     "qwen3",
     "qwen 3",
@@ -452,9 +455,49 @@ def _format_document_context_lines(documents: Optional[Sequence[ParsedDocument]]
         return []
     lines: list[str] = []
     for index, document in enumerate(documents, 1):
-        lines.append(f"{index}. [{document.file_type}] {document.filename}")
-        lines.append(document.text)
+        lines.append(f"- Document {index}: {document.filename} [{document.file_type}]")
+        kenmerken = f"{len(document.text)} tekens uit {document.source_bytes} bytes"
+        if document.truncated:
+            kenmerken = f"{kenmerken}; ingekort"
+        lines.append(f"  Kenmerken: {kenmerken}.")
+        lines.append("  Geextracteerde inhoud:")
+        for text_line in document.text.splitlines() or [""]:
+            lines.append(f"  {text_line}")
     return lines
+
+
+def history_documents_from_parsed(
+    documents: Optional[Sequence[ParsedDocument]],
+) -> list[HistoryDocument]:
+    if not documents:
+        return []
+
+    history_documents: list[HistoryDocument] = []
+    remaining_chars = MAX_HISTORY_DOCUMENT_CHARS
+
+    for document in documents:
+        if remaining_chars <= 0:
+            break
+        text = (document.text or "").strip()
+        if not text:
+            continue
+        limit = min(MAX_HISTORY_DOCUMENT_CHARS_PER_DOC, remaining_chars)
+        truncated = document.truncated
+        if len(text) > limit:
+            text = text[:limit]
+            truncated = True
+        remaining_chars -= len(text)
+        history_documents.append(
+            HistoryDocument(
+                filename=document.filename,
+                file_type=document.file_type,
+                text=text,
+                source_bytes=document.source_bytes,
+                truncated=truncated,
+            )
+        )
+
+    return history_documents
 
 
 def _document_details(documents: Optional[Sequence[ParsedDocument]]) -> List[Dict[str, Any]]:
@@ -472,6 +515,44 @@ def _document_details(documents: Optional[Sequence[ParsedDocument]]) -> List[Dic
             }
         )
     return details
+
+
+def _format_history_document_lines(documents: Optional[Sequence[HistoryDocument]]) -> list[str]:
+    if not documents:
+        return []
+    lines: list[str] = []
+    lines.append(f"[Documenten: {len(documents)}]")
+    for index, document in enumerate(documents, 1):
+        kenmerken = f"{len(document.text)} tekens uit {document.source_bytes} bytes"
+        if document.truncated:
+            kenmerken = f"{kenmerken}; ingekort"
+        lines.append(f"- Document {index}: {document.filename} [{document.file_type}]")
+        lines.append(f"  Kenmerken: {kenmerken}.")
+        lines.append("  Geextracteerde inhoud:")
+        for text_line in document.text.splitlines() or [""]:
+            lines.append(f"  {text_line}")
+    return lines
+
+
+def _format_attachment_context_lines(
+    *,
+    images_count: int = 0,
+    documents: Optional[Sequence[ParsedDocument]] = None,
+) -> list[str]:
+    if images_count <= 0 and not documents:
+        return []
+
+    lines = ["> bijlagen:"]
+    if images_count > 0:
+        noun = "afbeelding" if images_count == 1 else "afbeeldingen"
+        verb = "is" if images_count == 1 else "zijn"
+        lines.append(
+            f"- Er {verb} {images_count} {noun} meegestuurd. "
+            "De visuele inhoud is apart beschikbaar voor het model; baseer visuele claims alleen op wat echt zichtbaar is."
+        )
+
+    lines.extend(_format_document_context_lines(documents))
+    return lines
 
 
 def _context_terms(value: str) -> set[str]:
@@ -733,16 +814,52 @@ def _format_history_lines(history: Optional[Sequence[ChatMessage]]) -> list[str]
             speaker = t("speaker_system")
         else:
             speaker = t("speaker_user")
+        content_parts: list[str] = []
         content = _flatten_multiline(message.content or "")
+        if content:
+            content_parts.append(content)
         images_count = len(getattr(message, "images", []) or [])
         if images_count > 0:
             marker = f"[Afbeeldingen: {images_count}]"
-            if marker not in content:
-                content = f"{content}\n{marker}" if content else marker
-        if not content:
+            if marker not in content_parts:
+                content_parts.append(marker)
+        document_lines = _format_history_document_lines(getattr(message, "documents", []) or [])
+        if document_lines:
+            content_parts.extend(document_lines)
+        if not content_parts:
             continue
-        lines.append(f"{idx}. {speaker}: {content}")
+        rendered = "\n".join(content_parts)
+        lines.append(f"{idx}. {speaker}: {rendered}")
     return lines
+
+
+def collect_prompt_images(
+    history: Optional[Sequence[ChatMessage]] = None,
+    current_images: Optional[Sequence[str]] = None,
+) -> list[str]:
+    previous_images: list[str] = []
+    seen: set[str] = set()
+
+    for message in history or []:
+        for image in getattr(message, "images", []) or []:
+            data = (image or "").strip()
+            if not data or data in seen:
+                continue
+            seen.add(data)
+            previous_images.append(data)
+
+    if len(previous_images) > MAX_HISTORY_IMAGES:
+        previous_images = previous_images[-MAX_HISTORY_IMAGES:]
+        seen = set(previous_images)
+
+    combined = list(previous_images)
+    for image in current_images or []:
+        data = (image or "").strip()
+        if not data or data in seen:
+            continue
+        seen.add(data)
+        combined.append(data)
+    return combined
 
 
 
@@ -773,6 +890,11 @@ def build_augmented_prompt_with_details(
 ) -> tuple[str, Dict[str, List]]:
     """Build augmented prompt AND return context details for logging."""
     base_lines: list[str] = []
+    template = _prompt_template(mode=mode)
+    if template:
+        base_lines.append(template)
+        base_lines.append("")
+
     base_lines.extend(_system_prompt_lines())
     base_lines.append("")
 
@@ -782,23 +904,22 @@ def build_augmented_prompt_with_details(
         base_lines.extend(history_lines)
         base_lines.append("")
 
-    base_lines.append(f"{t('current_question')} {user_prompt.strip()}")
-    if images_count > 0:
-        base_lines.append(f"Bijgevoegde afbeeldingen: {images_count}")
-    document_lines = _format_document_context_lines(documents)
-    if document_lines:
-        base_lines.append("> document context:")
-        base_lines.extend(document_lines)
+    attachment_lines = _format_attachment_context_lines(
+        images_count=images_count,
+        documents=documents,
+    )
+    if attachment_lines:
+        base_lines.extend(attachment_lines)
+        base_lines.append("")
 
     context_lines, context_details = _gather_context_with_details(user_prompt)
     context_details["documents"] = _document_details(documents)
     if context_lines:
         base_lines.append("> context:")
         base_lines.extend(context_lines)
-    template = _prompt_template(mode=mode)
-    if template:
         base_lines.append("")
-        base_lines.append(template)
+
+    base_lines.append(f"{t('current_question')} {user_prompt.strip()}")
     return "\n".join(base_lines).strip(), context_details
 
 
@@ -1007,18 +1128,19 @@ async def handle_ask(
     final_prompt_override: Optional[str] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
-    images = normalize_images(req.images)
+    current_images = normalize_images(req.images)
+    prompt_images = collect_prompt_images(history_to_use, current_images=current_images)
     final_prompt = final_prompt_override or build_augmented_prompt(
         req.prompt,
         history_to_use,
-        images_count=len(images),
+        images_count=len(current_images),
         documents=documents,
         mode=req.mode,
     )
     log_prompt(final_prompt)
     thinking = ""
     try:
-        result = await _call_ollama(final_prompt, images=images, thinking=req.thinking)
+        result = await _call_ollama(final_prompt, images=prompt_images, thinking=req.thinking)
         message = result.get("message", "").strip()
         thinking = result.get("thinking", "").strip()
     except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout

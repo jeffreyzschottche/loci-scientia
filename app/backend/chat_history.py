@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Dict, List, Optional
 
-from .schemas import ChatMessage
+from .schemas import ChatMessage, HistoryDocument
 
 
 def _utcnow() -> datetime:
@@ -61,10 +61,12 @@ class ChatHistoryStore:
         role: str,
         content: str,
         images: Optional[List[str]] = None,
+        documents: Optional[List[HistoryDocument]] = None,
     ) -> None:
         clean = (content or "").strip()
         image_list = [item for item in (images or []) if item]
-        if not key or (not clean and not image_list):
+        document_list = [item for item in (documents or []) if item]
+        if not key or (not clean and not image_list and not document_list):
             return
         with self._lock:
             record = self._data.get(key)
@@ -76,6 +78,7 @@ class ChatHistoryStore:
                     role=role,
                     content=clean,
                     images=list(image_list),
+                    documents=list(document_list),
                 )
             )
             if len(record.messages) > self._max_items:
@@ -147,6 +150,10 @@ class ChatHistoryStore:
             if record.summarized_at != expected_summarized_at:
                 return False
             record.summary = clean
-            record.messages = [msg for msg in record.messages if getattr(msg, "images", None)]
+            record.messages = [
+                msg
+                for msg in record.messages
+                if getattr(msg, "images", None) or getattr(msg, "documents", None)
+            ]
             record.summarized_at = _utcnow()
             return True
