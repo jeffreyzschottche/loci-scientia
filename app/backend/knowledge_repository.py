@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import sqlite3
@@ -18,6 +19,8 @@ _QUERY_STOPWORDS = {
     "over", "te", "tot", "uit", "van", "vertel", "voor", "wat", "we", "wel", "wie", "wil",
     "wordt", "ze", "zelf", "zich", "zijn", "zo", "zou", "allemaal", "product", "producten",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeRepository:
@@ -48,17 +51,27 @@ class KnowledgeRepository:
         except Exception:
             return []
 
-        with get_qdrant_client(self._embedded_path) as client:
-            try:
-                response = client.query_points(
-                    collection_name=self.collection,
-                    query=vector,
-                    limit=limit,
-                    with_payload=True,
-                )
-                results = response.points if hasattr(response, "points") else []
-            except Exception:
-                return []
+        try:
+            client_context = get_qdrant_client(self._embedded_path)
+        except Exception as exc:
+            logger.warning("Opening Qdrant knowledge store failed: %s", exc)
+            return []
+
+        try:
+            with client_context as client:
+                try:
+                    response = client.query_points(
+                        collection_name=self.collection,
+                        query=vector,
+                        limit=limit,
+                        with_payload=True,
+                    )
+                    results = response.points if hasattr(response, "points") else []
+                except Exception:
+                    return []
+        except Exception as exc:
+            logger.warning("Querying Qdrant knowledge store failed: %s", exc)
+            return []
 
         hits: List[Tuple[Dict, float]] = []
         for point in results or []:

@@ -2,12 +2,6 @@
   "mode": "interactive_v1",
   "samples": [
     {
-      "timestamp": "2026-03-29T00:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
       "timestamp": "2026-03-29T00:45:00+00:00",
       "requests_today": 0,
       "active_users_today": 0,
@@ -300,6 +294,12 @@
       "requests_today": 1,
       "active_users_today": 1,
       "avg_response_ms": 324538
+    },
+    {
+      "timestamp": "2026-04-15T17:44:11.796753+00:00",
+      "requests_today": 5,
+      "active_users_today": 1,
+      "avg_response_ms": 165158
     }
   ]
 }
