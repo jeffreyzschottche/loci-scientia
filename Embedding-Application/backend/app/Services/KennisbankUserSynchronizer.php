@@ -29,7 +29,7 @@ class KennisbankUserSynchronizer
         ]);
 
         if ($needsPasswordUpdate) {
-            $user->password = $password;
+            $user->password = Hash::make($password);
         }
 
         $user->save();
