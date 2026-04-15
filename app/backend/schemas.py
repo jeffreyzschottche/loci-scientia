@@ -8,6 +8,15 @@ class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"] = "user"
     content: str
     images: list[str] = Field(default_factory=list)
+    documents: list["HistoryDocument"] = Field(default_factory=list)
+
+
+class HistoryDocument(BaseModel):
+    filename: str
+    file_type: str
+    text: str
+    source_bytes: int = 0
+    truncated: bool = False
 
 
 class PromptDocument(BaseModel):

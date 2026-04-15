@@ -11,12 +11,12 @@ TRANSLATIONS = {
     # AI Prompt templates
     "prompt_default_template": {
         "nl": (
-            "Je bent de AITJE assistent. Gebruik context waar mogelijk, "
+            "Je bent een behulpzame assistent. Gebruik context en bijlagen waar mogelijk, "
             "maar verzin niets als er geen relevante context beschikbaar is. "
             "Leg je antwoord duidelijk uit en antwoord in het Nederlands."
         ),
         "en": (
-            "You are the AITJE assistant. Use context where possible, "
+            "You are a helpful assistant. Use context and attachments where possible, "
             "but don't make anything up if there's no relevant context available. "
             "Explain your answer clearly and respond in English."
         ),
