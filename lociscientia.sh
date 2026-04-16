@@ -528,12 +528,95 @@ echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="
 echo
 
-echo "=== Ollama Setup ==="
-if install_ollama; then
-    start_ollama || echo "⚠️  Kon Ollama niet starten, app draait zonder LLM support"
-else
-    echo "⚠️  App draait zonder Ollama support"
-fi
+## ── FastFlowLM (FLM) ─────────────────────────────────────────────────────────
+
+install_flm() {
+    if ! command -v flm >/dev/null 2>&1; then
+        echo "⚠️  FLM (flm) niet gevonden. Installeer het .deb pakket handmatig."
+        echo "    Zie: https://www.amd.com/en/developer/resources/ryzen-ai-software.html"
+        return 1
+    fi
+    echo "✅ FLM is al geïnstalleerd"
+    return 0
+}
+
+flm_pid=""
+start_flm() {
+    if ! command -v flm >/dev/null 2>&1; then
+        echo "⚠️  FLM niet beschikbaar, overslaan..."
+        return 1
+    fi
+
+    local model="${FLM_MODEL:-gemma3:4b}"
+    local flm_url="${FLM_BASE_URL:-http://127.0.0.1:52625/v1}"
+
+    # Check of NPU driver geladen is
+    if ! lspci -d 1022:17f0 >/dev/null 2>&1; then
+        echo "⚠️  AMD NPU (1022:17f0) niet gevonden via lspci. FLM vereist een XDNA2 NPU."
+    fi
+
+    # Check of flm serve al draait
+    if pgrep -f "flm serve" >/dev/null 2>&1; then
+        echo "✅ FLM serve draait al"
+        return 0
+    fi
+
+    echo "⏳ FLM server starten met model $model..."
+
+    # Pull model als het er nog niet is
+    if ! flm list 2>/dev/null | grep -q "$model"; then
+        echo "📥 Model $model downloaden via FLM..."
+        if flm pull "$model"; then
+            echo "✅ Model $model gedownload"
+        else
+            echo "⚠️  FLM model download mislukt."
+            return 1
+        fi
+    else
+        echo "✅ Model $model is al beschikbaar"
+    fi
+
+    flm serve "$model" > "$PROJECT_ROOT/flm.log" 2>&1 &
+    flm_pid=$!
+    echo "$flm_pid" > "$PROJECT_ROOT/flm.pid" 2>/dev/null || true
+    echo "✅ FLM server gestart (PID: $flm_pid)"
+
+    # Wacht tot FLM bereikbaar is
+    local max_wait=60
+    local waited=0
+    while [ "$waited" -lt "$max_wait" ]; do
+        if curl -sf "$flm_url/models" >/dev/null 2>&1; then
+            echo "✅ FLM server is bereikbaar"
+            return 0
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    echo "⚠️  FLM kwam niet op tijd op (${max_wait}s)."
+    return 1
+}
+
+## ── LLM backend selectie ─────────────────────────────────────────────────────
+
+INFERENCE_BACKEND="${INFERENCE_BACKEND:-ollama}"
+
+echo "=== LLM Backend Setup (${INFERENCE_BACKEND}) ==="
+case "$INFERENCE_BACKEND" in
+    flm)
+        if install_flm; then
+            start_flm || echo "⚠️  Kon FLM niet starten, app draait zonder LLM support"
+        else
+            echo "⚠️  App draait zonder FLM support"
+        fi
+        ;;
+    *)
+        if install_ollama; then
+            start_ollama || echo "⚠️  Kon Ollama niet starten, app draait zonder LLM support"
+        else
+            echo "⚠️  App draait zonder Ollama support"
+        fi
+        ;;
+esac
 echo "===================="
 echo
 
@@ -631,6 +714,11 @@ cleanup() {
     if [ -n "${ollama_pid:-}" ]; then
         echo "🛑 Ollama stoppen..."
         kill "$ollama_pid" >/dev/null 2>&1 || true
+    fi
+
+    if [ -n "${flm_pid:-}" ]; then
+        echo "🛑 FLM stoppen..."
+        kill "$flm_pid" >/dev/null 2>&1 || true
     fi
 
     case "$DEVICE_PLATFORM" in

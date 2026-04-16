@@ -58,11 +58,21 @@ BACKEND_BEARER_TOKEN = _ENV_BEARER_TOKEN.strip()
 
 API_ROUTES_DEFAULT_PORT = int(os.environ.get("API_ROUTES_DEFAULT_PORT", str(BACKEND_PORT)))
 
+INFERENCE_BACKEND = os.environ.get("INFERENCE_BACKEND", "ollama").lower()
+
 OLLAMA_MODELS = [
     model.strip()
     for model in os.environ.get("OLLAMA_MODELS", "").split(",")
     if model.strip()
 ]
+
+FLM_MODELS = [
+    model.strip()
+    for model in os.environ.get("FLM_MODELS", "").split(",")
+    if model.strip()
+]
+
+LLM_MODELS = FLM_MODELS if INFERENCE_BACKEND == "flm" else OLLAMA_MODELS
 
 PROMPT_MODES = [
     mode.strip()

@@ -1,0 +1,17 @@
+[Unit]
+Description=FastFlowLM inference server (AITJE)
+After=network.target
+
+[Service]
+Type=simple
+User=aitje
+WorkingDirectory=/home/aitje
+EnvironmentFile=/home/aitje/loci-scientia/.env
+ExecStart=/usr/local/bin/flm serve ${FLM_MODEL}
+Restart=on-failure
+RestartSec=5
+# NPU vereist hoge memlock limit
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target

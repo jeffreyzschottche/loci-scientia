@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS, PROMPT_MODES
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, LLM_MODELS, OLLAMA_MODELS, PROMPT_MODES
 from ..translations import get_current_language, register_language_change_callback, set_language, t
 from .dialog_style import OverlayDialog, ask_yes_no_dialog, show_error_dialog
 
@@ -1273,7 +1273,7 @@ class SettingsPage(QWidget):
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            fallback = OLLAMA_MODELS
+            fallback = LLM_MODELS
             if fallback:
                 self._current_model = fallback[0]
                 self._saved_model = fallback[0]

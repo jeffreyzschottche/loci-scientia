@@ -47,15 +47,44 @@ class Settings(BaseModel):
     port: int = 8000
     ws_path: str = "/ws"
     offline_assets_dir: Optional[Path] = None
+    # -- inference backend selection ----------------------------------------
+    inference_backend: str = "ollama"  # "ollama" or "flm"
+    # -- Ollama settings ----------------------------------------------------
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "gemma3:4b"
     ollama_models: list[str] = ["gemma3:4b"]
     ollama_kv_cache_type: Optional[str] = None
     ollama_max_context: dict[str, Optional[int]] = Field(default_factory=dict)
     ollama_timeout: float = 180.0
+    # -- FastFlowLM settings ------------------------------------------------
+    flm_base_url: str = "http://127.0.0.1:52625/v1"
+    flm_api_key: str = "flm"
+    flm_model: str = "gemma3:4b"
+    flm_models: list[str] = ["gemma3:4b"]
+    flm_timeout: float = 180.0
+    # -- general ------------------------------------------------------------
     admin_usernames: list[str] = ["ADMIN"]
     chat_summary_idle_minutes: int = 0
     prompt_modes: list[str] = ["Developer", "Finance", "Law", "Child"]
+
+    @property
+    def active_model(self) -> str:
+        return self.flm_model if self.inference_backend == "flm" else self.ollama_model
+
+    @active_model.setter
+    def active_model(self, value: str) -> None:
+        if self.inference_backend == "flm":
+            self.flm_model = value
+        else:
+            self.ollama_model = value
+
+    @property
+    def active_models(self) -> list[str]:
+        return self.flm_models if self.inference_backend == "flm" else self.ollama_models
+
+    @property
+    def active_timeout(self) -> float:
+        return self.flm_timeout if self.inference_backend == "flm" else self.ollama_timeout
 
 
 def get_settings() -> "Settings":
@@ -63,6 +92,11 @@ def get_settings() -> "Settings":
     offline_assets_dir: Optional[Path] = None
     if assets_dir:
         offline_assets_dir = Path(assets_dir).expanduser().resolve()
+
+    # -- inference backend --------------------------------------------------
+    inference_backend = os.environ.get("INFERENCE_BACKEND", "ollama").lower()
+
+    # -- Ollama config ------------------------------------------------------
     ollama_base_url = (
         os.environ.get("OLLAMA_BASE_URL")
         or os.environ.get("OLLAMA_HOST")
@@ -87,6 +121,21 @@ def get_settings() -> "Settings":
         ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "180"))
     except ValueError:
         ollama_timeout = 180.0
+
+    # -- FastFlowLM config --------------------------------------------------
+    flm_base_url = os.environ.get("FLM_BASE_URL", "http://127.0.0.1:52625/v1").rstrip("/")
+    flm_api_key = os.environ.get("FLM_API_KEY", "flm")
+    flm_model = os.environ.get("FLM_MODEL") or "gemma3:4b"
+    raw_flm_models = os.environ.get("FLM_MODELS", "")
+    flm_models = [m.strip() for m in raw_flm_models.split(",") if m.strip()]
+    if flm_model not in flm_models:
+        flm_models.insert(0, flm_model)
+    try:
+        flm_timeout = float(os.environ.get("FLM_TIMEOUT", "180"))
+    except ValueError:
+        flm_timeout = 180.0
+
+    # -- general config -----------------------------------------------------
     raw_admins = os.environ.get("ADMIN_USERS", "ADMIN")
     admin_usernames = [name.strip() for name in raw_admins.split(",") if name.strip()]
     raw_idle_summary = os.environ.get("CHAT_SUMMARY_IDLE_MINUTES", "").strip()
@@ -102,12 +151,18 @@ def get_settings() -> "Settings":
         prompt_modes = ["Developer", "Finance", "Law", "Child"]
     return Settings(
         offline_assets_dir=offline_assets_dir,
+        inference_backend=inference_backend,
         ollama_base_url=ollama_base_url,
         ollama_model=ollama_model,
         ollama_models=ollama_models,
         ollama_kv_cache_type=ollama_kv_cache_type,
         ollama_max_context=ollama_max_context,
         ollama_timeout=ollama_timeout,
+        flm_base_url=flm_base_url,
+        flm_api_key=flm_api_key,
+        flm_model=flm_model,
+        flm_models=flm_models,
+        flm_timeout=flm_timeout,
         admin_usernames=admin_usernames or ["ADMIN"],
         chat_summary_idle_minutes=chat_summary_idle_minutes,
         prompt_modes=prompt_modes,
