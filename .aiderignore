@@ -1,0 +1,7 @@
+cat <<EOF > .aiderignore
+.venv/
+__pycache__/
+node_modules/
+.git/
+kennisbank_repo/
+EOF

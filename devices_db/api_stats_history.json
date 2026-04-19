@@ -2,288 +2,6 @@
   "mode": "interactive_v1",
   "samples": [
     {
-      "timestamp": "2026-03-29T00:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T01:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T01:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T01:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T01:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T02:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T02:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T02:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T02:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T03:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T03:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T03:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T03:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T04:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T04:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T04:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T04:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T05:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T05:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T05:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T05:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T06:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T06:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T06:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T06:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T07:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T07:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T07:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T07:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T08:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T08:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T08:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T08:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T09:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T09:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T09:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T09:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T10:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T10:15:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T10:30:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T10:45:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T11:00:00+00:00",
-      "requests_today": 0,
-      "active_users_today": 0,
-      "avg_response_ms": 0
-    },
-    {
-      "timestamp": "2026-03-29T11:15:00+00:00",
-      "requests_today": 1,
-      "active_users_today": 1,
-      "avg_response_ms": 32323
-    },
-    {
-      "timestamp": "2026-03-29T11:30:19.338018+00:00",
-      "requests_today": 2,
-      "active_users_today": 1,
-      "avg_response_ms": 21855
-    },
-    {
-      "timestamp": "2026-03-29T12:55:26.213878+00:00",
-      "requests_today": 3,
-      "active_users_today": 1,
-      "avg_response_ms": 19440
-    },
-    {
-      "timestamp": "2026-03-29T12:56:12.085878+00:00",
-      "requests_today": 4,
-      "active_users_today": 1,
-      "avg_response_ms": 19893
-    },
-    {
-      "timestamp": "2026-03-29T13:11:18.266087+00:00",
-      "requests_today": 5,
-      "active_users_today": 1,
-      "avg_response_ms": 19960
-    },
-    {
       "timestamp": "2026-03-29T13:31:26.635903+00:00",
       "requests_today": 7,
       "active_users_today": 1,
@@ -300,6 +18,288 @@
       "requests_today": 5,
       "active_users_today": 1,
       "avg_response_ms": 165158
+    },
+    {
+      "timestamp": "2026-04-17T19:44:49.769816+00:00",
+      "requests_today": 1,
+      "active_users_today": 1,
+      "avg_response_ms": 20701
+    },
+    {
+      "timestamp": "2026-04-17T19:46:54.460994+00:00",
+      "requests_today": 2,
+      "active_users_today": 2,
+      "avg_response_ms": 15946
+    },
+    {
+      "timestamp": "2026-04-17T19:50:54.753763+00:00",
+      "requests_today": 3,
+      "active_users_today": 3,
+      "avg_response_ms": 14839
+    },
+    {
+      "timestamp": "2026-04-17T19:52:58.538974+00:00",
+      "requests_today": 4,
+      "active_users_today": 3,
+      "avg_response_ms": 18504
+    },
+    {
+      "timestamp": "2026-04-17T19:57:29.341857+00:00",
+      "requests_today": 5,
+      "active_users_today": 4,
+      "avg_response_ms": 31795
+    },
+    {
+      "timestamp": "2026-04-17T20:01:01.990115+00:00",
+      "requests_today": 6,
+      "active_users_today": 4,
+      "avg_response_ms": 37489
+    },
+    {
+      "timestamp": "2026-04-17T20:03:12.948803+00:00",
+      "requests_today": 7,
+      "active_users_today": 4,
+      "avg_response_ms": 37885
+    },
+    {
+      "timestamp": "2026-04-17T20:05:49.007746+00:00",
+      "requests_today": 8,
+      "active_users_today": 5,
+      "avg_response_ms": 38024
+    },
+    {
+      "timestamp": "2026-04-17T20:10:33.377532+00:00",
+      "requests_today": 9,
+      "active_users_today": 5,
+      "avg_response_ms": 38250
+    },
+    {
+      "timestamp": "2026-04-17T20:11:52.442885+00:00",
+      "requests_today": 11,
+      "active_users_today": 5,
+      "avg_response_ms": 41920
+    },
+    {
+      "timestamp": "2026-04-17T20:13:05.706163+00:00",
+      "requests_today": 11,
+      "active_users_today": 5,
+      "avg_response_ms": 50470
+    },
+    {
+      "timestamp": "2026-04-18T11:45:39.911113+00:00",
+      "requests_today": 1,
+      "active_users_today": 1,
+      "avg_response_ms": 21736
+    },
+    {
+      "timestamp": "2026-04-18T11:46:10.025064+00:00",
+      "requests_today": 2,
+      "active_users_today": 1,
+      "avg_response_ms": 16592
+    },
+    {
+      "timestamp": "2026-04-18T11:59:30.437418+00:00",
+      "requests_today": 3,
+      "active_users_today": 2,
+      "avg_response_ms": 11344
+    },
+    {
+      "timestamp": "2026-04-18T11:59:52.246123+00:00",
+      "requests_today": 4,
+      "active_users_today": 3,
+      "avg_response_ms": 9897
+    },
+    {
+      "timestamp": "2026-04-18T12:04:40.264144+00:00",
+      "requests_today": 5,
+      "active_users_today": 3,
+      "avg_response_ms": 11251
+    },
+    {
+      "timestamp": "2026-04-18T12:15:18.952656+00:00",
+      "requests_today": 6,
+      "active_users_today": 3,
+      "avg_response_ms": 12630
+    },
+    {
+      "timestamp": "2026-04-18T12:16:52.966111+00:00",
+      "requests_today": 7,
+      "active_users_today": 4,
+      "avg_response_ms": 13455
+    },
+    {
+      "timestamp": "2026-04-18T12:17:41.232368+00:00",
+      "requests_today": 8,
+      "active_users_today": 4,
+      "avg_response_ms": 14244
+    },
+    {
+      "timestamp": "2026-04-18T12:19:19.765861+00:00",
+      "requests_today": 9,
+      "active_users_today": 4,
+      "avg_response_ms": 14186
+    },
+    {
+      "timestamp": "2026-04-18T12:19:59.760724+00:00",
+      "requests_today": 11,
+      "active_users_today": 4,
+      "avg_response_ms": 13852
+    },
+    {
+      "timestamp": "2026-04-18T12:20:42.318374+00:00",
+      "requests_today": 12,
+      "active_users_today": 4,
+      "avg_response_ms": 14708
+    },
+    {
+      "timestamp": "2026-04-18T12:22:08.546513+00:00",
+      "requests_today": 13,
+      "active_users_today": 4,
+      "avg_response_ms": 15498
+    },
+    {
+      "timestamp": "2026-04-18T12:23:55.695938+00:00",
+      "requests_today": 14,
+      "active_users_today": 4,
+      "avg_response_ms": 17932
+    },
+    {
+      "timestamp": "2026-04-18T16:09:12.660505+00:00",
+      "requests_today": 15,
+      "active_users_today": 5,
+      "avg_response_ms": 19705
+    },
+    {
+      "timestamp": "2026-04-18T16:09:51.308863+00:00",
+      "requests_today": 16,
+      "active_users_today": 5,
+      "avg_response_ms": 19773
+    },
+    {
+      "timestamp": "2026-04-18T16:18:57.080729+00:00",
+      "requests_today": 17,
+      "active_users_today": 6,
+      "avg_response_ms": 23326
+    },
+    {
+      "timestamp": "2026-04-18T17:13:13.774381+00:00",
+      "requests_today": 18,
+      "active_users_today": 6,
+      "avg_response_ms": 24048
+    },
+    {
+      "timestamp": "2026-04-18T17:13:58.752956+00:00",
+      "requests_today": 19,
+      "active_users_today": 6,
+      "avg_response_ms": 23531
+    },
+    {
+      "timestamp": "2026-04-18T17:14:39.257907+00:00",
+      "requests_today": 20,
+      "active_users_today": 6,
+      "avg_response_ms": 23569
+    },
+    {
+      "timestamp": "2026-04-18T17:22:01.096313+00:00",
+      "requests_today": 25,
+      "active_users_today": 8,
+      "avg_response_ms": 23149
+    },
+    {
+      "timestamp": "2026-04-18T17:22:42.229466+00:00",
+      "requests_today": 26,
+      "active_users_today": 8,
+      "avg_response_ms": 23077
+    },
+    {
+      "timestamp": "2026-04-18T17:24:15.299681+00:00",
+      "requests_today": 28,
+      "active_users_today": 9,
+      "avg_response_ms": 22617
+    },
+    {
+      "timestamp": "2026-04-18T17:24:40.823983+00:00",
+      "requests_today": 29,
+      "active_users_today": 9,
+      "avg_response_ms": 22318
+    },
+    {
+      "timestamp": "2026-04-18T17:25:16.193261+00:00",
+      "requests_today": 30,
+      "active_users_today": 9,
+      "avg_response_ms": 22327
+    },
+    {
+      "timestamp": "2026-04-18T17:25:48.312448+00:00",
+      "requests_today": 31,
+      "active_users_today": 9,
+      "avg_response_ms": 22246
+    },
+    {
+      "timestamp": "2026-04-18T17:26:17.505687+00:00",
+      "requests_today": 32,
+      "active_users_today": 9,
+      "avg_response_ms": 22195
+    },
+    {
+      "timestamp": "2026-04-18T17:26:40.849347+00:00",
+      "requests_today": 33,
+      "active_users_today": 9,
+      "avg_response_ms": 21978
+    },
+    {
+      "timestamp": "2026-04-18T17:27:45.545970+00:00",
+      "requests_today": 34,
+      "active_users_today": 9,
+      "avg_response_ms": 22428
+    },
+    {
+      "timestamp": "2026-04-18T17:39:57.329804+00:00",
+      "requests_today": 35,
+      "active_users_today": 10,
+      "avg_response_ms": 22183
+    },
+    {
+      "timestamp": "2026-04-18T17:40:19.662456+00:00",
+      "requests_today": 36,
+      "active_users_today": 10,
+      "avg_response_ms": 21995
+    },
+    {
+      "timestamp": "2026-04-18T18:54:30.254600+00:00",
+      "requests_today": 37,
+      "active_users_today": 11,
+      "avg_response_ms": 22252
+    },
+    {
+      "timestamp": "2026-04-18T18:54:59.539324+00:00",
+      "requests_today": 38,
+      "active_users_today": 11,
+      "avg_response_ms": 22170
+    },
+    {
+      "timestamp": "2026-04-18T18:55:23.898358+00:00",
+      "requests_today": 39,
+      "active_users_today": 11,
+      "avg_response_ms": 22050
+    },
+    {
+      "timestamp": "2026-04-18T18:57:05.597578+00:00",
+      "requests_today": 40,
+      "active_users_today": 11,
+      "avg_response_ms": 22646
+    },
+    {
+      "timestamp": "2026-04-18T20:50:02.129320+00:00",
+      "requests_today": 41,
+      "active_users_today": 12,
+      "avg_response_ms": 22464
+    },
+    {
+      "timestamp": "2026-04-18T20:50:43.688237+00:00",
+      "requests_today": 42,
+      "active_users_today": 12,
+      "avg_response_ms": 22369
     }
   ]
 }

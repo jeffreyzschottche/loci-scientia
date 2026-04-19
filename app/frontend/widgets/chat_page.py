@@ -5,6 +5,7 @@ import html
 import json
 import os
 import uuid
+from collections.abc import Coroutine
 
 import requests
 from datetime import datetime
@@ -27,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PROMPT_MODES
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS, PROMPT_MODES
 from ..translations import t, register_language_change_callback
 
 API_BASE = BACKEND_HTTP
@@ -35,8 +36,9 @@ MAX_BUBBLE_WIDTH = 680
 ROW_GAP = 12
 SIDE_PADDING = 12
 ASSISTANT_AVATAR_SIZE = 32
-ASSISTANT_MAX_WIDTH = 900
-ASSISTANT_MIN_WIDTH = 640
+ASSISTANT_MAX_WIDTH = 1600
+ASSISTANT_MIN_WIDTH = 0
+ASSISTANT_TARGET_WIDTH_RATIO = 0.5
 class ChatSignals(QObject):
     response_token = Signal(int, str)
     thinking_token = Signal(int, str)
@@ -252,6 +254,7 @@ class AssistantMessageWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
         self.setMinimumWidth(ASSISTANT_MIN_WIDTH)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
 
         self.thinking_card = QFrame()
         self.thinking_card.setStyleSheet(
@@ -405,6 +408,7 @@ class ChatPage(QWidget):
         self._auto_token_error: str | None = None
         self.available_modes = PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]
         self.selected_mode = self._load_focus_mode()
+        self.current_model_name = self._fallback_current_model()
         self.thinking_enabled = True
         self._is_generating = False
         self._stop_requested = False
@@ -423,7 +427,7 @@ class ChatPage(QWidget):
         self.thinking_toggle_wrap = QWidget()
         thinking_wrap_layout = QHBoxLayout(self.thinking_toggle_wrap)
         thinking_wrap_layout.setContentsMargins(0, 0, 0, 0)
-        thinking_wrap_layout.setSpacing(10)
+        thinking_wrap_layout.setSpacing(6)
 
         self.thinking_label = QLabel()
         thinking_font = self.thinking_label.font()
@@ -439,19 +443,19 @@ class ChatPage(QWidget):
         controls.addWidget(self.thinking_toggle_wrap, 0, Qt.AlignLeft)
         controls.addStretch(1)
 
-        self.focus_mode_wrap = QWidget()
-        focus_mode_layout = QHBoxLayout(self.focus_mode_wrap)
-        focus_mode_layout.setContentsMargins(0, 0, 0, 0)
-        focus_mode_layout.setSpacing(10)
+        self.model_wrap = QWidget()
+        model_layout = QHBoxLayout(self.model_wrap)
+        model_layout.setContentsMargins(0, 0, 0, 0)
+        model_layout.setSpacing(10)
 
-        self.focus_mode_label = QLabel()
-        self.focus_mode_label.setStyleSheet("color:#6b7280; font-weight:700;")
-        focus_mode_layout.addWidget(self.focus_mode_label, 0, Qt.AlignVCenter)
+        self.current_model_label = QLabel()
+        self.current_model_label.setStyleSheet("color:#6b7280; font-weight:700;")
+        model_layout.addWidget(self.current_model_label, 0, Qt.AlignVCenter)
 
-        self.change_focus_mode_btn = QPushButton()
-        self.change_focus_mode_btn.setCursor(Qt.PointingHandCursor)
-        self.change_focus_mode_btn.setText(t("chat_change_focus_mode"))
-        self.change_focus_mode_btn.setStyleSheet(
+        self.change_model_btn = QPushButton()
+        self.change_model_btn.setCursor(Qt.PointingHandCursor)
+        self.change_model_btn.setText(t("chat_change_model"))
+        self.change_model_btn.setStyleSheet(
             "QPushButton {"
             "  background-color:#facc15;"
             "  border:1px solid #facc15;"
@@ -464,10 +468,10 @@ class ChatPage(QWidget):
             "}"
             "QPushButton:hover { background-color:#111111; color:#facc15; border-color:#111111; }"
         )
-        self.change_focus_mode_btn.setFixedHeight(40)
-        self.change_focus_mode_btn.clicked.connect(self._open_focus_mode_settings)
-        focus_mode_layout.addWidget(self.change_focus_mode_btn, 0, Qt.AlignVCenter)
-        controls.addWidget(self.focus_mode_wrap, 0, Qt.AlignRight)
+        self.change_model_btn.setFixedHeight(40)
+        self.change_model_btn.clicked.connect(self._open_model_settings)
+        model_layout.addWidget(self.change_model_btn, 0, Qt.AlignVCenter)
+        controls.addWidget(self.model_wrap, 0, Qt.AlignRight)
 
         self.new_chat_btn = QPushButton(t("chat_start_new"))
         self.new_chat_btn.setCursor(Qt.PointingHandCursor)
@@ -488,7 +492,8 @@ class ChatPage(QWidget):
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
         self._sync_thinking_button()
-        self._sync_focus_mode_status()
+        self._sync_model_status()
+        self._load_current_model()
 
         self.history_card = QFrame()
         self.history_card.setObjectName("ChatWrapper")
@@ -512,9 +517,37 @@ class ChatPage(QWidget):
         self.history_layout: QVBoxLayout | None = None
         self.empty_state: QWidget | None = None
         self.empty_label: QLabel | None = None
+        self.disclaimer_label: QLabel | None = None
         self._rebuild_history_view()
         history_card_layout.addWidget(self.history_scroll)
         layout.addWidget(self.history_card)
+
+        disclaimer_wrap = QWidget()
+        disclaimer_wrap.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        disclaimer_layout = QHBoxLayout(disclaimer_wrap)
+        disclaimer_layout.setContentsMargins(0, 10, 0, 10)
+        disclaimer_layout.setSpacing(0)
+        disclaimer_layout.setAlignment(Qt.AlignCenter)
+
+        self.disclaimer_label = QLabel(t("chat_disclaimer"))
+        self.disclaimer_label.setObjectName("ChatDisclaimerPill")
+        self.disclaimer_label.setAlignment(Qt.AlignCenter)
+        self.disclaimer_label.setWordWrap(False)
+        self.disclaimer_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.disclaimer_label.setFixedHeight(38)
+        self.disclaimer_label.setStyleSheet(
+            "QLabel#ChatDisclaimerPill {"
+            "  background:#ffffff;"
+            "  color:#111111;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:19px;"
+            "  padding:0 18px;"
+            "  font-size:11px;"
+            "  font-weight:600;"
+            "}"
+        )
+        disclaimer_layout.addWidget(self.disclaimer_label)
+        layout.addWidget(disclaimer_wrap)
 
         input_card = QFrame()
         input_card.setObjectName("Card")
@@ -561,15 +594,23 @@ class ChatPage(QWidget):
         self.send_btn.setMinimumHeight(40)
         self._sync_send_button()
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._sync_thinking_button()
+        self._refresh_message_widths()
+
 
     def _update_translations(self) -> None:
         """Update UI elements when language changes."""
         self.new_chat_btn.setText(t("chat_start_new"))
-        self.change_focus_mode_btn.setText(t("chat_change_focus_mode"))
+        self.change_model_btn.setText(t("chat_change_model"))
         self._sync_thinking_button()
-        self._sync_focus_mode_status()
+        self._sync_model_status()
         self.input.setPlaceholderText(t("chat_placeholder"))
         self._sync_send_button()
+        if self.disclaimer_label:
+            self.disclaimer_label.setText(t("chat_disclaimer"))
+            self.disclaimer_label.adjustSize()
         if self.empty_label:
             self.empty_label.setText(t("chat_welcome"))
 
@@ -586,20 +627,60 @@ class ChatPage(QWidget):
         self.thinking_enabled = checked
         self._sync_thinking_button()
 
-    def _display_focus_mode(self) -> str:
-        self.selected_mode = self._load_focus_mode()
-        return self.selected_mode or t("chat_mode_default")
-
-    def _sync_focus_mode_status(self) -> None:
-        self.focus_mode_label.setText(
-            t("chat_current_mode_label", mode=self._display_focus_mode())
+    def _sync_model_status(self) -> None:
+        self.current_model_label.setText(
+            t("chat_current_model_label", model=self.current_model_name or t("settings_not_set"))
         )
 
-    def _open_focus_mode_settings(self) -> None:
+    def _open_model_settings(self) -> None:
         self.open_settings_tab_requested.emit("advanced")
 
+    def _auth_headers(self) -> dict[str, str]:
+        if self._bearer_token:
+            return {"Authorization": f"Bearer {self._bearer_token}"}
+        return {}
+
+    def _fallback_current_model(self) -> str:
+        env_model = os.environ.get("OLLAMA_MODEL", "").strip()
+        if env_model:
+            return env_model
+        if OLLAMA_MODELS:
+            return OLLAMA_MODELS[0]
+        return ""
+
+    def _schedule_task(self, coro: Coroutine[object, object, object]) -> None:
+        loop = asyncio.get_event_loop()
+        loop.create_task(coro)
+
+    def _load_current_model(self) -> None:
+        self._schedule_task(self._load_current_model_async())
+
+    async def _load_current_model_async(self) -> None:
+        model_name = self._fallback_current_model()
+        try:
+            response = await asyncio.to_thread(
+                requests.get,
+                f"{API_BASE}/api/v1/ollama/models",
+                timeout=10,
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            payload = response.json()
+            current = str(payload.get("current") or "").strip()
+            available = payload.get("available") or []
+            if current:
+                model_name = current
+            elif available:
+                model_name = str(available[0]).strip()
+        except Exception:
+            pass
+
+        self.current_model_name = model_name
+        self._sync_model_status()
+
     def on_page_shown(self) -> None:
-        self._sync_focus_mode_status()
+        self._sync_model_status()
+        self._load_current_model()
 
     def _sync_thinking_button(self) -> None:
         if self.thinking_btn.isChecked() != self.thinking_enabled:
@@ -608,27 +689,50 @@ class ChatPage(QWidget):
         disabled_label = t("chat_thinking_disabled")
         metrics = self.thinking_label.fontMetrics()
         label_width = max(
-            168,
             metrics.horizontalAdvance(enabled_label),
             metrics.horizontalAdvance(disabled_label),
-        ) + 24
-        self.thinking_label.setFixedWidth(label_width)
+        ) + 12
+        self.thinking_label.setMinimumWidth(label_width)
         self.thinking_label.setText(
             enabled_label if self.thinking_enabled else disabled_label
         )
-        wrap_layout = self.thinking_toggle_wrap.layout()
-        if wrap_layout is not None:
-            margins = wrap_layout.contentsMargins()
-            wrap_width = (
-                margins.left()
-                + label_width
-                + wrap_layout.spacing()
-                + self.thinking_btn.width()
-                + margins.right()
-            )
-            wrap_width += 24
-            self.thinking_toggle_wrap.setFixedWidth(wrap_width)
-            self.thinking_toggle_wrap.updateGeometry()
+        self.thinking_toggle_wrap.setMinimumWidth(
+            label_width + self.thinking_btn.sizeHint().width() + 24
+        )
+        self.thinking_toggle_wrap.updateGeometry()
+
+    def _assistant_bubble_max_width(self) -> int:
+        viewport = self.history_scroll.viewport()
+        available_width = viewport.width() if viewport is not None else self.width()
+        spacing_budget = SIDE_PADDING * 2 + ASSISTANT_AVATAR_SIZE + 12 + 12
+        preferred_width = max(320, available_width - spacing_budget)
+        return min(ASSISTANT_MAX_WIDTH, preferred_width)
+
+    def _assistant_bubble_min_width(self) -> int:
+        viewport = self.history_scroll.viewport()
+        available_width = viewport.width() if viewport is not None else self.width()
+        spacing_budget = SIDE_PADDING * 2 + ASSISTANT_AVATAR_SIZE + 12 + 12
+        target_width = int(max(320, available_width * ASSISTANT_TARGET_WIDTH_RATIO) - spacing_budget)
+        return max(320, min(self._assistant_bubble_max_width(), target_width))
+
+    def _refresh_message_widths(self) -> None:
+        if self.history_container is None:
+            return
+        assistant_width = self._assistant_bubble_max_width()
+        assistant_min_width = self._assistant_bubble_min_width()
+        for bubble in self.history_container.findChildren(QFrame):
+            if bubble.objectName() == "AssistantBubble":
+                bubble.setMaximumWidth(assistant_width)
+                bubble.setMinimumWidth(assistant_min_width)
+                bubble.updateGeometry()
+        for container in self.history_container.findChildren(QWidget):
+            role = container.property("chat_role")
+            if role == "assistant":
+                container.setMinimumWidth(
+                    assistant_min_width + ASSISTANT_AVATAR_SIZE + 12
+                )
+                container.setMaximumWidth(assistant_width + ASSISTANT_AVATAR_SIZE + 12)
+                container.updateGeometry()
 
     def _start_new_chat(self):
         """Reset the conversation history."""
@@ -676,7 +780,9 @@ class ChatPage(QWidget):
         self.current_reply_widget = None
         self.input.setPlaceholderText(t("chat_placeholder"))
         self._show_typing_indicator()
-        asyncio.create_task(self._stream(text, self.selected_mode, request_id, self._chat_epoch))
+        self._schedule_task(
+            self._stream(text, self.selected_mode, request_id, self._chat_epoch)
+        )
 
     def _request_payload(self, prompt: str, mode: str | None = None) -> dict:
         payload = {
@@ -1120,6 +1226,8 @@ class ChatPage(QWidget):
 
     def _append_message(self, role: str, text: str) -> QLabel | AssistantMessageWidget:
         self._set_empty_state_visible(False)
+        assistant_width = self._assistant_bubble_max_width()
+        assistant_min_width = self._assistant_bubble_min_width()
 
         row_outer = QWidget()
         row_outer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
@@ -1128,7 +1236,12 @@ class ChatPage(QWidget):
         row_outer_layout.setSpacing(0)
 
         row_inner = QWidget()
-        row_inner.setMaximumWidth(ASSISTANT_MAX_WIDTH if role == "assistant" else MAX_BUBBLE_WIDTH)
+        row_inner.setProperty("chat_role", role)
+        if role == "assistant":
+            row_inner.setMinimumWidth(assistant_min_width + ASSISTANT_AVATAR_SIZE + 12)
+            row_inner.setMaximumWidth(assistant_width + ASSISTANT_AVATAR_SIZE + 12)
+        else:
+            row_inner.setMaximumWidth(MAX_BUBBLE_WIDTH)
         row_inner.setSizePolicy(
             QSizePolicy.Expanding if role == "assistant" else QSizePolicy.Maximum,
             QSizePolicy.Maximum,
@@ -1142,8 +1255,10 @@ class ChatPage(QWidget):
         if role == "user":
             bubble.setStyleSheet("background:#111111; border:1px solid #111111; border-radius:20px;")
         self._apply_bubble_shadow(bubble)
-        max_width = ASSISTANT_MAX_WIDTH if role == "assistant" else MAX_BUBBLE_WIDTH
+        max_width = assistant_width if role == "assistant" else MAX_BUBBLE_WIDTH
         bubble.setMaximumWidth(int(max_width * (0.82 if role == "user" else 1.0)))
+        if role == "assistant":
+            bubble.setMinimumWidth(assistant_min_width)
         bubble.setSizePolicy(
             QSizePolicy.Expanding if role == "assistant" else QSizePolicy.Maximum,
             QSizePolicy.Maximum,
@@ -1197,10 +1312,9 @@ class ChatPage(QWidget):
             row_outer_layout.addStretch(0)
         else:
             inner_layout.addWidget(self._build_assistant_avatar(), 0, Qt.AlignTop)
-            inner_layout.addWidget(bubble, 0, Qt.AlignLeft)
-            inner_layout.addStretch(1)
+            inner_layout.addWidget(bubble, 1, Qt.AlignLeft)
             row_outer_layout.addStretch(0)
-            row_outer_layout.addWidget(row_inner, 0, Qt.AlignLeft)
+            row_outer_layout.addWidget(row_inner, 1, Qt.AlignLeft)
             row_outer_layout.addStretch(1)
 
         self._insert_history_row(row_outer)
@@ -1223,7 +1337,7 @@ class ChatPage(QWidget):
         if request_id is None and not self._is_generating and self.current_reply_widget is None:
             return
         if request_id is not None:
-            asyncio.create_task(self._cancel_active_request(request_id))
+            self._schedule_task(self._cancel_active_request(request_id))
         self._stop_requested = True
         self._is_generating = False
         self._active_request_id = None

@@ -203,44 +203,14 @@ class DevicesPage(QWidget):
             empty_layout = QHBoxLayout(empty_wrap)
             empty_layout.setContentsMargins(0, 24, 0, 0)
             empty_layout.setSpacing(0)
-
-            add_first_card = QPushButton()
-            add_first_card.setCursor(Qt.PointingHandCursor)
-            add_first_card.setFixedSize(230, 230)
-            add_first_card.setStyleSheet(
-                "QPushButton {"
-                "  background:#ffffff;"
-                "  border:1px solid #e5e7eb;"
-                "  border-radius:28px;"
-                "}"
-                "QPushButton:hover { border-color:#facc15; background:#fffdf5; }"
+            empty_layout.addWidget(
+                self._build_add_card(
+                    title_key="devices_empty_title",
+                    subtitle_key="devices_empty_subtitle",
+                ),
+                0,
+                Qt.AlignLeft | Qt.AlignTop,
             )
-            add_first_card.clicked.connect(self._open_add_dialog)
-
-            card_layout = QVBoxLayout(add_first_card)
-            card_layout.setContentsMargins(24, 24, 24, 24)
-            card_layout.setSpacing(12)
-            card_layout.addStretch(1)
-
-            plus_label = QLabel("+")
-            plus_label.setAlignment(Qt.AlignCenter)
-            plus_label.setStyleSheet("font-size:64px; font-weight:300; color:#111111;")
-            card_layout.addWidget(plus_label)
-
-            title = QLabel(t("devices_empty_title"))
-            title.setAlignment(Qt.AlignCenter)
-            title.setWordWrap(True)
-            title.setStyleSheet("font-size:18px; font-weight:700; color:#111111;")
-            card_layout.addWidget(title)
-
-            subtitle = QLabel(t("devices_empty_subtitle"))
-            subtitle.setAlignment(Qt.AlignCenter)
-            subtitle.setWordWrap(True)
-            subtitle.setStyleSheet("font-size:13px; color:#6b7280;")
-            card_layout.addWidget(subtitle)
-            card_layout.addStretch(1)
-
-            empty_layout.addWidget(add_first_card, 0, Qt.AlignLeft | Qt.AlignTop)
             empty_layout.addStretch(1)
             self.list_layout.addWidget(empty_wrap, 0, 0)
         else:
@@ -250,8 +220,57 @@ class DevicesPage(QWidget):
                 row = idx // columns
                 col = idx % columns
                 self.list_layout.addWidget(card, row, col)
+
+            add_card_index = len(self.devices)
+            self.list_layout.addWidget(
+                self._build_add_card(
+                    title_key="devices_add_contact_title",
+                    subtitle_key="devices_add_contact_subtitle",
+                ),
+                add_card_index // columns,
+                add_card_index % columns,
+            )
             for col in range(columns):
                 self.list_layout.setColumnStretch(col, 1)
+
+    def _build_add_card(self, *, title_key: str, subtitle_key: str) -> QPushButton:
+        add_card = QPushButton()
+        add_card.setCursor(Qt.PointingHandCursor)
+        add_card.setFixedSize(230, 230)
+        add_card.setStyleSheet(
+            "QPushButton {"
+            "  background:#ffffff;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:28px;"
+            "}"
+            "QPushButton:hover { border-color:#facc15; background:#fffdf5; }"
+        )
+        add_card.clicked.connect(self._open_add_dialog)
+
+        card_layout = QVBoxLayout(add_card)
+        card_layout.setContentsMargins(24, 24, 24, 24)
+        card_layout.setSpacing(12)
+        card_layout.addStretch(1)
+
+        plus_label = QLabel("+")
+        plus_label.setAlignment(Qt.AlignCenter)
+        plus_label.setStyleSheet("font-size:64px; font-weight:300; color:#111111;")
+        card_layout.addWidget(plus_label)
+
+        title = QLabel(t(title_key))
+        title.setAlignment(Qt.AlignCenter)
+        title.setWordWrap(True)
+        title.setStyleSheet("font-size:18px; font-weight:700; color:#111111;")
+        card_layout.addWidget(title)
+
+        subtitle = QLabel(t(subtitle_key))
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("font-size:13px; color:#6b7280;")
+        card_layout.addWidget(subtitle)
+        card_layout.addStretch(1)
+
+        return add_card
 
     def _grid_columns(self) -> int:
         viewport_width = self.scroll_area.viewport().width() if self.scroll_area else self.width()

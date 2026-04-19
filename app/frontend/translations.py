@@ -160,6 +160,10 @@ TRANSLATIONS = {
         "nl": "Start een gesprek met je Edge AI-assistent",
         "en": "Start a conversation with your Edge AI assistant",
     },
+    "chat_disclaimer": {
+        "nl": "Aitje is AI en kan ook fouten maken. Controleer belangrijke informatie.",
+        "en": "Aitje is AI and can also make mistakes. Verify important information.",
+    },
     "page_subtitle_kb": {
         "nl": "Inzage voor kennisbank documenten en opslag",
         "en": "Insight into knowledge base documents and storage",
@@ -723,6 +727,14 @@ TRANSLATIONS = {
     "devices_empty_subtitle": {
         "nl": "Voeg een account toe dat via de API kan verbinden.",
         "en": "Add an account that can connect through the API.",
+    },
+    "devices_add_contact_title": {
+        "nl": "Voeg een nieuw contact toe",
+        "en": "Add a new contact",
+    },
+    "devices_add_contact_subtitle": {
+        "nl": "Maak direct nog een contact aan.",
+        "en": "Create another contact right away.",
     },
     "devices_edit_device": {
         "nl": "Apparaat bewerken",
@@ -1517,9 +1529,17 @@ TRANSLATIONS = {
         "nl": "Current mode: {mode}",
         "en": "Current mode: {mode}",
     },
+    "chat_current_model_label": {
+        "nl": "Huidig model : {model}",
+        "en": "Current Model : {model}",
+    },
     "chat_change_focus_mode": {
         "nl": "Wijzig focus mode",
         "en": "Change focus mode",
+    },
+    "chat_change_model": {
+        "nl": "Wijzig model",
+        "en": "Change model",
     },
     "chat_error_prefix": {
         "nl": "[fout]",

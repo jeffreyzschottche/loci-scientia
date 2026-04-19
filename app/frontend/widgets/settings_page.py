@@ -7,6 +7,7 @@ import platform
 import re
 import shutil
 import subprocess
+from collections.abc import Coroutine
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, available_timezones
@@ -82,6 +83,10 @@ class SettingsPage(QWidget):
         "  color:#171717;"
         "}"
     )
+
+    def _schedule_task(self, coro: Coroutine[object, object, object]) -> None:
+        loop = asyncio.get_event_loop()
+        loop.create_task(coro)
     COMBO_POPUP_STYLE = (
         "QListView {"
         "  background:#fffdf8;"
@@ -481,7 +486,7 @@ class SettingsPage(QWidget):
     def _refresh_wifi_status(self) -> None:
         if self._wifi_status:
             self._wifi_status.setText(t("settings_wifi_status_loading"))
-        asyncio.create_task(self._refresh_wifi_status_async())
+        self._schedule_task(self._refresh_wifi_status_async())
 
     async def _refresh_wifi_status_async(self) -> None:
         info = await asyncio.to_thread(self._read_wifi_info)
@@ -1260,7 +1265,7 @@ class SettingsPage(QWidget):
     def _load_models(self) -> None:
         if not self._ollama_combo or not self._ollama_status:
             return
-        asyncio.create_task(self._load_models_async())
+        self._schedule_task(self._load_models_async())
 
     async def _load_models_async(self) -> None:
         try:
@@ -1418,7 +1423,7 @@ class SettingsPage(QWidget):
     def _load_support_status(self) -> None:
         if not self._support_status:
             return
-        asyncio.create_task(self._load_support_status_async())
+        self._schedule_task(self._load_support_status_async())
 
     async def _load_support_status_async(self) -> None:
         try:
@@ -1454,7 +1459,7 @@ class SettingsPage(QWidget):
             return
         duration = self._selected_support_duration()
         self._set_support_busy(True, t("settings_activating_support"))
-        asyncio.create_task(self._enable_support_async(duration))
+        self._schedule_task(self._enable_support_async(duration))
 
     async def _enable_support_async(self, duration: int) -> None:
         try:
@@ -1494,7 +1499,7 @@ class SettingsPage(QWidget):
         ):
             return
         self._set_support_busy(True, t("settings_closing_support"))
-        asyncio.create_task(self._disable_support_async())
+        self._schedule_task(self._disable_support_async())
 
     async def _disable_support_async(self) -> None:
         try:
