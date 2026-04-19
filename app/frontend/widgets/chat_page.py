@@ -10,7 +10,7 @@ from collections.abc import Coroutine
 import requests
 from datetime import datetime
 from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QColor, QFont, QPainter, QTextDocument, QTextOption
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QTextDocument, QTextOption
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -38,7 +38,48 @@ SIDE_PADDING = 12
 ASSISTANT_AVATAR_SIZE = 32
 ASSISTANT_MAX_WIDTH = 1600
 ASSISTANT_MIN_WIDTH = 0
-ASSISTANT_TARGET_WIDTH_RATIO = 0.5
+CHAT_BACKGROUND_IMAGE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "images", "aitje-chat-bg.png")
+)
+
+
+class ChatHistoryCanvas(QWidget):
+    def __init__(self):
+        super().__init__()
+        self._background = QPixmap(CHAT_BACKGROUND_IMAGE)
+        self._show_background = True
+
+    def set_background_visible(self, visible: bool) -> None:
+        visible = bool(visible)
+        if self._show_background == visible:
+            return
+        self._show_background = visible
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._show_background or self._background.isNull():
+            return
+
+        max_side = int(min(self.width() * 0.50, self.height() * 0.54, 640))
+        if max_side <= 0:
+            return
+
+        image = self._background.scaled(
+            max_side,
+            max_side,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation,
+        )
+        x = (self.width() - image.width()) // 2
+        y = int(self.height() * 0.43)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.setOpacity(0.10)
+        painter.drawPixmap(x, y, image)
+
+
 class ChatSignals(QObject):
     response_token = Signal(int, str)
     thinking_token = Signal(int, str)
@@ -709,11 +750,7 @@ class ChatPage(QWidget):
         return min(ASSISTANT_MAX_WIDTH, preferred_width)
 
     def _assistant_bubble_min_width(self) -> int:
-        viewport = self.history_scroll.viewport()
-        available_width = viewport.width() if viewport is not None else self.width()
-        spacing_budget = SIDE_PADDING * 2 + ASSISTANT_AVATAR_SIZE + 12 + 12
-        target_width = int(max(320, available_width * ASSISTANT_TARGET_WIDTH_RATIO) - spacing_budget)
-        return max(320, min(self._assistant_bubble_max_width(), target_width))
+        return self._assistant_bubble_max_width()
 
     def _refresh_message_widths(self) -> None:
         if self.history_container is None:
@@ -1312,10 +1349,10 @@ class ChatPage(QWidget):
             row_outer_layout.addStretch(0)
         else:
             inner_layout.addWidget(self._build_assistant_avatar(), 0, Qt.AlignTop)
-            inner_layout.addWidget(bubble, 1, Qt.AlignLeft)
+            inner_layout.addWidget(bubble, 1)
             row_outer_layout.addStretch(0)
-            row_outer_layout.addWidget(row_inner, 1, Qt.AlignLeft)
-            row_outer_layout.addStretch(1)
+            row_outer_layout.addWidget(row_inner, 1)
+            row_outer_layout.addStretch(0)
 
         self._insert_history_row(row_outer)
         self.message_rows.append(row_outer)
@@ -1422,7 +1459,8 @@ class ChatPage(QWidget):
     def _rebuild_history_view(self) -> None:
         old_container = self.history_container
 
-        self.history_container = QWidget()
+        self.history_container = ChatHistoryCanvas()
+        self.history_container.set_background_visible(True)
         self.history_container.setStyleSheet("background:transparent;")
         self.history_layout = QVBoxLayout(self.history_container)
         self.history_layout.setContentsMargins(SIDE_PADDING, 16, SIDE_PADDING, 16)
@@ -1433,13 +1471,13 @@ class ChatPage(QWidget):
         empty_state_layout = QVBoxLayout(self.empty_state)
         empty_state_layout.setContentsMargins(0, 0, 0, 0)
         empty_state_layout.setSpacing(0)
-        empty_state_layout.addStretch(1)
+        empty_state_layout.addStretch(3)
 
         self.empty_label = QLabel(t("chat_welcome"))
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet("color:#9ca3af; font-size:14px; background:transparent;")
         empty_state_layout.addWidget(self.empty_label, 0, Qt.AlignCenter)
-        empty_state_layout.addStretch(1)
+        empty_state_layout.addStretch(5)
 
         self.history_layout.addWidget(self.empty_state, 1)
         self.history_layout.addStretch(1)
@@ -1466,6 +1504,8 @@ class ChatPage(QWidget):
         if self.empty_state is None:
             return
         self.empty_state.setVisible(visible)
+        if self.history_container is not None:
+            self.history_container.set_background_visible(visible)
         if visible:
             self.empty_label.setText(t("chat_welcome"))
             self.history_scroll.verticalScrollBar().setValue(0)
