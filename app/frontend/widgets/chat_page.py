@@ -682,6 +682,15 @@ class ChatPage(QWidget):
         return {}
 
     def _fallback_current_model(self) -> str:
+        provider = os.environ.get("LLM_PROVIDER", "").strip().lower()
+        if provider == "lemonade":
+            env_model = os.environ.get("LEMONADE_MODEL", "").strip()
+            if env_model:
+                return env_model
+            raw = os.environ.get("LEMONADE_MODELS", "")
+            first = next((m.strip() for m in raw.split(",") if m.strip()), "")
+            if first:
+                return first
         env_model = os.environ.get("OLLAMA_MODEL", "").strip()
         if env_model:
             return env_model
@@ -701,7 +710,7 @@ class ChatPage(QWidget):
         try:
             response = await asyncio.to_thread(
                 requests.get,
-                f"{API_BASE}/api/v1/ollama/models",
+                f"{API_BASE}/api/v1/llm/models",
                 timeout=10,
                 headers=self._auth_headers(),
             )

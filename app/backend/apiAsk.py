@@ -15,6 +15,13 @@ import httpx
 
 from .devices_repo import DevicesRepository
 from .knowledge_repository import KnowledgeRepository
+from .llm import LLMUnavailable, get_backend
+from .llm.ollama import (
+    THINKING_MODEL_MARKERS,
+    _build_generate_payload as _build_ollama_generate_payload_impl,
+    _split_response_parts as _split_ollama_response_parts_impl,
+    _supports_thinking as _ollama_supports_thinking,
+)
 from .schemas import ChatMessage, ChatRequest, Device, HistoryDocument, PromptDocument
 from .settings import settings
 from .translations import t
@@ -28,7 +35,6 @@ PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
-THINKING_TAG_RE = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _TOKEN_PATTERN = re.compile(r"\S+")
 _CONTEXT_TOKEN_PATTERN = re.compile(r"[0-9A-Za-zÀ-ÖØ-öø-ÿ][0-9A-Za-zÀ-ÖØ-öø-ÿ_-]*")
 _CONTEXT_STOPWORDS = {
@@ -49,14 +55,29 @@ MAX_TOTAL_DOCUMENT_CHARS = 100_000
 MAX_HISTORY_DOCUMENT_CHARS = 12_000
 MAX_HISTORY_DOCUMENT_CHARS_PER_DOC = 4_000
 MAX_HISTORY_IMAGES = 8
-THINKING_MODEL_MARKERS = (
-    "qwen3",
-    "qwen 3",
-    "qwen3.5",
-    "deepseek-r1",
-    "deepseek_r1",
-    "deepseek-v3.1",
-    "gpt-oss",
+
+# Re-exports die main.py en oudere callers gebruiken.
+__all__ = (
+    "ApiLogEntry",
+    "ParsedDocument",
+    "THINKING_MODEL_MARKERS",
+    "build_augmented_prompt",
+    "build_augmented_prompt_with_details",
+    "build_ollama_generate_payload",
+    "collect_prompt_images",
+    "estimate_prompt_tokens",
+    "generate_conversation_id",
+    "generate_request_id",
+    "handle_ask",
+    "history_documents_from_parsed",
+    "log_api_request",
+    "log_prompt",
+    "model_supports_ollama_thinking",
+    "normalize_documents",
+    "normalize_images",
+    "prepare_prompt",
+    "split_ollama_response_parts",
+    "summarize_history",
 )
 
 
@@ -998,7 +1019,9 @@ async def summarize_history(
         return (existing_summary or "").strip()
     prompt = _build_summary_prompt(history_lines, existing_summary)
     try:
-        summary = await _call_ollama(prompt, options={"num_predict": 256})
+        backend = get_backend()
+        result = await backend.generate(prompt, options={"num_predict": 256})
+        summary = result.message
     except Exception as exc:  # pragma: no cover - netwerkfout
         logger.warning("%s %s", t("summary_failed"), exc)
         summary = _fallback_summary(existing_summary, history_lines)
@@ -1026,8 +1049,7 @@ def normalize_images(images: Optional[Sequence[str]]) -> list[str]:
 
 
 def model_supports_ollama_thinking(model: str) -> bool:
-    normalized = (model or "").strip().lower()
-    return any(marker in normalized for marker in THINKING_MODEL_MARKERS)
+    return _ollama_supports_thinking(model)
 
 
 def build_ollama_generate_payload(
@@ -1037,85 +1059,50 @@ def build_ollama_generate_payload(
     images: Optional[Sequence[str]] = None,
     thinking: Optional[bool] = None,
 ) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "model": settings.ollama_model,
-        "prompt": prompt,
-        "stream": stream,
-    }
-    if images:
-        payload["images"] = list(images)
-    max_context = settings.ollama_max_context.get(settings.ollama_model)
-    if isinstance(max_context, int) and max_context > 0:
-        payload["options"] = {"num_ctx": max_context}
-    if model_supports_ollama_thinking(settings.ollama_model):
-        payload["think"] = True if thinking is None else bool(thinking)
-    return payload
+    return _build_ollama_generate_payload_impl(
+        prompt,
+        stream=stream,
+        images=images,
+        thinking=thinking,
+    )
 
 
 def split_ollama_response_parts(
     response_text: Optional[str],
     thinking_text: Optional[str] = None,
 ) -> tuple[str, str]:
-    response = (response_text or "").strip()
-    thinking_parts = [part.strip() for part in [(thinking_text or "").strip()] if part.strip()]
-    if response:
-        inline_thinking = [match.strip() for match in THINKING_TAG_RE.findall(response) if match.strip()]
-        if inline_thinking:
-            thinking_parts.extend(inline_thinking)
-            response = THINKING_TAG_RE.sub("", response).strip()
-    seen: set[str] = set()
-    ordered_thinking: list[str] = []
-    for part in thinking_parts:
-        if part and part not in seen:
-            seen.add(part)
-            ordered_thinking.append(part)
-    return ("\n\n".join(ordered_thinking).strip(), response)
+    return _split_ollama_response_parts_impl(response_text, thinking_text)
 
 
-async def _call_ollama(
-    prompt: str,
-    options: Optional[dict] = None,
-    images: Optional[Sequence[str]] = None,
-    thinking: Optional[bool] = None,
-) -> dict[str, str]:
-    ollama_url = f"{settings.ollama_base_url}/api/generate"
-    payload = build_ollama_generate_payload(
-        prompt,
-        stream=False,
-        images=images,
-        thinking=thinking,
-    )
-    if options:
-        if "options" in payload:
-            payload["options"].update(options)
-        else:
-            payload["options"] = dict(options)
-    async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
-        response = await client.post(ollama_url, json=payload)
-        response.raise_for_status()
-        data = response.json()
-        thinking, message = split_ollama_response_parts(
-            response_text=data.get("response"),
-            thinking_text=data.get("thinking"),
-        )
-        return {"thinking": thinking, "message": message}
+def _active_model_label() -> str:
+    return settings.active_model or "(geen)"
+
+
+def _active_base_url() -> str:
+    return settings.active_base_url
+
+
+def _active_provider_label() -> str:
+    return settings.llm_provider.capitalize()
 
 
 def _fallback_response(original_prompt: str) -> str:
+    provider = _active_provider_label()
     return (
-        f"{t('ollama_not_available')} "
-        f"{t('ollama_no_response', url=settings.ollama_base_url, model=settings.ollama_model)} "
-        f"'{original_prompt}'. "
-        f"{t('ollama_check_service')}"
+        f"[{provider} niet bereikbaar] "
+        f"Geen antwoord van {_active_base_url()} met model '{_active_model_label()}'. "
+        f"Je vroeg: '{original_prompt}'. "
+        "Controleer of de LLM-service draait en bereikbaar is."
     )
 
 
 def _fallback_timeout_response(original_prompt: str) -> str:
-    timeout_seconds = f"{settings.ollama_timeout:g}"
+    provider = _active_provider_label()
+    timeout_seconds = f"{settings.active_timeout:g}"
     return (
-        "[Ollama reageert te langzaam] "
+        f"[{provider} reageert te langzaam] "
         f"Geen antwoord ontvangen binnen {timeout_seconds}s van "
-        f"{settings.ollama_base_url} met model '{settings.ollama_model}'. "
+        f"{_active_base_url()} met model '{_active_model_label()}'. "
         f"Je vroeg: '{original_prompt}'. "
         "Dit gebeurt vaak bij een koude start of het laden van een groot model; probeer het opnieuw."
     )
@@ -1139,32 +1126,38 @@ async def handle_ask(
     )
     log_prompt(final_prompt)
     thinking = ""
+    backend = get_backend()
     try:
-        result = await _call_ollama(final_prompt, images=prompt_images, thinking=req.thinking)
-        message = result.get("message", "").strip()
-        thinking = result.get("thinking", "").strip()
+        result = await backend.generate(
+            final_prompt, images=prompt_images, thinking=req.thinking
+        )
+        message = (result.message or "").strip()
+        thinking = (result.thinking or "").strip()
     except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout
         logger.warning(
-            "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
-            settings.ollama_timeout,
-            settings.ollama_base_url,
-            settings.ollama_model,
+            "Timeout bij %s (timeout=%ss, url=%s, model=%s): %r",
+            backend.name,
+            settings.active_timeout,
+            settings.active_base_url,
+            settings.active_model,
             exc,
         )
         message = _fallback_timeout_response(req.prompt)
-    except httpx.RequestError as exc:  # pragma: no cover - netwerkfout
+    except (httpx.RequestError, LLMUnavailable) as exc:  # pragma: no cover - netwerkfout
         logger.warning(
-            "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
-            settings.ollama_base_url,
-            settings.ollama_model,
+            "Kan niet verbinden met %s (url=%s, model=%s): %s",
+            backend.name,
+            settings.active_base_url,
+            settings.active_model,
             exc,
         )
         message = _fallback_response(req.prompt)
     except Exception as exc:  # pragma: no cover - netwerkfout
         logger.warning(
-            "Onverwachte Ollama fout (url=%s, model=%s): %r",
-            settings.ollama_base_url,
-            settings.ollama_model,
+            "Onverwachte %s fout (url=%s, model=%s): %r",
+            backend.name,
+            settings.active_base_url,
+            settings.active_model,
             exc,
         )
         message = _fallback_response(req.prompt)

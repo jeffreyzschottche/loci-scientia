@@ -64,6 +64,16 @@ OLLAMA_MODELS = [
     if model.strip()
 ]
 
+LEMONADE_MODELS = [
+    model.strip()
+    for model in os.environ.get("LEMONADE_MODELS", "").split(",")
+    if model.strip()
+]
+
+LLM_PROVIDER = (os.environ.get("LLM_PROVIDER", "ollama") or "ollama").strip().lower()
+
+LLM_MODELS = LEMONADE_MODELS if LLM_PROVIDER == "lemonade" else OLLAMA_MODELS
+
 PROMPT_MODES = [
     mode.strip()
     for mode in os.environ.get("PROMPT_MODES", "Developer,Finance,Law,Child").split(",")

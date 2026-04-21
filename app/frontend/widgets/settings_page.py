@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS, PROMPT_MODES
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, LLM_MODELS, OLLAMA_MODELS, PROMPT_MODES
 from ..translations import get_current_language, register_language_change_callback, set_language, t
 from .dialog_style import OverlayDialog, ask_yes_no_dialog, show_error_dialog
 
@@ -1271,14 +1271,14 @@ class SettingsPage(QWidget):
         try:
             response = await asyncio.to_thread(
                 requests.get,
-                f"{BACKEND_HTTP}/api/v1/ollama/models",
+                f"{BACKEND_HTTP}/api/v1/llm/models",
                 timeout=10,
                 headers=self._auth_headers(),
             )
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            fallback = OLLAMA_MODELS
+            fallback = LLM_MODELS or OLLAMA_MODELS
             if fallback:
                 self._current_model = fallback[0]
                 self._saved_model = fallback[0]
@@ -1348,7 +1348,7 @@ class SettingsPage(QWidget):
             return
 
     def _stream_model_switch(self, model: str) -> None:
-        url = f"{BACKEND_HTTP}/api/v1/ollama/model/stream"
+        url = f"{BACKEND_HTTP}/api/v1/llm/model/stream"
         with requests.post(
             url,
             json={"model": model},

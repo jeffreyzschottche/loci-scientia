@@ -78,8 +78,12 @@ class BearerTokenResponse(BaseModel):
     expires_at: datetime
 
 
-class OllamaModelRequest(BaseModel):
+class ModelRequest(BaseModel):
     model: str
+
+
+class OllamaModelRequest(ModelRequest):
+    """Backwards-compat alias for /api/v1/ollama/model* endpoints."""
 
 
 class ChatCancelRequest(BaseModel):

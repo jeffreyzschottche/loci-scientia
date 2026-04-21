@@ -528,13 +528,113 @@ echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="
 echo
 
-echo "=== Ollama Setup ==="
-if install_ollama; then
-    start_ollama || echo "⚠️  Kon Ollama niet starten, app draait zonder LLM support"
-else
-    echo "⚠️  App draait zonder Ollama support"
-fi
-echo "===================="
+LLM_PROVIDER="${LLM_PROVIDER:-ollama}"
+case "$LLM_PROVIDER" in
+    ollama|lemonade) ;;
+    *)
+        echo "⚠️  Onbekende LLM_PROVIDER '$LLM_PROVIDER'; terugvallen op ollama."
+        LLM_PROVIDER="ollama"
+        ;;
+esac
+export LLM_PROVIDER
+
+lemonade_pid=""
+install_lemonade() {
+    if command -v lemonade-server >/dev/null 2>&1 || command -v lemonade-server-dev >/dev/null 2>&1; then
+        echo "✅ Lemonade Server is al geïnstalleerd"
+        return 0
+    fi
+    echo "📦 Lemonade Server niet gevonden; pip install lemonade-sdk[dev] (in venv)..."
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+    # shellcheck source=/dev/null
+    source .venv/bin/activate
+    if python -m pip install --upgrade "lemonade-sdk"; then
+        echo "✅ Lemonade SDK geïnstalleerd (lemonade-server-dev beschikbaar in .venv)"
+        return 0
+    fi
+    echo "⚠️  Lemonade SDK installatie mislukt."
+    echo "    Installeer handmatig: https://lemonade-server.ai/ of 'pip install lemonade-sdk'"
+    return 1
+}
+
+detect_npu() {
+    if [ -e /dev/accel/accel0 ] || [ -e /dev/amdxdna ]; then
+        echo "✅ AMD NPU device-node gedetecteerd (Ryzen AI)"
+        return 0
+    fi
+    if command -v lspci >/dev/null 2>&1 && lspci 2>/dev/null | grep -iq -E 'IPU|XDNA|Ryzen AI'; then
+        echo "✅ AMD NPU gedetecteerd via lspci"
+        return 0
+    fi
+    echo "ℹ️  Geen AMD NPU gedetecteerd; Lemonade zal terugvallen op CPU/GPU backend."
+    return 1
+}
+
+start_lemonade() {
+    local host port
+    local base_url="${LEMONADE_BASE_URL:-http://127.0.0.1:8020}"
+    host="$(printf '%s' "$base_url" | sed -E 's#https?://##; s#/.*##; s#:[0-9]+$##')"
+    port="$(printf '%s' "$base_url" | sed -nE 's#.*:([0-9]+).*#\1#p')"
+    port="${port:-8020}"
+    host="${host:-127.0.0.1}"
+
+    detect_npu || true
+
+    local bin=""
+    if command -v lemonade-server-dev >/dev/null 2>&1; then
+        bin="lemonade-server-dev"
+    elif command -v lemonade-server >/dev/null 2>&1; then
+        bin="lemonade-server"
+    else
+        echo "⚠️  Lemonade Server binary niet gevonden na installatie."
+        return 1
+    fi
+
+    if curl -fsS "$base_url/api/v1/health" >/dev/null 2>&1; then
+        echo "✅ Lemonade Server draait al op $base_url"
+        return 0
+    fi
+
+    echo "⏳ Lemonade Server starten op $host:$port..."
+    "$bin" serve --host "$host" --port "$port" > "$PROJECT_ROOT/lemonade.log" 2>&1 &
+    lemonade_pid=$!
+    echo "$lemonade_pid" > "$PROJECT_ROOT/lemonade.pid" 2>/dev/null || true
+    echo "✅ Lemonade Server gestart (PID: $lemonade_pid)"
+
+    local attempt
+    for attempt in {1..40}; do
+        if curl -fsS "$base_url/api/v1/health" >/dev/null 2>&1; then
+            echo "✅ Lemonade health OK"
+            return 0
+        fi
+        sleep 1
+    done
+    echo "⚠️  Lemonade Server kwam niet op tijd op (zie lemonade.log)."
+    return 1
+}
+
+case "$LLM_PROVIDER" in
+    ollama)
+        echo "=== Ollama Setup ==="
+        if install_ollama; then
+            start_ollama || echo "⚠️  Kon Ollama niet starten, app draait zonder LLM support"
+        else
+            echo "⚠️  App draait zonder Ollama support"
+        fi
+        echo "===================="
+        ;;
+    lemonade)
+        echo "=== Lemonade Setup ==="
+        if install_lemonade; then
+            start_lemonade || echo "⚠️  Kon Lemonade niet starten, app draait zonder LLM support"
+        else
+            echo "⚠️  App draait zonder Lemonade support"
+        fi
+        echo "======================"
+        ;;
+esac
 echo
 
 BACKEND_HOST="${BACKEND_HOST:-}"
@@ -631,6 +731,11 @@ cleanup() {
     if [ -n "${ollama_pid:-}" ]; then
         echo "🛑 Ollama stoppen..."
         kill "$ollama_pid" >/dev/null 2>&1 || true
+    fi
+
+    if [ -n "${lemonade_pid:-}" ]; then
+        echo "🛑 Lemonade stoppen..."
+        kill "$lemonade_pid" >/dev/null 2>&1 || true
     fi
 
     case "$DEVICE_PLATFORM" in

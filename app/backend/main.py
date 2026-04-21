@@ -28,7 +28,6 @@ from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import (
     ApiLogEntry,
     ParsedDocument,
-    build_ollama_generate_payload,
     build_augmented_prompt_with_details,
     collect_prompt_images,
     estimate_prompt_tokens,
@@ -44,6 +43,7 @@ from .apiAsk import (
     split_ollama_response_parts,
     summarize_history,
 )
+from .llm import LLMUnavailable, get_backend, invalidate_backend_cache
 from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
@@ -57,6 +57,7 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    ModelRequest,
     OllamaModelRequest,
     SignOnRequest,
     SupportTunnelRequest,
@@ -92,7 +93,7 @@ if settings.offline_assets_dir and settings.offline_assets_dir.exists():
 devices_repo = DevicesRepository()
 token_store = BearerTokenStore()
 chat_history = ChatHistoryStore(max_items=20)
-ollama_switch_lock = asyncio.Lock()
+llm_switch_lock = asyncio.Lock()
 support_tunnel = SupportTunnelManager(env_path=ENV_FILE_PATH)
 admin_tokens = AdminTokenManager(
     token_store=token_store,
@@ -407,7 +408,7 @@ def _format_prompt_for_history(prompt: str, images_count: int, documents_count: 
 
 
 def _ensure_prompt_within_context(final_prompt: str) -> None:
-    max_context = settings.ollama_max_context.get(settings.ollama_model)
+    max_context = settings.active_max_context.get(settings.active_model)
     if not isinstance(max_context, int) or max_context <= 0:
         return
     estimated_tokens = estimate_prompt_tokens(final_prompt)
@@ -503,107 +504,77 @@ def api_stats_history_snapshot(_: TokenRecord = Depends(require_admin_token)):
     return api_stats_history.snapshot()
 
 
-async def _pull_ollama_model(model: str) -> None:
+async def _pull_active_model(model: str) -> None:
+    backend = get_backend()
     success = False
-    async for data in _stream_ollama_pull(model):
-        if data.get("status") == "success":
+    error: Optional[str] = None
+    async for event in backend.pull_model(model):
+        if event.error:
+            error = event.error
+        if event.done and not event.error:
             success = True
             break
     if not success:
-        raise HTTPException(status_code=502, detail="Ollama pull beeindigd zonder succes-status")
+        detail = f"{backend.name} pull eindigde zonder succes-status"
+        if error:
+            detail = f"{detail}: {error}"
+        raise HTTPException(status_code=502, detail=detail)
 
 
-async def _stream_ollama_pull(model: str):
-    ollama_url = f"{settings.ollama_base_url}/api/pull"
-    payload = {"name": model}
-
+def _persist_active_model(model: str) -> None:
     try:
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", ollama_url, json=payload) as response:
-                if response.status_code >= 400:
-                    error_body = await response.aread()
-                    raise HTTPException(
-                        status_code=502,
-                        detail=(
-                            f"Ollama pull faalde ({response.status_code}): "
-                            f"{error_body.decode('utf-8', errors='replace').strip()}"
-                        ),
-                    )
-
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    yield data
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Ollama pull faalde: {exc}") from exc
-
-
-def _persist_ollama_model(model: str) -> None:
-    if not ENV_FILE_PATH.exists():
-        raise HTTPException(status_code=500, detail=f".env niet gevonden: {ENV_FILE_PATH}")
-    try:
-        content = ENV_FILE_PATH.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail=f".env lezen faalde: {exc}") from exc
-
-    lines = content.splitlines(keepends=True)
-    updated = False
-    for idx, line in enumerate(lines):
-        if line.startswith("OLLAMA_MODEL="):
-            lines[idx] = f"OLLAMA_MODEL={model}\n"
-            updated = True
-            break
-    if not updated:
-        if lines and not lines[-1].endswith("\n"):
-            lines[-1] = lines[-1] + "\n"
-        lines.append(f"OLLAMA_MODEL={model}\n")
-
-    try:
-        ENV_FILE_PATH.write_text("".join(lines), encoding="utf-8")
+        get_backend().persist_model(model)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f".env schrijven faalde: {exc}") from exc
 
 
-@app.get("/api/v1/ollama/models")
-def list_ollama_models(_: TokenRecord = Depends(require_admin_token)):
-    return {"current": settings.ollama_model, "available": settings.ollama_models}
+def _allowed_models() -> list[str]:
+    return settings.active_models
 
 
-@app.post("/api/v1/ollama/model")
-async def set_ollama_model(req: OllamaModelRequest, _: TokenRecord = Depends(require_admin_token)):
+@app.get("/api/v1/llm/models")
+def list_llm_models(_: TokenRecord = Depends(require_admin_token)):
+    data = get_backend().list_models()
+    data["provider"] = settings.llm_provider
+    return data
+
+
+@app.post("/api/v1/llm/model")
+async def set_llm_model(req: ModelRequest, _: TokenRecord = Depends(require_admin_token)):
     model = req.model.strip()
     if not model:
         raise HTTPException(status_code=400, detail="model ontbreekt")
-    if model not in settings.ollama_models:
+    if model not in _allowed_models():
         raise HTTPException(status_code=400, detail="model niet toegestaan")
 
-    async with ollama_switch_lock:
-        if model != settings.ollama_model:
-            await _pull_ollama_model(model)
-            _persist_ollama_model(model)
-            settings.ollama_model = model
+    backend = get_backend()
+    async with llm_switch_lock:
+        if model != backend.current_model:
+            await _pull_active_model(model)
+            _persist_active_model(model)
+            backend.apply_model(model)
 
-    return {"current": settings.ollama_model}
+    return {"current": backend.current_model, "provider": settings.llm_provider}
 
 
-@app.post("/api/v1/ollama/model/stream")
-async def set_ollama_model_stream(
-    req: OllamaModelRequest,
+@app.post("/api/v1/llm/model/stream")
+async def set_llm_model_stream(
+    req: ModelRequest,
     _: TokenRecord = Depends(require_admin_token),
 ):
     model = req.model.strip()
     if not model:
         raise HTTPException(status_code=400, detail="model ontbreekt")
-    if model not in settings.ollama_models:
+    if model not in _allowed_models():
         raise HTTPException(status_code=400, detail="model niet toegestaan")
 
+    backend = get_backend()
+
     async def event_stream():
-        async with ollama_switch_lock:
-            if model == settings.ollama_model:
+        async with llm_switch_lock:
+            if model == backend.current_model:
                 payload = json.dumps(
                     {"progress": 100, "status": "Model is al actief", "done": True, "current": model}
                 )
@@ -615,29 +586,35 @@ async def set_ollama_model_stream(
             payload = json.dumps({"progress": progress, "status": status})
             yield f"data: {payload}\n\n"
 
-            try:
-                async for data in _stream_ollama_pull(model):
-                    status = data.get("status") or status
-                    completed = data.get("completed")
-                    total = data.get("total")
-                    if isinstance(completed, (int, float)) and isinstance(total, (int, float)) and total:
-                        progress = min(100, int(completed * 100 / total))
-                    payload = json.dumps({"progress": progress, "status": status})
+            success = False
+            async for event in backend.pull_model(model):
+                if event.error and event.done:
+                    payload = json.dumps({"error": event.status or event.error, "done": True})
                     yield f"data: {payload}\n\n"
-                    if data.get("status") == "success":
-                        break
-            except HTTPException as exc:
-                payload = json.dumps({"error": exc.detail, "done": True})
+                    return
+                if event.progress is not None:
+                    progress = event.progress
+                status = event.status or status
+                payload = json.dumps({"progress": progress, "status": status})
+                yield f"data: {payload}\n\n"
+                if event.done:
+                    success = True
+                    break
+
+            if not success:
+                payload = json.dumps(
+                    {"error": f"{backend.name} pull eindigde zonder succes-status", "done": True}
+                )
                 yield f"data: {payload}\n\n"
                 return
 
             try:
-                _persist_ollama_model(model)
+                _persist_active_model(model)
             except HTTPException as exc:
                 payload = json.dumps({"error": exc.detail, "done": True})
                 yield f"data: {payload}\n\n"
                 return
-            settings.ollama_model = model
+            backend.apply_model(model)
             payload = json.dumps(
                 {"progress": 100, "status": "Model actief", "done": True, "current": model}
             )
@@ -651,6 +628,28 @@ async def set_ollama_model_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+# Backwards-compat aliases — oudere clients praten nog tegen /api/v1/ollama/...
+@app.get("/api/v1/ollama/models")
+def list_ollama_models(record: TokenRecord = Depends(require_admin_token)):
+    return list_llm_models(record)
+
+
+@app.post("/api/v1/ollama/model")
+async def set_ollama_model(
+    req: OllamaModelRequest,
+    record: TokenRecord = Depends(require_admin_token),
+):
+    return await set_llm_model(ModelRequest(model=req.model), record)
+
+
+@app.post("/api/v1/ollama/model/stream")
+async def set_ollama_model_stream(
+    req: OllamaModelRequest,
+    record: TokenRecord = Depends(require_admin_token),
+):
+    return await set_llm_model_stream(ModelRequest(model=req.model), record)
 
 
 @app.get("/api/support/tunnel", response_model=SupportTunnelStatus)
@@ -937,106 +936,79 @@ async def sse_stream_generator(
         yield f"data: {event_data}\n\n"
         await asyncio.sleep(1)
 
-    # Call Ollama API with streaming
-    ollama_url = f"{settings.ollama_base_url}/api/generate"
-    ollama_payload = build_ollama_generate_payload(
-        final_prompt,
-        stream=True,
-        images=prompt_images,
-        thinking=req.thinking,
-    )
+    backend = get_backend()
+    provider_label = backend.name.capitalize()
+    backend_url = settings.active_base_url
+    backend_model = settings.active_model
+    cancelled_mid_stream = False
 
     try:
-        async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
-            async with client.stream("POST", ollama_url, json=ollama_payload) as response:
-                generation.bind_response(response)
-                if response.status_code >= 400:
-                    # Lees fouttekst voor logging zodat we weten waarom de fallback triggert.
-                    error_body = await response.aread()
-                    error_message = f"Ollama status {response.status_code}: {error_body.decode('utf-8', errors='replace').strip()}"
-                    logger.warning(
-                        "Ollama gaf status %s voor model '%s' via %s: %s",
-                        response.status_code,
-                        settings.ollama_model,
-                        ollama_url,
-                        error_body.decode("utf-8", errors="replace").strip(),
-                    )
-                    response.raise_for_status()
-
-                async for line in response.aiter_lines():
-                    if generation.cancelled:
-                        active_generations.pop(request_id, None)
-                        return
-                    if not line:
-                        continue
-
-                    try:
-                        data = json.loads(line)
-
-                        if "thinking" in data:
-                            token = data["thinking"]
-                            if token:
-                                thinking_chunks.append(token)
-                                event_data = json.dumps({"thinking": token, "done": False})
-                                yield f"data: {event_data}\n\n"
-
-                        # Ollama sends answer tokens in "response" field
-                        if "response" in data:
-                            token = data["response"]
-                            if token:  # Only send non-empty tokens
-                                assistant_chunks.append(token)
-                                event_data = json.dumps({"token": token, "done": False})
-                                yield f"data: {event_data}\n\n"
-
-                        # Check if done
-                        if data.get("done", False):
-                            break
-
-                    except json.JSONDecodeError:
-                        continue
-
+        async for chunk in backend.stream(
+            final_prompt,
+            images=prompt_images,
+            thinking=req.thinking,
+        ):
+            if generation.cancelled:
+                cancelled_mid_stream = True
+                break
+            if chunk.thinking:
+                thinking_chunks.append(chunk.thinking)
+                event_data = json.dumps({"thinking": chunk.thinking, "done": False})
+                yield f"data: {event_data}\n\n"
+            if chunk.token:
+                assistant_chunks.append(chunk.token)
+                event_data = json.dumps({"token": chunk.token, "done": False})
+                yield f"data: {event_data}\n\n"
+            if chunk.done:
+                break
     except httpx.TimeoutException as exc:
-        error_message = f"Ollama timeout after {settings.ollama_timeout:g}s: {exc!r}"
+        error_message = f"{provider_label} timeout after {settings.active_timeout:g}s: {exc!r}"
         logger.warning(
-            "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
-            settings.ollama_timeout,
-            ollama_url,
-            settings.ollama_model,
+            "Timeout bij %s (timeout=%ss, url=%s, model=%s): %r",
+            provider_label,
+            settings.active_timeout,
+            backend_url,
+            backend_model,
             exc,
         )
         mock_response = (
-            "[Ollama reageert te langzaam - Mock response] "
-            f"Geen antwoord binnen {settings.ollama_timeout:g}s van {ollama_url} "
-            f"met model '{settings.ollama_model}'. Je vroeg: '{req.prompt}'. "
+            f"[{provider_label} reageert te langzaam - Mock response] "
+            f"Geen antwoord binnen {settings.active_timeout:g}s van {backend_url} "
+            f"met model '{backend_model}'. Je vroeg: '{req.prompt}'. "
             "Dit gebeurt vaak bij een koude start of model-lading; probeer het opnieuw."
         )
-    except httpx.RequestError as exc:
-        # Fallback to mock response if Ollama is not available
-        error_message = f"Ollama connection failed: {exc}"
+    except (httpx.RequestError, LLMUnavailable) as exc:
+        error_message = f"{provider_label} connection failed: {exc}"
         logger.warning(
-            "Kan niet verbinden met Ollama (url=%s, model=%s): %s",
-            ollama_url,
-            settings.ollama_model,
+            "Kan niet verbinden met %s (url=%s, model=%s): %s",
+            provider_label,
+            backend_url,
+            backend_model,
             exc,
         )
         mock_response = (
-            "[Ollama niet beschikbaar - Mock response] "
-            f"Kon geen antwoord krijgen van Ollama op {ollama_url} met model '{settings.ollama_model}'. "
-            f"Je vroeg: '{req.prompt}'. Controleer of de Ollama-service draait en bereikbaar is."
+            f"[{provider_label} niet beschikbaar - Mock response] "
+            f"Kon geen antwoord krijgen van {provider_label} op {backend_url} met model '{backend_model}'. "
+            f"Je vroeg: '{req.prompt}'. Controleer of de LLM-service draait en bereikbaar is."
         )
     except Exception as exc:
-        error_message = f"Ollama onverwachte fout: {exc!r}"
+        error_message = f"{provider_label} onverwachte fout: {exc!r}"
         logger.warning(
-            "Onverwachte Ollama fout (url=%s, model=%s): %r",
-            ollama_url,
-            settings.ollama_model,
+            "Onverwachte %s fout (url=%s, model=%s): %r",
+            provider_label,
+            backend_url,
+            backend_model,
             exc,
         )
         mock_response = (
-            "[Ollama fout - Mock response] "
-            f"Er ging iets mis bij {ollama_url} met model '{settings.ollama_model}'. "
-            f"Je vroeg: '{req.prompt}'. Controleer de backend- en Ollama-logs."
+            f"[{provider_label} fout - Mock response] "
+            f"Er ging iets mis bij {backend_url} met model '{backend_model}'. "
+            f"Je vroeg: '{req.prompt}'. Controleer de backend- en LLM-logs."
         )
+
+    if cancelled_mid_stream:
+        active_generations.pop(request_id, None)
+        return
 
     if mock_response:
         # Stream the mock response word by word
@@ -1053,6 +1025,8 @@ async def sse_stream_generator(
 
     raw_assistant_text = "".join(assistant_chunks).strip()
     raw_thinking_text = "".join(thinking_chunks).strip()
+    # Sommige modellen (Qwen3 etc.) injecteren <think>…</think> in de tokens;
+    # die strippen we uit het zichtbare antwoord en verplaatsen ze naar thinking.
     thinking_text, assistant_text = split_ollama_response_parts(
         response_text=raw_assistant_text,
         thinking_text=raw_thinking_text,
