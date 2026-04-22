@@ -478,6 +478,20 @@ async def start_idle_summary_task() -> None:
         summary_task = asyncio.create_task(_idle_summary_loop())
 
 
+async def _warmup_embedder() -> None:
+    from .rag.embedder import embed_text
+    try:
+        await asyncio.to_thread(embed_text, "warmup")
+        logger.info("Fastembed embedder warmup gelukt")
+    except Exception as exc:
+        logger.warning("Fastembed embedder warmup overgeslagen: %s", exc)
+
+
+@app.on_event("startup")
+async def warmup_embedder_task() -> None:
+    asyncio.create_task(_warmup_embedder())
+
+
 @app.on_event("shutdown")
 async def stop_idle_summary_task() -> None:
     global summary_task
