@@ -205,31 +205,9 @@ ensure_wifi_ui() {
                 echo "📦 iwd installeren (nodig voor iwgtk)..."
                 sudo apt-get install -y iwd
             fi
-            if command -v systemctl >/dev/null 2>&1; then
+            if command -v systemctl >/dev/null 2>&1 && ! systemctl is-active NetworkManager >/dev/null 2>&1; then
                 sudo systemctl enable iwd >/dev/null 2>&1 || true
                 sudo systemctl restart iwd >/dev/null 2>&1 || true
-            fi
-            if command -v systemctl >/dev/null 2>&1 && systemctl is-active NetworkManager >/dev/null 2>&1; then
-                echo "ℹ️  NetworkManager detectie: switch WiFi backend naar iwd (kan WiFi kort onderbreken)."
-                if [ -d /etc/NetworkManager/conf.d ]; then
-                    backend_conf="/etc/NetworkManager/conf.d/10-wifi-backend.conf"
-                    if ! grep -q "wifi.backend=iwd" "$backend_conf" 2>/dev/null; then
-                        sudo tee "$backend_conf" >/dev/null <<'EOF'
-[device]
-wifi.backend=iwd
-EOF
-                    fi
-                else
-                    backend_conf="/etc/NetworkManager/NetworkManager.conf"
-                    if ! grep -q "wifi.backend=iwd" "$backend_conf" 2>/dev/null; then
-                        sudo tee -a "$backend_conf" >/dev/null <<'EOF'
-
-[device]
-wifi.backend=iwd
-EOF
-                    fi
-                fi
-                sudo systemctl restart NetworkManager >/dev/null 2>&1 || true
             fi
             ;;
         *)
