@@ -4,13 +4,14 @@ import asyncio
 import html
 import json
 import os
+import time
 import uuid
 from collections.abc import Coroutine
 
 import requests
 from datetime import datetime
 from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QTextDocument, QTextOption
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -22,7 +23,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QTextBrowser,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -175,109 +175,28 @@ class TypingDotsWidget(QWidget):
             painter.drawEllipse(x, y, diameter, diameter)
 
 
-class AutoSizingMarkdownView(QTextBrowser):
+class AutoSizingMarkdownView(QLabel):
     def __init__(self):
         super().__init__()
         self._plain_text = ""
-        self._syncing_height = False
-        self.setReadOnly(True)
-        self.setOpenExternalLinks(True)
-        self.setFrameShape(QFrame.NoFrame)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setLineWrapMode(QTextBrowser.WidgetWidth)
-        self.setStyleSheet("background:transparent; border:none;")
-        self.document().setDocumentMargin(0)
-        option = self.document().defaultTextOption()
-        option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
-        self.document().setDefaultTextOption(option)
-        self.document().setDefaultStyleSheet(
-            """
-            body { color:#111827; font-size:14px; line-height:1.55; overflow-wrap:anywhere; word-break:break-word; }
-            p { margin:0 0 10px 0; overflow-wrap:anywhere; word-break:break-word; }
-            h1, h2, h3, h4 { margin:14px 0 8px 0; color:#111111; font-weight:700; }
-            ul, ol { margin:0 0 10px 20px; }
-            li { margin:0 0 4px 0; overflow-wrap:anywhere; word-break:break-word; }
-            a { color:#0f766e; text-decoration:none; }
-            blockquote {
-                margin:10px 0;
-                padding:8px 12px;
-                border-left:4px solid #f59e0b;
-                background:#fffbeb;
-                color:#44403c;
-                overflow-wrap:anywhere;
-                word-break:break-word;
-            }
-            code {
-                font-family:"SFMono-Regular","Cascadia Mono","DejaVu Sans Mono",monospace;
-                background:#f3f4f6;
-                padding:2px 5px;
-                border-radius:6px;
-                overflow-wrap:anywhere;
-                word-break:break-word;
-            }
-            pre {
-                margin:10px 0;
-                padding:12px 14px;
-                background:#111827;
-                color:#f9fafb;
-                border-radius:12px;
-                white-space:pre-wrap;
-                word-wrap:break-word;
-                overflow-wrap:anywhere;
-                word-break:break-word;
-            }
-            pre code {
-                background:transparent;
-                padding:0;
-            }
-            """
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.PlainText)
+        self.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.setStyleSheet(
+            "background:transparent; border:none; color:#111827;"
+            "font-size:14px; line-height:1.55;"
         )
-        layout = self.document().documentLayout()
-        if layout is not None:
-            layout.documentSizeChanged.connect(self._queue_sync_height)
 
     def set_markdown_text(self, text: str, placeholder: str = "") -> None:
         self._plain_text = text or ""
-        if self._plain_text.strip():
-            self.setMarkdown(self._plain_text)
-        elif placeholder:
-            self.setHtml(f"<p>{html.escape(placeholder)}</p>")
-        else:
-            self.setHtml("")
-        self._queue_sync_height()
+        content = self._plain_text if self._plain_text.strip() else (placeholder or "")
+        self.setText(content)
+        self.updateGeometry()
 
     def plain_text(self) -> str:
         return self._plain_text
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._queue_sync_height()
-
-    def _queue_sync_height(self, *_args) -> None:
-        if self._syncing_height:
-            return
-        QTimer.singleShot(0, self._sync_height)
-
-    def _sync_height(self) -> None:
-        if self._syncing_height:
-            return
-        self._syncing_height = True
-        try:
-            width = max(0, self.viewport().width() - 4)
-            if abs(self.document().textWidth() - width) > 1:
-                self.document().setTextWidth(width)
-            self.document().adjustSize()
-            height = int(self.document().size().height()) + 8
-            self.setFixedHeight(max(28, height))
-            self.updateGeometry()
-            parent = self.parentWidget()
-            if parent is not None:
-                parent.updateGeometry()
-                parent.adjustSize()
-        finally:
-            self._syncing_height = False
 
 
 class AssistantMessageWidget(QWidget):
@@ -922,6 +841,21 @@ class ChatPage(QWidget):
                 detail = self._format_api_error_response(resp)
                 raise RuntimeError(detail)
 
+            response_buf: list[str] = []
+            thinking_buf: list[str] = []
+            last_flush = time.monotonic()
+            flush_interval = 0.03  # ~30ms batching window
+
+            def flush_response() -> None:
+                if response_buf:
+                    self.signals.response_token.emit(request_id, "".join(response_buf))
+                    response_buf.clear()
+
+            def flush_thinking() -> None:
+                if thinking_buf:
+                    self.signals.thinking_token.emit(request_id, "".join(thinking_buf))
+                    thinking_buf.clear()
+
             for line in resp.iter_lines():
                 if chat_epoch != self._chat_epoch:
                     return
@@ -938,6 +872,8 @@ class ChatPage(QWidget):
                     continue
 
                 if event_data.get("status") == "queued":
+                    flush_response()
+                    flush_thinking()
                     position = event_data.get("position", 0)
                     self.signals.queue_position.emit(request_id, position)
                     continue
@@ -945,16 +881,28 @@ class ChatPage(QWidget):
                 if "thinking" in event_data and not event_data.get("done"):
                     token = event_data.get("thinking") or ""
                     if token:
-                        self.signals.thinking_token.emit(request_id, token)
+                        thinking_buf.append(token)
+                    now = time.monotonic()
+                    if now - last_flush >= flush_interval:
+                        flush_response()
+                        flush_thinking()
+                        last_flush = now
                     continue
 
                 if "token" in event_data and not event_data.get("done"):
                     token = event_data.get("token") or ""
                     if token:
-                        self.signals.response_token.emit(request_id, token)
+                        response_buf.append(token)
+                    now = time.monotonic()
+                    if now - last_flush >= flush_interval:
+                        flush_response()
+                        flush_thinking()
+                        last_flush = now
                     continue
 
                 if event_data.get("done"):
+                    flush_response()
+                    flush_thinking()
                     self.signals.final_payload.emit(
                         request_id,
                         event_data.get("thinking", "") or "",
@@ -962,6 +910,9 @@ class ChatPage(QWidget):
                     )
                     self.signals.done.emit(request_id)
                     return
+
+            flush_response()
+            flush_thinking()
 
         # Als de stream eindigt zonder done-event, sluit netjes af.
         self.signals.done.emit(request_id)
@@ -1067,7 +1018,7 @@ class ChatPage(QWidget):
             return ""
         return str(detail)
 
-    @Slot(str)
+    @Slot(int, str)
     def _on_response_token(self, request_id: int, token: str):
         if request_id != self._active_request_id:
             return
@@ -1088,7 +1039,7 @@ class ChatPage(QWidget):
         if should_stick:
             self._scroll_to_bottom()
 
-    @Slot(str)
+    @Slot(int, str)
     def _on_thinking_token(self, request_id: int, token: str):
         if request_id != self._active_request_id:
             return
@@ -1104,7 +1055,7 @@ class ChatPage(QWidget):
         if should_stick:
             self._scroll_to_bottom()
 
-    @Slot(str, str)
+    @Slot(int, str, str)
     def _on_final_payload(self, request_id: int, thinking: str, message: str):
         if request_id != self._active_request_id:
             return
@@ -1211,7 +1162,7 @@ class ChatPage(QWidget):
             )
             return None
 
-    @Slot()
+    @Slot(int)
     def _on_done(self, request_id: int):
         """Finalize the current message."""
         if request_id != self._active_request_id:
@@ -1238,7 +1189,7 @@ class ChatPage(QWidget):
         self.current_thinking_text = ""
         self.current_reply_widget = None
 
-    @Slot(int)
+    @Slot(int, int)
     def _on_queue_position(self, request_id: int, position: int):
         """Update UI with queue position."""
         if request_id != self._active_request_id:
