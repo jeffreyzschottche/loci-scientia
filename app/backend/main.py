@@ -487,9 +487,23 @@ async def _warmup_embedder() -> None:
         logger.warning("Fastembed embedder warmup overgeslagen: %s", exc)
 
 
+async def _warmup_llm_backend() -> None:
+    try:
+        backend = get_backend()
+        await backend.generate("warmup", options={"max_tokens": 1})
+        logger.info("LLM backend warmup gelukt (%s/%s)", backend.name, backend.current_model)
+    except Exception as exc:
+        logger.warning("LLM backend warmup overgeslagen: %s", exc)
+
+
 @app.on_event("startup")
 async def warmup_embedder_task() -> None:
     asyncio.create_task(_warmup_embedder())
+
+
+@app.on_event("startup")
+async def warmup_llm_backend_task() -> None:
+    asyncio.create_task(_warmup_llm_backend())
 
 
 @app.on_event("shutdown")
