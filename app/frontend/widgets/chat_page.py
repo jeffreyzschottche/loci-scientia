@@ -913,7 +913,7 @@ class ChatPage(QWidget):
             url,
             json=payload,
             stream=True,
-            timeout=60,
+            timeout=300,
             headers=self._auth_headers(),
         ) as resp:
             if resp.status_code >= 400:
