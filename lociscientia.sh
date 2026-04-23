@@ -517,24 +517,142 @@ esac
 export LLM_PROVIDER
 
 lemonade_pid=""
-install_lemonade() {
-    if command -v lemonade-server >/dev/null 2>&1 || command -v lemonade-server-dev >/dev/null 2>&1; then
-        echo "✅ Lemonade Server is al geïnstalleerd"
+
+_lemonade_bin_dir="$PROJECT_ROOT/bin/lemonade"
+
+_find_cpp_lemonade_bin() {
+    # Zoek expliciet de C++ binaries (lemond of de lemonade-server shim).
+    # De Python `lemonade-server-dev` is gedeprecateerd en wordt hier bewust genegeerd.
+    local candidate
+    for candidate in \
+        "$_lemonade_bin_dir/lemond" \
+        "$_lemonade_bin_dir/lemonade-server" \
+        "/opt/bin/lemond" \
+        "/opt/bin/lemonade-server"; do
+        if [ -x "$candidate" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    if command -v lemond >/dev/null 2>&1; then
+        command -v lemond
         return 0
     fi
-    echo "📦 Lemonade Server niet gevonden; pip install lemonade-sdk[dev] (in venv)..."
-    if [ ! -d ".venv" ]; then
-        python3 -m venv .venv
+    if command -v lemonade-server >/dev/null 2>&1; then
+        local path
+        path="$(command -v lemonade-server)"
+        # Shim in de project-venv is de Python-variant; die willen we niet.
+        case "$path" in
+            "$PROJECT_ROOT/.venv/"*) ;;
+            *) printf '%s' "$path"; return 0 ;;
+        esac
     fi
-    # shellcheck source=/dev/null
-    source .venv/bin/activate
-    if python -m pip install --upgrade "lemonade-sdk"; then
-        echo "✅ Lemonade SDK geïnstalleerd (lemonade-server-dev beschikbaar in .venv)"
-        return 0
-    fi
-    echo "⚠️  Lemonade SDK installatie mislukt."
-    echo "    Installeer handmatig: https://lemonade-server.ai/ of 'pip install lemonade-sdk'"
     return 1
+}
+
+_install_lemonade_from_tarball() {
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "⚠️  curl ontbreekt; kan embeddable tarball niet downloaden."
+        return 1
+    fi
+    local api_url="https://api.github.com/repos/lemonade-sdk/lemonade/releases/latest"
+    local tarball_url
+    tarball_url="$(curl -fsSL "$api_url" \
+        | grep -oE '"browser_download_url":[[:space:]]*"[^"]*lemonade-embeddable-[0-9.]+-ubuntu-x64\.tar\.gz"' \
+        | head -n1 | sed -E 's/.*"(https[^"]+)"/\1/')"
+    if [ -z "$tarball_url" ]; then
+        echo "⚠️  Kon embeddable tarball URL niet vinden in GitHub releases."
+        return 1
+    fi
+    mkdir -p "$_lemonade_bin_dir"
+    local tmp_tgz
+    tmp_tgz="$(mktemp --suffix=.tar.gz)"
+    echo "⬇️  Download embeddable Lemonade: $(basename "$tarball_url")"
+    if ! curl -fSL "$tarball_url" -o "$tmp_tgz"; then
+        rm -f "$tmp_tgz"
+        echo "⚠️  Download embeddable Lemonade mislukt."
+        return 1
+    fi
+    if ! tar -xzf "$tmp_tgz" -C "$_lemonade_bin_dir" --strip-components=1; then
+        rm -f "$tmp_tgz"
+        echo "⚠️  Uitpakken embeddable tarball mislukt."
+        return 1
+    fi
+    rm -f "$tmp_tgz"
+    if [ ! -x "$_lemonade_bin_dir/lemond" ]; then
+        echo "⚠️  lemond binary niet gevonden in embeddable tarball."
+        return 1
+    fi
+    echo "✅ C++ Lemonade (lemond) geïnstalleerd in $_lemonade_bin_dir"
+    return 0
+}
+
+_install_lemonade_from_ppa() {
+    if ! command -v apt-get >/dev/null 2>&1; then
+        return 1
+    fi
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo; kan Lemonade PPA niet toevoegen."
+        return 1
+    fi
+    local sudo_cmd=()
+    if [ "$(id -u)" -ne 0 ]; then
+        sudo_cmd=(sudo)
+    fi
+    if ! command -v add-apt-repository >/dev/null 2>&1; then
+        echo "📦 software-properties-common installeren voor add-apt-repository..."
+        "${sudo_cmd[@]}" apt-get update -y || true
+        "${sudo_cmd[@]}" apt-get install -y software-properties-common || return 1
+    fi
+    echo "🍋 PPA ppa:lemonade-team/stable toevoegen..."
+    if ! "${sudo_cmd[@]}" add-apt-repository -y ppa:lemonade-team/stable; then
+        return 1
+    fi
+    "${sudo_cmd[@]}" apt-get update -y || return 1
+    if ! "${sudo_cmd[@]}" apt-get install -y lemonade-server; then
+        return 1
+    fi
+    return 0
+}
+
+install_lemonade() {
+    # Hard eis: de C++ Lemonade Server (lemond). De Python `lemonade-server-dev`
+    # is gedeprecateerd (zie lemonade.log) en wordt niet meer gebruikt.
+    if _find_cpp_lemonade_bin >/dev/null; then
+        echo "✅ C++ Lemonade Server is al geïnstalleerd ($(_find_cpp_lemonade_bin))"
+        return 0
+    fi
+
+    echo "📦 C++ Lemonade Server niet gevonden; installeren..."
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            local distro_id=""
+            if [ -r /etc/os-release ]; then
+                # shellcheck disable=SC1091
+                distro_id="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
+            fi
+            if echo "$distro_id" | grep -qiE 'ubuntu|debian'; then
+                if _install_lemonade_from_ppa; then
+                    if _find_cpp_lemonade_bin >/dev/null; then
+                        echo "✅ lemonade-server geïnstalleerd via PPA"
+                        return 0
+                    fi
+                fi
+                echo "ℹ️  PPA-installatie niet gelukt; val terug op embeddable tarball."
+            fi
+            if _install_lemonade_from_tarball; then
+                return 0
+            fi
+            echo "⚠️  Automatische installatie mislukt."
+            echo "    Installeer handmatig via https://lemonade-server.ai/install_options.html"
+            return 1
+            ;;
+        *)
+            echo "⚠️  Automatische installatie voor ${DEVICE_PLATFORM} niet ondersteund."
+            echo "    Installeer handmatig via https://lemonade-server.ai/install_options.html"
+            return 1
+            ;;
+    esac
 }
 
 detect_npu() {
@@ -550,6 +668,24 @@ detect_npu() {
     return 1
 }
 
+_warmup_lemonade_model() {
+    local base_url="$1"
+    local model="${LEMONADE_MODEL:-}"
+    if [ -z "$model" ]; then
+        echo "ℹ️  LEMONADE_MODEL niet ingesteld; warm-up overgeslagen."
+        return 0
+    fi
+    echo "🔥 Lemonade warm-up: model $model preloaden (achtergrond)..."
+    (
+        curl -fsS -X POST "$base_url/api/v1/load" \
+            -H "Content-Type: application/json" \
+            -d "{\"model_name\":\"$model\"}" \
+            >>"$PROJECT_ROOT/lemonade.log" 2>&1 \
+            && echo "✅ Lemonade warm-up voltooid voor $model" >>"$PROJECT_ROOT/lemonade.log" \
+            || echo "⚠️  Lemonade warm-up faalde voor $model" >>"$PROJECT_ROOT/lemonade.log"
+    ) &
+}
+
 start_lemonade() {
     local host port
     local base_url="${LEMONADE_BASE_URL:-http://127.0.0.1:8020}"
@@ -561,22 +697,37 @@ start_lemonade() {
     detect_npu || true
 
     local bin=""
-    if command -v lemonade-server-dev >/dev/null 2>&1; then
-        bin="lemonade-server-dev"
-    elif command -v lemonade-server >/dev/null 2>&1; then
-        bin="lemonade-server"
-    else
-        echo "⚠️  Lemonade Server binary niet gevonden na installatie."
+    bin="$(_find_cpp_lemonade_bin || true)"
+    if [ -z "$bin" ]; then
+        echo "⚠️  C++ Lemonade binary niet gevonden na installatie."
         return 1
     fi
 
     if curl -fsS "$base_url/api/v1/health" >/dev/null 2>&1; then
         echo "✅ Lemonade Server draait al op $base_url"
+        _warmup_lemonade_model "$base_url"
         return 0
     fi
 
-    echo "⏳ Lemonade Server starten op $host:$port..."
-    "$bin" serve --host "$host" --port "$port" > "$PROJECT_ROOT/lemonade.log" 2>&1 &
+    echo "⏳ C++ Lemonade Server starten ($bin) op $host:$port..."
+    case "$(basename "$bin")" in
+        lemond)
+            # Native C++ server; cache_dir wordt bewust niet doorgegeven zodat
+            # lemond zijn default runtime-dir (~/.cache/lemonade, $XDG_RUNTIME_DIR)
+            # gebruikt en niet in /opt of vergelijkbare read-only paden schrijft.
+            "$bin" --host "$host" --port "$port" \
+                > "$PROJECT_ROOT/lemonade.log" 2>&1 &
+            ;;
+        lemonade-server)
+            # Legacy shim die delegeert naar lemond; accepteert `serve`.
+            "$bin" serve --host "$host" --port "$port" \
+                > "$PROJECT_ROOT/lemonade.log" 2>&1 &
+            ;;
+        *)
+            echo "⚠️  Onbekende Lemonade binary: $bin"
+            return 1
+            ;;
+    esac
     lemonade_pid=$!
     echo "$lemonade_pid" > "$PROJECT_ROOT/lemonade.pid" 2>/dev/null || true
     echo "✅ Lemonade Server gestart (PID: $lemonade_pid)"
@@ -585,6 +736,7 @@ start_lemonade() {
     for attempt in {1..40}; do
         if curl -fsS "$base_url/api/v1/health" >/dev/null 2>&1; then
             echo "✅ Lemonade health OK"
+            _warmup_lemonade_model "$base_url"
             return 0
         fi
         sleep 1
