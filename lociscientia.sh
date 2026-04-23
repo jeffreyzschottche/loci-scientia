@@ -686,6 +686,30 @@ _warmup_lemonade_model() {
     ) &
 }
 
+_reap_orphan_llama_servers() {
+    # Bij een onverwachte exit blijft soms een llama-server subprocess hangen
+    # dat VRAM vasthoudt (PPID 1). Dat blokkeert het herladen van het model.
+    # Ruim alleen échte orphans op — processen waarvan de parent (lemond) al weg is.
+    if ! command -v pgrep >/dev/null 2>&1; then
+        return 0
+    fi
+    local pids
+    pids="$(pgrep -f 'lemonade/bin/llamacpp/.*llama-server' 2>/dev/null || true)"
+    [ -z "$pids" ] && return 0
+    local pid ppid
+    for pid in $pids; do
+        ppid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]')"
+        if [ "$ppid" = "1" ]; then
+            echo "🧹 Orphan llama-server (pid $pid) opruimen om VRAM vrij te maken..."
+            kill "$pid" >/dev/null 2>&1 || true
+            sleep 1
+            if kill -0 "$pid" >/dev/null 2>&1; then
+                kill -9 "$pid" >/dev/null 2>&1 || true
+            fi
+        fi
+    done
+}
+
 start_lemonade() {
     local host port
     local base_url="${LEMONADE_BASE_URL:-http://127.0.0.1:8020}"
@@ -702,6 +726,8 @@ start_lemonade() {
         echo "⚠️  C++ Lemonade binary niet gevonden na installatie."
         return 1
     fi
+
+    _reap_orphan_llama_servers
 
     if curl -fsS "$base_url/api/v1/health" >/dev/null 2>&1; then
         echo "✅ Lemonade Server draait al op $base_url"
@@ -865,7 +891,26 @@ cleanup() {
 
     if [ -n "${lemonade_pid:-}" ]; then
         echo "🛑 Lemonade stoppen..."
+        # Kill de hele procesgroep zodat llama-server subprocessen niet als
+        # orphans blijven draaien (zouden anders VRAM vasthouden bij restart).
+        local lemonade_children
+        lemonade_children="$(pgrep -P "$lemonade_pid" 2>/dev/null || true)"
         kill "$lemonade_pid" >/dev/null 2>&1 || true
+        for lpid in $lemonade_children; do
+            kill "$lpid" >/dev/null 2>&1 || true
+        done
+        sleep 2
+        if kill -0 "$lemonade_pid" >/dev/null 2>&1; then
+            kill -9 "$lemonade_pid" >/dev/null 2>&1 || true
+        fi
+        # Vang eventuele achtergebleven llama-server processen af.
+        if command -v pgrep >/dev/null 2>&1; then
+            local stragglers
+            stragglers="$(pgrep -f 'lemonade/bin/llamacpp/.*llama-server' 2>/dev/null || true)"
+            for lpid in $stragglers; do
+                kill -9 "$lpid" >/dev/null 2>&1 || true
+            done
+        fi
     fi
 
     case "$DEVICE_PLATFORM" in

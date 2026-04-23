@@ -2,42 +2,6 @@
   "mode": "interactive_v1",
   "samples": [
     {
-      "timestamp": "2026-04-18T12:23:55.695938+00:00",
-      "requests_today": 14,
-      "active_users_today": 4,
-      "avg_response_ms": 17932
-    },
-    {
-      "timestamp": "2026-04-18T16:09:12.660505+00:00",
-      "requests_today": 15,
-      "active_users_today": 5,
-      "avg_response_ms": 19705
-    },
-    {
-      "timestamp": "2026-04-18T16:09:51.308863+00:00",
-      "requests_today": 16,
-      "active_users_today": 5,
-      "avg_response_ms": 19773
-    },
-    {
-      "timestamp": "2026-04-18T16:18:57.080729+00:00",
-      "requests_today": 17,
-      "active_users_today": 6,
-      "avg_response_ms": 23326
-    },
-    {
-      "timestamp": "2026-04-18T17:13:13.774381+00:00",
-      "requests_today": 18,
-      "active_users_today": 6,
-      "avg_response_ms": 24048
-    },
-    {
-      "timestamp": "2026-04-18T17:13:58.752956+00:00",
-      "requests_today": 19,
-      "active_users_today": 6,
-      "avg_response_ms": 23531
-    },
-    {
       "timestamp": "2026-04-18T17:14:39.257907+00:00",
       "requests_today": 20,
       "active_users_today": 6,
@@ -300,6 +264,42 @@
       "requests_today": 3,
       "active_users_today": 1,
       "avg_response_ms": 14909
+    },
+    {
+      "timestamp": "2026-04-23T11:51:01.450625+00:00",
+      "requests_today": 4,
+      "active_users_today": 1,
+      "avg_response_ms": 17038
+    },
+    {
+      "timestamp": "2026-04-23T11:51:35.439452+00:00",
+      "requests_today": 5,
+      "active_users_today": 1,
+      "avg_response_ms": 18191
+    },
+    {
+      "timestamp": "2026-04-23T11:52:46.434670+00:00",
+      "requests_today": 6,
+      "active_users_today": 1,
+      "avg_response_ms": 21469
+    },
+    {
+      "timestamp": "2026-04-23T11:57:55.368503+00:00",
+      "requests_today": 7,
+      "active_users_today": 1,
+      "avg_response_ms": 18956
+    },
+    {
+      "timestamp": "2026-04-23T11:58:16.209692+00:00",
+      "requests_today": 8,
+      "active_users_today": 1,
+      "avg_response_ms": 17935
+    },
+    {
+      "timestamp": "2026-04-23T11:58:59.272632+00:00",
+      "requests_today": 9,
+      "active_users_today": 1,
+      "avg_response_ms": 16364
     }
   ]
 }
