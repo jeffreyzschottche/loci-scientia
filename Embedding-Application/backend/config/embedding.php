@@ -14,7 +14,7 @@ return [
 
     'model' => env('EMBEDDING_MODEL', env('FASTEMBED_MODEL', 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2')),
     'vector_dimension' => (int) env('EMBEDDING_VECTOR_DIMENSION', 768),
-    'chunk_tokens' => (int) env('EMBEDDING_CHUNK_TOKENS', 448),
-    'chunk_overlap_tokens' => (int) env('EMBEDDING_CHUNK_OVERLAP_TOKENS', 96),
+    'chunk_tokens' => (int) env('EMBEDDING_CHUNK_TOKENS', 150),
+    'chunk_overlap_tokens' => (int) env('EMBEDDING_CHUNK_OVERLAP_TOKENS', 80),
     'tokens_per_word' => (float) env('EMBEDDING_TOKENS_PER_WORD', 1.3),
 ];

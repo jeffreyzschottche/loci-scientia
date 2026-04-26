@@ -849,6 +849,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         history=history,
         documents=documents,
         final_prompt_override=final_prompt,
+        citations=context_details.get("citations", []),
     )
     message = response.get("message", "")
 
@@ -1072,6 +1073,7 @@ async def sse_stream_generator(
             "done": True,
             "message": assistant_text,
             "thinking": thinking_text,
+            "citations": context_details.get("citations", []),
         }
     )
     yield f"data: {event_data}\n\n"

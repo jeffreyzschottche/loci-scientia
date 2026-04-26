@@ -1609,6 +1609,18 @@ TRANSLATIONS = {
         "nl": "Gekopieerd",
         "en": "Copied",
     },
+    "chat_sources_title": {
+        "nl": "GEBRUIKTE BRONNEN",
+        "en": "SOURCES USED",
+    },
+    "chat_sources_page": {
+        "nl": "p. {page}",
+        "en": "p. {page}",
+    },
+    "chat_sources_pages": {
+        "nl": "p. {start}-{end}",
+        "en": "p. {start}-{end}",
+    },
     "chat_thinking_block": {
         "nl": "Nadenken",
         "en": "Thinking",
