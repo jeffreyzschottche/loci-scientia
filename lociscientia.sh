@@ -24,6 +24,19 @@ ORIGINAL_LOCAL_HOSTNAME=""
 ORIGINAL_COMPUTER_NAME=""
 SUDO_KEEPALIVE_PID=""
 HAVE_SUDO=0
+NPU_REBOOT_REQUIRED=0
+NPU_STACK_READY=0
+NPU_ACCEL_AVAILABLE=0
+
+_os_release_field() {
+    local field="$1"
+    if [ ! -r /etc/os-release ]; then
+        return 1
+    fi
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    eval "printf '%s' \"\${$field:-}\""
+}
 
 ensure_sudo_session() {
     if ! command -v sudo >/dev/null 2>&1; then
@@ -53,6 +66,41 @@ _trim() {
     value="${value#"${value%%[![:space:]]*}"}"
     value="${value%"${value##*[![:space:]]}"}"
     printf "%s" "$value"
+}
+
+_have_root_access() {
+    [ "$HAVE_SUDO" -eq 1 ] || [ "$(id -u)" -eq 0 ]
+}
+
+_run_privileged() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+_version_ge() {
+    [ "$1" = "$2" ] && return 0
+    local first
+    first="$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)"
+    [ "$first" = "$2" ]
+}
+
+_npu_is_required() {
+    local mode="${LEMONADE_REQUIRE_NPU:-auto}"
+    case "$mode" in
+        1|true|TRUE|yes|YES|on|ON)
+            return 0
+            ;;
+        auto|AUTO|"")
+            detect_npu >/dev/null 2>&1
+            return $?
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 _run_ollama() {
@@ -615,6 +663,399 @@ _install_lemonade_from_ppa() {
     return 0
 }
 
+_find_flm_bin() {
+    local candidate
+    for candidate in \
+        "$PROJECT_ROOT/bin/flm/flm" \
+        "/opt/bin/flm"; do
+        if [ -x "$candidate" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    if command -v flm >/dev/null 2>&1; then
+        command -v flm
+        return 0
+    fi
+    return 1
+}
+
+_install_linux_npu_packages() {
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get niet beschikbaar; Linux NPU packages worden niet automatisch geïnstalleerd."
+        return 1
+    fi
+    if ! _have_root_access; then
+        echo "⚠️  Geen sudo/root; libxrt-npu2, amdxdna-dkms en linux-firmware worden niet automatisch geïnstalleerd."
+        return 1
+    fi
+    local missing_packages=()
+    local package
+    for package in libxrt-npu2 amdxdna-dkms linux-firmware; do
+        if ! dpkg -s "$package" >/dev/null 2>&1; then
+            missing_packages+=("$package")
+        fi
+    done
+    if [ "${#missing_packages[@]}" -eq 0 ]; then
+        echo "✅ Linux NPU packages zijn al aanwezig"
+        return 0
+    fi
+    echo "📦 Linux NPU packages installeren: ${missing_packages[*]}"
+    _run_privileged apt-get update -y
+    _run_privileged apt-get install -y "${missing_packages[@]}"
+}
+
+_install_flm_from_release() {
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "⚠️  curl ontbreekt; kan FastFlowLM release niet downloaden."
+        return 1
+    fi
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get ontbreekt; kan FastFlowLM .deb niet installeren."
+        return 1
+    fi
+    if ! _have_root_access; then
+        echo "⚠️  Geen sudo/root; kan FastFlowLM niet automatisch installeren."
+        return 1
+    fi
+
+    local api_url="https://api.github.com/repos/FastFlowLM/FastFlowLM/releases/latest"
+    local release_json=""
+    local flm_url=""
+    local arch_regex='(amd64|x86_64)'
+    local os_id="" version_id="" version_codename="" ubuntu_version_no_dots=""
+    local ubuntu_major_minor="" asset_regex="" fallback_regex="" available_assets=""
+    local exact_markers=""
+    local require_exact_asset=0
+
+    if [ -n "${FASTFLOWLM_DEB_URL:-}" ]; then
+        flm_url="${FASTFLOWLM_DEB_URL}"
+    else
+        release_json="$(curl -fsSL "$api_url")" || return 1
+        os_id="$(_os_release_field ID | tr '[:upper:]' '[:lower:]')"
+        version_id="$(_os_release_field VERSION_ID)"
+        version_codename="$(_os_release_field VERSION_CODENAME | tr '[:upper:]' '[:lower:]')"
+        ubuntu_version_no_dots="${version_id//./}"
+        ubuntu_major_minor="$(printf '%s' "$version_id" | cut -d. -f1,2)"
+
+        case "$os_id" in
+            ubuntu)
+                asset_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*(ubuntu|noble|oracular|plucky|questing)[^\"]*${arch_regex}[^\"]*\\.deb\""
+                if [ "$version_id" = "25.10" ] || [ "$version_codename" = "questing" ]; then
+                    require_exact_asset=1
+                    exact_markers="questing|25\\.10|2510"
+                    asset_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*(${exact_markers})[^\"]*${arch_regex}[^\"]*\\.deb\""
+                elif [ -n "$version_id" ] || [ -n "$version_codename" ]; then
+                    asset_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*(${version_codename}|${version_id}|${ubuntu_version_no_dots}|${ubuntu_major_minor}|ubuntu)[^\"]*${arch_regex}[^\"]*\\.deb\""
+                fi
+                fallback_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*ubuntu[^\"]*${arch_regex}[^\"]*\\.deb\""
+                ;;
+            debian)
+                asset_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*(debian|bookworm|trixie|forky)[^\"]*${arch_regex}[^\"]*\\.deb\""
+                fallback_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*debian[^\"]*${arch_regex}[^\"]*\\.deb\""
+                ;;
+            *)
+                fallback_regex="\"browser_download_url\":[[:space:]]*\"[^\"]*(linux|ubuntu|debian)[^\"]*${arch_regex}[^\"]*\\.deb\""
+                ;;
+        esac
+
+        if [ -n "$asset_regex" ]; then
+            flm_url="$(printf '%s' "$release_json" \
+                | grep -oE "$asset_regex" \
+                | head -n1 | sed -E 's/.*"(https[^"]+)"/\1/')"
+        fi
+        if [ -z "$flm_url" ] && [ "$require_exact_asset" -eq 0 ] && [ -n "$fallback_regex" ]; then
+            flm_url="$(printf '%s' "$release_json" \
+                | grep -oE "$fallback_regex" \
+                | head -n1 | sed -E 's/.*"(https[^"]+)"/\1/')"
+        fi
+        available_assets="$(printf '%s' "$release_json" \
+            | grep -oE '"browser_download_url":[[:space:]]*"[^"]+\.deb"' \
+            | sed -E 's/.*\/([^\/"]+)"$/\1/' \
+            | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    fi
+    if [ -z "$flm_url" ]; then
+        echo "⚠️  Kon geen FastFlowLM .deb vinden die past bij $( _os_release_field PRETTY_NAME || printf '%s' 'dit systeem' )."
+        if [ "$require_exact_asset" -eq 1 ]; then
+            echo "    Voor Ubuntu 25.10/questing accepteert dit script geen Ubuntu 24.04 fallback-package."
+        fi
+        if [ -n "$available_assets" ]; then
+            echo "    Beschikbare release-assets: $available_assets"
+        fi
+        return 1
+    fi
+
+    local tmp_deb
+    tmp_deb="$(mktemp --suffix=.deb)"
+    echo "⬇️  Download FastFlowLM: $(basename "$flm_url")"
+    if ! curl -fSL "$flm_url" -o "$tmp_deb"; then
+        rm -f "$tmp_deb"
+        echo "⚠️  Download FastFlowLM mislukt."
+        return 1
+    fi
+    if ! _run_privileged apt-get install -y "$tmp_deb"; then
+        rm -f "$tmp_deb"
+        echo "⚠️  FastFlowLM installatie mislukt."
+        return 1
+    fi
+    rm -f "$tmp_deb"
+    return 0
+}
+
+_install_flm_from_source() {
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get ontbreekt; kan build-dependencies voor FastFlowLM niet automatisch installeren."
+        return 1
+    fi
+    if ! _have_root_access; then
+        echo "⚠️  Geen sudo/root; kan FastFlowLM build-dependencies niet automatisch installeren."
+        return 1
+    fi
+
+    local build_packages=(
+        git
+        cmake
+        ninja-build
+        build-essential
+        pkg-config
+    )
+    local tmp_dir=""
+    local source_ref="${FASTFLOWLM_SOURCE_REF:-}"
+    local clone_url="${FASTFLOWLM_GIT_URL:-https://github.com/FastFlowLM/FastFlowLM.git}"
+    local cmake_preset="${FASTFLOWLM_CMAKE_PRESET:-linux-default}"
+
+    echo "📦 Build-dependencies voor FastFlowLM installeren..."
+    _run_privileged apt-get update -y
+    _run_privileged apt-get install -y "${build_packages[@]}"
+
+    if ! command -v git >/dev/null 2>&1; then
+        echo "⚠️  git ontbreekt nog steeds na installatie van build-dependencies."
+        return 1
+    fi
+    if ! command -v cmake >/dev/null 2>&1; then
+        echo "⚠️  cmake ontbreekt nog steeds na installatie van build-dependencies."
+        return 1
+    fi
+
+    tmp_dir="$(mktemp -d)"
+    echo "⬇️  FastFlowLM broncode ophalen..."
+    if ! git clone --depth=1 "$clone_url" "$tmp_dir/FastFlowLM"; then
+        rm -rf "$tmp_dir"
+        echo "⚠️  FastFlowLM broncode ophalen mislukt."
+        return 1
+    fi
+
+    if [ -n "$source_ref" ]; then
+        echo "📍 FastFlowLM checkout: $source_ref"
+        if ! git -C "$tmp_dir/FastFlowLM" fetch --depth=1 origin "$source_ref" \
+            || ! git -C "$tmp_dir/FastFlowLM" checkout "$source_ref"; then
+            rm -rf "$tmp_dir"
+            echo "⚠️  FastFlowLM checkout naar $source_ref mislukt."
+            return 1
+        fi
+    fi
+
+    echo "🛠️  FastFlowLM bouwen vanaf broncode..."
+    if ! (
+        cd "$tmp_dir/FastFlowLM/src" \
+        && cmake --preset "$cmake_preset" \
+        && cmake --build --preset "$cmake_preset" -j"$(nproc)" \
+        && _run_privileged cmake --install --preset "$cmake_preset"
+    ); then
+        rm -rf "$tmp_dir"
+        echo "⚠️  FastFlowLM build/install vanaf broncode mislukt."
+        return 1
+    fi
+
+    rm -rf "$tmp_dir"
+    return 0
+}
+
+_install_flm() {
+    if _install_flm_from_release; then
+        return 0
+    fi
+
+    local os_id="" version_id="" version_codename=""
+    os_id="$(_os_release_field ID | tr '[:upper:]' '[:lower:]')"
+    version_id="$(_os_release_field VERSION_ID)"
+    version_codename="$(_os_release_field VERSION_CODENAME | tr '[:upper:]' '[:lower:]')"
+
+    if [ "$os_id" = "ubuntu" ] && { [ "$version_id" = "25.10" ] || [ "$version_codename" = "questing" ]; }; then
+        echo "ℹ️  Geen geschikte FastFlowLM .deb gevonden voor Ubuntu 25.10; val terug op build vanaf broncode."
+        _install_flm_from_source
+        return $?
+    fi
+
+    return 1
+}
+
+_ensure_amdxdna_module() {
+    if command -v lsmod >/dev/null 2>&1 && lsmod | grep -q '^amdxdna'; then
+        return 0
+    fi
+    if ! command -v modprobe >/dev/null 2>&1; then
+        return 1
+    fi
+    if ! _have_root_access; then
+        return 1
+    fi
+    echo "🔧 amdxdna kernelmodule laden..."
+    if ! _run_privileged modprobe amdxdna >/dev/null 2>&1; then
+        echo "⚠️  modprobe amdxdna faalde."
+        if command -v modinfo >/dev/null 2>&1; then
+            local module_path=""
+            module_path="$(modinfo -F filename amdxdna 2>/dev/null || true)"
+            if [ -n "$module_path" ]; then
+                echo "ℹ️  amdxdna modulepad: $module_path"
+            fi
+        fi
+        if command -v dkms >/dev/null 2>&1; then
+            local dkms_status=""
+            dkms_status="$(dkms status amdxdna 2>/dev/null || true)"
+            if [ -n "$dkms_status" ]; then
+                echo "ℹ️  DKMS status: $dkms_status"
+            fi
+        fi
+        if [ -r /sys/firmware/efi/efivars/SecureBoot-* ] || command -v mokutil >/dev/null 2>&1; then
+            local secure_boot_state="unknown"
+            if command -v mokutil >/dev/null 2>&1; then
+                secure_boot_state="$(mokutil --sb-state 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+            fi
+            if [ "$secure_boot_state" != "unknown" ] && [ -n "$secure_boot_state" ]; then
+                echo "ℹ️  Secure Boot: $secure_boot_state"
+            fi
+        fi
+        if _have_root_access && command -v dmesg >/dev/null 2>&1; then
+            local dmesg_excerpt=""
+            dmesg_excerpt="$(_run_privileged dmesg 2>/dev/null | tail -n 120 | grep -iE 'amdxdna|npu|xdna|secure boot|module verification' | tail -n 12 || true)"
+            if [ -n "$dmesg_excerpt" ]; then
+                echo "ℹ️  Relevante kernelmeldingen:"
+                printf '%s\n' "$dmesg_excerpt" | sed 's/^/    /'
+                if printf '%s' "$dmesg_excerpt" | grep -q 'SVA bind device failed, ret -95'; then
+                    echo "💡 Hint: ret -95 betekent doorgaans dat IOMMU SVA/SVM niet beschikbaar is voor de NPU."
+                    echo "    Controleer in BIOS/UEFI dat SVM en IOMMU aan staan, en reboot daarna."
+                    echo "    Controleer ook dat de kernel niet met iommu=off of amd_iommu=off gestart is."
+                fi
+            fi
+        fi
+        return 1
+    fi
+    sleep 1
+    if command -v lsmod >/dev/null 2>&1 && lsmod | grep -q '^amdxdna'; then
+        return 0
+    fi
+    echo "⚠️  modprobe amdxdna gaf geen fout, maar de module staat niet in lsmod."
+    if _have_root_access && command -v dmesg >/dev/null 2>&1; then
+        local post_dmesg_excerpt=""
+        post_dmesg_excerpt="$(_run_privileged dmesg 2>/dev/null | tail -n 120 | grep -iE 'amdxdna|npu|xdna|secure boot|module verification' | tail -n 12 || true)"
+        if [ -n "$post_dmesg_excerpt" ]; then
+            echo "ℹ️  Relevante kernelmeldingen:"
+            printf '%s\n' "$post_dmesg_excerpt" | sed 's/^/    /'
+            if printf '%s' "$post_dmesg_excerpt" | grep -q 'SVA bind device failed, ret -95'; then
+                echo "💡 Hint: ret -95 betekent doorgaans dat IOMMU SVA/SVM niet beschikbaar is voor de NPU."
+                echo "    Controleer in BIOS/UEFI dat SVM en IOMMU aan staan, en reboot daarna."
+                echo "    Controleer ook dat de kernel niet met iommu=off of amd_iommu=off gestart is."
+            fi
+        fi
+    fi
+    return 1
+}
+
+_read_npu_fw_version() {
+    local version=""
+    if compgen -G '/sys/bus/pci/drivers/amdxdna/*/fw_version' >/dev/null 2>&1; then
+        version="$(cat /sys/bus/pci/drivers/amdxdna/*/fw_version 2>/dev/null | head -n1)"
+    fi
+    printf '%s' "$version"
+}
+
+_configure_lemonade_for_npu() {
+    local flm_model="${LEMONADE_NPU_MODEL:-gemma3:4b}"
+    local raw_models="${LEMONADE_MODELS:-}"
+    if [ -z "${LEMONADE_MODEL:-}" ] || printf '%s' "${LEMONADE_MODEL:-}" | grep -qi 'gguf'; then
+        export LEMONADE_MODEL="$flm_model"
+        echo "✅ Lemonade NPU-model geselecteerd: $LEMONADE_MODEL"
+    fi
+    if [ -z "$raw_models" ] || printf '%s' "$raw_models" | grep -qi 'gguf'; then
+        export LEMONADE_MODELS="$LEMONADE_MODEL"
+    elif ! printf ',%s,' "$raw_models" | grep -q ",$LEMONADE_MODEL,"; then
+        export LEMONADE_MODELS="$LEMONADE_MODEL,$raw_models"
+    fi
+}
+
+ensure_lemonade_npu_stack() {
+    NPU_STACK_READY=0
+    NPU_ACCEL_AVAILABLE=0
+
+    if [ "${LEMONADE_PREFER_NPU:-1}" = "0" ]; then
+        echo "ℹ️  LEMONADE_PREFER_NPU=0; NPU setup expliciet overgeslagen."
+        return 0
+    fi
+
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *)
+            echo "ℹ️  NPU setup is alleen geautomatiseerd voor Linux."
+            return 0
+            ;;
+    esac
+
+    if ! detect_npu; then
+        return 0
+    fi
+
+    _install_linux_npu_packages || true
+
+    if ! _ensure_amdxdna_module; then
+        echo "⚠️  amdxdna kernelmodule is niet geladen."
+        NPU_REBOOT_REQUIRED=1
+    fi
+
+    local fw_version=""
+    fw_version="$(_read_npu_fw_version)"
+    if [ -n "$fw_version" ]; then
+        echo "ℹ️  Gedetecteerde NPU firmware: $fw_version"
+        if ! _version_ge "$fw_version" "1.1.0.0"; then
+            echo "⚠️  NPU firmware is ouder dan 1.1.0.0; Linux FLM/NPU inference zal waarschijnlijk niet werken."
+            echo "    Werk linux-firmware/NPU firmware bij en reboot daarna."
+            NPU_REBOOT_REQUIRED=1
+        fi
+    else
+        echo "⚠️  NPU firmwareversie kon niet worden gelezen via amdxdna."
+    fi
+
+    if [ ! -e /dev/accel/accel0 ] && [ ! -e /dev/amdxdna ]; then
+        echo "⚠️  NPU device-node ontbreekt; reboot of driver setup kan nog nodig zijn."
+        NPU_REBOOT_REQUIRED=1
+    fi
+
+    if ! _find_flm_bin >/dev/null 2>&1; then
+        echo "📦 FastFlowLM (flm) niet gevonden; proberen te installeren..."
+        _install_flm || true
+    fi
+
+    if _find_flm_bin >/dev/null 2>&1; then
+        echo "✅ FastFlowLM gevonden ($(_find_flm_bin))"
+    else
+        echo "⚠️  FastFlowLM ontbreekt nog; Lemonade zal zonder FLM niet op de NPU draaien."
+    fi
+
+    if [ "$NPU_REBOOT_REQUIRED" -eq 0 ] && _find_flm_bin >/dev/null 2>&1; then
+        NPU_STACK_READY=1
+        NPU_ACCEL_AVAILABLE=1
+        _configure_lemonade_for_npu
+    else
+        echo "ℹ️  Lemonade blijft voor nu op CPU/GPU totdat FLM + firmware + driver compleet zijn."
+        if _npu_is_required; then
+            echo "❌ NPU is verplicht voor deze run, maar FastFlowLM/NPU stack is niet klaar."
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
 install_lemonade() {
     # Hard eis: de C++ Lemonade Server (lemond). De Python `lemonade-server-dev`
     # is gedeprecateerd (zie lemonade.log) en wordt niet meer gebruikt.
@@ -718,7 +1159,10 @@ start_lemonade() {
     port="${port:-8020}"
     host="${host:-127.0.0.1}"
 
-    detect_npu || true
+    if ! ensure_lemonade_npu_stack; then
+        echo "⚠️  Lemonade start niet omdat NPU-acceleratie verplicht is maar niet beschikbaar."
+        return 1
+    fi
 
     local bin=""
     bin="$(_find_cpp_lemonade_bin || true)"
@@ -736,6 +1180,11 @@ start_lemonade() {
     fi
 
     echo "⏳ C++ Lemonade Server starten ($bin) op $host:$port..."
+    if [ "$NPU_ACCEL_AVAILABLE" -eq 1 ]; then
+        echo "🚀 NPU-stack klaar; Lemonade krijgt FLM-geschikte modelconfiguratie mee."
+    elif detect_npu >/dev/null 2>&1; then
+        echo "ℹ️  NPU hardware aanwezig, maar stack/model is nog niet volledig klaar; Lemonade kan terugvallen op GPU/CPU."
+    fi
     case "$(basename "$bin")" in
         lemond)
             # Native C++ server; cache_dir wordt bewust niet doorgegeven zodat
@@ -784,7 +1233,19 @@ case "$LLM_PROVIDER" in
     lemonade)
         echo "=== Lemonade Setup ==="
         if install_lemonade; then
-            start_lemonade || echo "⚠️  Kon Lemonade niet starten, app draait zonder LLM support"
+            if ! start_lemonade; then
+                if _npu_is_required; then
+                    echo "❌ Lemonade vereist NPU-acceleratie op deze machine; afbreken."
+                    exit 1
+                fi
+                echo "⚠️  Kon Lemonade niet starten, app draait zonder LLM support"
+            fi
+            if [ -n "${LEMONADE_MODEL:-}" ]; then
+                echo "ℹ️  Actief Lemonade model voor deze run: ${LEMONADE_MODEL}"
+            fi
+            if [ "$NPU_REBOOT_REQUIRED" -eq 1 ]; then
+                echo "⚠️  NPU stack is aangepast maar een reboot lijkt nog nodig voordat FLM/NPU inference werkt."
+            fi
         else
             echo "⚠️  App draait zonder Lemonade support"
         fi

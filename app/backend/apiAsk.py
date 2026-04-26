@@ -594,7 +594,13 @@ def _ranked_knowledge_hits(prompt_text: str) -> List[tuple[Dict[str, Any], float
     query_terms = _context_terms(prompt_text)
     ranked: list[tuple[Dict[str, Any], float, int]] = []
 
-    for payload, score in knowledge_repo.search_chunks(prompt_text, limit=5):
+    try:
+        knowledge_matches = knowledge_repo.search_chunks(prompt_text, limit=5)
+    except Exception as exc:
+        logger.warning("Kennisbank-context overgeslagen: %s", exc)
+        return []
+
+    for payload, score in knowledge_matches:
         haystack = " ".join(
             [
                 str(payload.get("document_title") or ""),
@@ -621,7 +627,11 @@ def _ranked_knowledge_hits(prompt_text: str) -> List[tuple[Dict[str, Any], float
 def _gather_context_lines(prompt_text: str) -> list[str]:
     scored: list[tuple[str, str, float]] = []
 
-    device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    try:
+        device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    except Exception as exc:
+        logger.warning("Device-context overgeslagen: %s", exc)
+        device_hits = []
     for device, score in device_hits:
         scored.append(
             (
@@ -664,7 +674,11 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
         "knowledge": [],
     }
 
-    device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    try:
+        device_hits = devices_repo.search_devices(prompt_text, limit=5)
+    except Exception as exc:
+        logger.warning("Device-context overgeslagen: %s", exc)
+        device_hits = []
     for device, score in device_hits:
         scored.append(
             (

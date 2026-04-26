@@ -120,6 +120,25 @@ class PromptBuildingTests(unittest.TestCase):
             ],
         )
 
+    def test_augmented_prompt_skips_context_when_embeddings_unavailable(self):
+        with patch.object(
+            apiAsk.devices_repo,
+            "search_devices",
+            side_effect=RuntimeError("Fastembed model ontbreekt lokaal"),
+        ), patch.object(
+            apiAsk.knowledge_repo,
+            "search_chunks",
+            side_effect=RuntimeError("Fastembed model ontbreekt lokaal"),
+        ):
+            prompt, details = apiAsk.build_augmented_prompt_with_details(
+                "Hallo",
+                mode="Developer",
+            )
+
+        self.assertIn("Huidige vraag: Hallo", prompt)
+        self.assertEqual(details["devices"], [])
+        self.assertEqual(details["knowledge"], [])
+
     def test_format_history_lines_include_document_context(self):
         history = [
             ChatMessage(
