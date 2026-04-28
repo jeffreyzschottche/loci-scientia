@@ -181,63 +181,6 @@ ensure_mdns_support() {
     esac
 }
 
-ensure_wifi_ui() {
-    case "$DEVICE_PLATFORM" in
-        linux|jetson)
-            if [ "$HAVE_SUDO" -ne 1 ]; then
-                echo "⚠️  Geen sudo, iwgtk/iwd worden niet automatisch geïnstalleerd."
-                return 1
-            fi
-            if ! command -v apt-get >/dev/null 2>&1; then
-                echo "⚠️  apt-get niet beschikbaar, sla iwgtk/iwd installatie over."
-                return 1
-            fi
-            if command -v iwgtk >/dev/null 2>&1; then
-                echo "✅ iwgtk is al geïnstalleerd"
-            else
-                echo "📦 iwgtk installeren..."
-                sudo apt-get update -y
-                sudo apt-get install -y iwgtk
-            fi
-            if command -v iwd >/dev/null 2>&1; then
-                echo "✅ iwd is al geïnstalleerd"
-            else
-                echo "📦 iwd installeren (nodig voor iwgtk)..."
-                sudo apt-get install -y iwd
-            fi
-            if command -v systemctl >/dev/null 2>&1; then
-                sudo systemctl enable iwd >/dev/null 2>&1 || true
-                sudo systemctl restart iwd >/dev/null 2>&1 || true
-            fi
-            if command -v systemctl >/dev/null 2>&1 && systemctl is-active NetworkManager >/dev/null 2>&1; then
-                echo "ℹ️  NetworkManager detectie: switch WiFi backend naar iwd (kan WiFi kort onderbreken)."
-                if [ -d /etc/NetworkManager/conf.d ]; then
-                    backend_conf="/etc/NetworkManager/conf.d/10-wifi-backend.conf"
-                    if ! grep -q "wifi.backend=iwd" "$backend_conf" 2>/dev/null; then
-                        sudo tee "$backend_conf" >/dev/null <<'EOF'
-[device]
-wifi.backend=iwd
-EOF
-                    fi
-                else
-                    backend_conf="/etc/NetworkManager/NetworkManager.conf"
-                    if ! grep -q "wifi.backend=iwd" "$backend_conf" 2>/dev/null; then
-                        sudo tee -a "$backend_conf" >/dev/null <<'EOF'
-
-[device]
-wifi.backend=iwd
-EOF
-                    fi
-                fi
-                sudo systemctl restart NetworkManager >/dev/null 2>&1 || true
-            fi
-            ;;
-        *)
-            return 0
-            ;;
-    esac
-}
-
 ensure_remote_support_dependencies() {
     case "$DEVICE_PLATFORM" in
         linux|jetson)
@@ -520,7 +463,6 @@ start_ollama() {
 
 echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
-ensure_wifi_ui
 ensure_remote_support_dependencies
 ensure_remote_support_service
 configure_hostname
