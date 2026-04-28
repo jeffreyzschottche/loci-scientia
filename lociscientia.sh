@@ -106,6 +106,31 @@ running_kernel_has_headers() {
     [ -d "/usr/src/linux-headers-$kernel" ]
 }
 
+_normalize_bool() {
+    local value
+    value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    case "$value" in
+        1|true|yes|on|enable|enabled) printf '1' ;;
+        0|false|no|off|disable|disabled) printf '0' ;;
+        *) printf '' ;;
+    esac
+}
+
+_detect_vulkan_runtime() {
+    if [ -e /usr/lib/x86_64-linux-gnu/libvulkan.so.1 ] \
+        || [ -e /usr/lib64/libvulkan.so.1 ] \
+        || [ -e /usr/lib/aarch64-linux-gnu/libvulkan.so.1 ]; then
+        return 0
+    fi
+    if command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q 'libvulkan\.so\.1'; then
+        return 0
+    fi
+    if [ -d /usr/share/vulkan/icd.d ] && ls /usr/share/vulkan/icd.d/*.json >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
 report_gpu_runtime_status() {
     if command -v nvidia-smi >/dev/null 2>&1; then
         if nvidia-smi >/dev/null 2>&1; then
@@ -474,9 +499,30 @@ start_ollama() {
         *) kv_cache_type="";;
     esac
 
+    vulkan_pref="$(_normalize_bool "${OLLAMA_VULKAN:-}")"
+    if [ -z "$vulkan_pref" ]; then
+        if _detect_vulkan_runtime; then
+            vulkan_pref="1"
+            echo "🟣 Vulkan runtime gedetecteerd → OLLAMA_VULKAN=1 (auto)"
+        else
+            vulkan_pref="0"
+        fi
+    fi
+
     if pgrep -x "ollama" >/dev/null 2>&1; then
+        restart_reason=""
         if [ -n "$kv_cache_type" ]; then
-            echo "♻️  Ollama herstarten om OLLAMA_KV_CACHE_TYPE=$kv_cache_type toe te passen..."
+            restart_reason="OLLAMA_KV_CACHE_TYPE=$kv_cache_type"
+        fi
+        if [ "$vulkan_pref" = "1" ]; then
+            if [ -n "$restart_reason" ]; then
+                restart_reason="$restart_reason, OLLAMA_VULKAN=1"
+            else
+                restart_reason="OLLAMA_VULKAN=1"
+            fi
+        fi
+        if [ -n "$restart_reason" ]; then
+            echo "♻️  Ollama herstarten om $restart_reason toe te passen..."
             if ! _stop_ollama; then
                 echo "⚠️  Ollama kon niet worden gestopt; herstart overslaan."
                 return 1
@@ -494,6 +540,12 @@ start_ollama() {
         echo "✅ OLLAMA_KV_CACHE_TYPE=$OLLAMA_KV_CACHE_TYPE"
     else
         unset OLLAMA_KV_CACHE_TYPE
+    fi
+    if [ "$vulkan_pref" = "1" ]; then
+        export OLLAMA_VULKAN=1
+        echo "✅ OLLAMA_VULKAN=1 (Vulkan backend ingeschakeld)"
+    else
+        unset OLLAMA_VULKAN
     fi
     echo "✅ OLLAMA_HOST=$OLLAMA_HOST"
     _run_ollama serve > "$PROJECT_ROOT/ollama.log" 2>&1 &
