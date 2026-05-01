@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -9,6 +10,8 @@ from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorPa
 from .qdrant_utils import QDRANT_LOCAL_DIR, get_qdrant_client
 from .rag.embedder import embed_text
 from .schemas import Device, DeviceCreate, DevicePatch
+
+logger = logging.getLogger(__name__)
 
 
 class DevicesRepository:
@@ -222,7 +225,11 @@ class DevicesRepository:
             client.delete(collection_name=self.collection, points_selector=[device_id])
 
     def search_devices(self, query: str, limit: int = 3) -> list[tuple[Device, float]]:
-        vector = embed_text(query).vector
+        try:
+            vector = embed_text(query).vector
+        except Exception as exc:
+            logger.warning("Device search embeddings unavailable: %s", exc)
+            return []
         with self._client_context() as client:
             try:
                 response = client.query_points(
