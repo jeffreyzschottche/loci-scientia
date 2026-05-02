@@ -766,6 +766,7 @@ def kennisbank_document_detail(doc_id: str, _: TokenRecord = Depends(require_adm
 
 
 @app.post("/api/v1/signon", response_model=BearerTokenResponse)
+@app.post("/api/v1/sigon", response_model=BearerTokenResponse, include_in_schema=False)
 def api_signon(req: SignOnRequest):
     device = devices_repo.find_by_username(req.user_name)
     if device is None or device.user_name != req.user_name:
