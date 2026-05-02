@@ -22,7 +22,7 @@ from .translations import t
 logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_ITEMS = 3
-MIN_CONTEXT_SCORE = 0.25
+MIN_CONTEXT_SCORE = 0.45
 KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
@@ -30,16 +30,6 @@ PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "promptlog.log"
 API_PROMPT_LOG_PATH = Path(__file__).resolve().parents[2] / "apiprompt.log"
 THINKING_TAG_RE = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _TOKEN_PATTERN = re.compile(r"\S+")
-_CONTEXT_TOKEN_PATTERN = re.compile(r"[0-9A-Za-zÀ-ÖØ-öø-ÿ][0-9A-Za-zÀ-ÖØ-öø-ÿ_-]*")
-_CONTEXT_STOPWORDS = {
-    "aan", "al", "als", "bij", "dan", "dat", "de", "den", "der", "dit", "doe", "door",
-    "een", "en", "er", "geef", "haar", "heb", "heeft", "hem", "het", "hier", "hoe",
-    "hun", "iemand", "ik", "in", "info", "informatie", "is", "je", "kan", "me", "meer", "met", "mij", "mijn",
-    "naar", "niet", "nu", "of", "om", "ons", "ook", "over", "te", "tot", "uit", "van",
-    "vertel", "voor", "wat", "we", "wel", "wie", "wil", "wordt", "ze", "zei", "zelf", "zich",
-    "zijn", "zo", "zou",
-    "allemaal", "product", "producten",
-}
 MIN_IMAGE_DIMENSION = 32
 MAX_DOCUMENTS_PER_REQUEST = 3
 MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
@@ -555,92 +545,50 @@ def _format_attachment_context_lines(
     return lines
 
 
-def _context_terms(value: str) -> set[str]:
-    terms: set[str] = set()
-    for raw in _CONTEXT_TOKEN_PATTERN.findall((value or "").lower()):
-        token = raw.strip("_-")
-        if token.isdigit():
-            continue
-        if token.endswith("s") and len(token) > 4:
-            token = token[:-1]
-        if len(token) < 3 or token in _CONTEXT_STOPWORDS:
-            continue
-        terms.add(token)
-    return terms
+def _format_pages(pages: Any) -> str:
+    if isinstance(pages, (list, tuple)):
+        numbers = [str(p) for p in pages if isinstance(p, int) or (isinstance(p, str) and p.strip())]
+        if not numbers:
+            return ""
+        if len(numbers) == 1:
+            return f"p. {numbers[0]}"
+        return f"p. {numbers[0]}-{numbers[-1]}"
+    if isinstance(pages, int):
+        return f"p. {pages}"
+    return ""
 
 
-def _ranked_knowledge_hits(prompt_text: str) -> List[tuple[Dict[str, Any], float, int]]:
-    query_terms = _context_terms(prompt_text)
-    ranked: list[tuple[Dict[str, Any], float, int]] = []
-
-    for payload, score in knowledge_repo.search_chunks(prompt_text, limit=5):
-        haystack = " ".join(
-            [
-                str(payload.get("document_title") or ""),
-                str(payload.get("doc_id") or ""),
-                str(payload.get("section") or ""),
-                str(payload.get("text") or "")[:800],
-            ]
-        )
-        overlap = len(query_terms & _context_terms(haystack)) if query_terms else 0
-        ranked.append((payload, float(score or 0.0), overlap))
-
-    if not ranked:
-        return []
-
-    if query_terms:
-        overlapping = [item for item in ranked if item[2] > 0]
-        if overlapping:
-            ranked = overlapping
-
-    ranked.sort(key=lambda item: (item[2], item[1]), reverse=True)
-    return ranked
+def _knowledge_source_label(payload: Dict[str, Any]) -> str:
+    """Human-readable source: 'Filename — p. 3' or 'Title — p. 3' fallback."""
+    filename = str(payload.get("original_filename") or "").strip()
+    title = str(payload.get("document_title") or payload.get("doc_id") or "doc").strip()
+    label = filename or title
+    pages_label = _format_pages(payload.get("pages"))
+    return f"{label} — {pages_label}" if pages_label else label
 
 
-def _gather_context_lines(prompt_text: str) -> list[str]:
-    scored: list[tuple[str, str, float]] = []
-
-    device_hits = devices_repo.search_devices(prompt_text, limit=5)
-    for device, score in device_hits:
-        scored.append(
-            (
-                "device",
-                _flatten_multiline(describe_device(device)),
-                float(score or 0.0),
-            )
-        )
-
-    knowledge_hits = _ranked_knowledge_hits(prompt_text)
-    for payload, score, _overlap in knowledge_hits:
-        text = _flatten_multiline(str(payload.get("text") or ""))
-        if not text:
-            continue
-        title = payload.get("document_title") or payload.get("doc_id") or "doc"
-        prefix = f"{title}"
-        snippet = text[:KNOWLEDGE_SNIPPET_LENGTH] + ("…" if len(text) > KNOWLEDGE_SNIPPET_LENGTH else "")
-        desc = f"{prefix}: {snippet}"
-        scored.append(("knowledge", desc, float(score or 0.0)))
-
-    if not scored:
-        return []
-
-    scored.sort(key=lambda item: item[2], reverse=True)
-    best_score = scored[0][2]
-    threshold = max(MIN_CONTEXT_SCORE, best_score * 0.7)
-    filtered = [item for item in scored if item[2] >= threshold]
-    limited = filtered[:MAX_CONTEXT_ITEMS]
-    lines: list[str] = []
-    for idx, (kind, desc, score) in enumerate(limited, 1):
-        lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
-    return lines
+def _build_citation(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
+    snippet_text = _flatten_multiline(str(payload.get("text") or ""))
+    snippet = snippet_text[:240] + ("..." if len(snippet_text) > 240 else "")
+    return {
+        "doc_id": payload.get("doc_id"),
+        "chunk_id": payload.get("chunk_id"),
+        "title": payload.get("document_title") or payload.get("doc_id"),
+        "original_filename": payload.get("original_filename"),
+        "pages": payload.get("pages"),
+        "section": payload.get("section"),
+        "score": round(float(score or 0.0), 4),
+        "snippet": snippet,
+    }
 
 
 def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str, List]]:
-    """Gather context lines AND detailed info for logging."""
+    """Gather context lines AND detailed info for logging + citations."""
     scored: list[tuple[str, str, float]] = []
     details: Dict[str, List] = {
         "devices": [],
         "knowledge": [],
+        "citations": [],
     }
 
     device_hits = devices_repo.search_devices(prompt_text, limit=5)
@@ -658,32 +606,34 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
             "score": float(score or 0.0),
         })
 
-    knowledge_hits = _ranked_knowledge_hits(prompt_text)
-    for payload, score, overlap in knowledge_hits:
+    knowledge_hits = knowledge_repo.search_chunks(
+        prompt_text,
+        limit=MAX_CONTEXT_ITEMS,
+        score_threshold=MIN_CONTEXT_SCORE,
+    )
+    for payload, score in knowledge_hits:
         text = _flatten_multiline(str(payload.get("text") or ""))
         if not text:
             continue
-        title = payload.get("document_title") or payload.get("doc_id") or "doc"
-        prefix = f"{title}"
+        source_label = _knowledge_source_label(payload)
         snippet = text[:KNOWLEDGE_SNIPPET_LENGTH] + ("..." if len(text) > KNOWLEDGE_SNIPPET_LENGTH else "")
-        desc = f"{prefix}: {snippet}"
+        desc = f"[{source_label}] {snippet}"
         scored.append(("knowledge", desc, float(score or 0.0)))
         details["knowledge"].append({
             "doc_id": payload.get("doc_id"),
-            "title": title,
+            "title": payload.get("document_title") or payload.get("doc_id"),
+            "original_filename": payload.get("original_filename"),
+            "pages": payload.get("pages"),
             "score": float(score or 0.0),
-            "term_overlap": overlap,
             "snippet": text[:100] + ("..." if len(text) > 100 else ""),
         })
+        details["citations"].append(_build_citation(payload, score))
 
     if not scored:
         return [], details
 
     scored.sort(key=lambda item: item[2], reverse=True)
-    best_score = scored[0][2]
-    threshold = max(MIN_CONTEXT_SCORE, best_score * 0.7)
-    filtered = [item for item in scored if item[2] >= threshold]
-    limited = filtered[:MAX_CONTEXT_ITEMS]
+    limited = scored[:MAX_CONTEXT_ITEMS]
     lines: list[str] = []
     for idx, (kind, desc, score) in enumerate(limited, 1):
         lines.append(f"{idx}. [{kind}] score {score:.3f}: {desc}")
@@ -1126,6 +1076,7 @@ async def handle_ask(
     history: Optional[Sequence[ChatMessage]] = None,
     documents: Optional[Sequence[ParsedDocument]] = None,
     final_prompt_override: Optional[str] = None,
+    citations: Optional[List[Dict[str, Any]]] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
     current_images = normalize_images(req.images)
@@ -1170,4 +1121,4 @@ async def handle_ask(
         message = _fallback_response(req.prompt)
     if not message:
         message = t("no_response_generated")
-    return {"message": message, "thinking": thinking}
+    return {"message": message, "thinking": thinking, "citations": list(citations or [])}

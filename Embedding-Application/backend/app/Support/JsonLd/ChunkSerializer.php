@@ -16,8 +16,9 @@ class ChunkSerializer
         $wordCount = $chunk->metadata['word_count'] ?? str_word_count($chunk->text);
         $contentDate = $document->content_date?->toDateString();
         $embeddingMeta = $this->embeddingMetadata();
+        $pages = $chunk->metadata['pages'] ?? null;
 
-        return [
+        $payload = [
             '@type' => 'TextDigitalDocument',
             '@id' => "chunk:{$chunk->chunk_id}",
             'identifier' => $chunk->content_hash,
@@ -36,6 +37,12 @@ class ChunkSerializer
                 '@id' => "doc:{$document->doc_id}",
             ],
         ];
+
+        if (is_array($pages) && ! empty($pages)) {
+            $payload['pages'] = array_values(array_map('intval', $pages));
+        }
+
+        return $payload;
     }
 
     /**

@@ -41,6 +41,7 @@ class DocumentRecord:
     category: Optional[str]
     version: Optional[str]
     content_date: Optional[str]
+    original_filename: Optional[str]
     metadata: Dict
 
 
@@ -51,6 +52,7 @@ class ChunkRecord:
     text: str
     position: int
     section: Optional[str]
+    pages: Optional[List[int]]
     metadata: Dict
 
     def content_hash(self) -> str:
@@ -158,6 +160,7 @@ def _load_documents(doc_dir: Path) -> Dict[str, DocumentRecord]:
             category=data.get("articleSection"),
             version=data.get("version"),
             content_date=data.get("datePublished"),
+            original_filename=data.get("originalFilename"),
             metadata={
                 "source_url": data.get("url"),
                 "priority": data.get("position"),
@@ -192,6 +195,16 @@ def _load_chunks(chunk_dir: Path, documents: Dict[str, DocumentRecord]) -> List[
             chunk_id = _strip_prefix(raw_chunk_id, "chunk:") or f"{doc_id}-{entry.get('position', 0)}"
             section_ref = item.get("isPartOf", {}).get("@id") if isinstance(item.get("isPartOf"), dict) else None
             section_id = _strip_prefix(section_ref or "", "sec:")
+            raw_pages = item.get("pages")
+            pages: Optional[List[int]] = None
+            if isinstance(raw_pages, list):
+                page_numbers = []
+                for value in raw_pages:
+                    try:
+                        page_numbers.append(int(value))
+                    except (TypeError, ValueError):
+                        continue
+                pages = page_numbers or None
             metadata = {
                 "wordCount": item.get("wordCount"),
                 "tokenCount": item.get("tokenCount"),
@@ -205,6 +218,7 @@ def _load_chunks(chunk_dir: Path, documents: Dict[str, DocumentRecord]) -> List[
                     text=text,
                     position=int(entry.get("position") or item.get("position") or 0),
                     section=section_id or None,
+                    pages=pages,
                     metadata=metadata,
                 )
             )
@@ -336,11 +350,13 @@ def _index_in_qdrant(
                     "chunk_id": chunk.chunk_id,
                     "position": chunk.position,
                     "section": chunk.section,
+                    "pages": chunk.pages,
                     "text": chunk.text,
                     "metadata": chunk.metadata,
                     "document_title": doc.title if doc else chunk.doc_id,
                     "document_category": doc.category if doc else None,
                     "document_date": doc.content_date if doc else None,
+                    "original_filename": doc.original_filename if doc else None,
                 }
                 points.append(
                     PointStruct(

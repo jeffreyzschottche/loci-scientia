@@ -2,18 +2,6 @@
   "mode": "interactive_v1",
   "samples": [
     {
-      "timestamp": "2026-04-15T12:02:19.041713+00:00",
-      "requests_today": 1,
-      "active_users_today": 1,
-      "avg_response_ms": 324538
-    },
-    {
-      "timestamp": "2026-04-15T17:44:11.796753+00:00",
-      "requests_today": 5,
-      "active_users_today": 1,
-      "avg_response_ms": 165158
-    },
-    {
       "timestamp": "2026-04-17T19:44:49.769816+00:00",
       "requests_today": 1,
       "active_users_today": 1,
@@ -300,6 +288,18 @@
       "requests_today": 1,
       "active_users_today": 1,
       "avg_response_ms": 21220
+    },
+    {
+      "timestamp": "2026-05-01T22:46:29.510156+00:00",
+      "requests_today": 2,
+      "active_users_today": 1,
+      "avg_response_ms": 17313
+    },
+    {
+      "timestamp": "2026-05-01T22:46:55.284193+00:00",
+      "requests_today": 3,
+      "active_users_today": 1,
+      "avg_response_ms": 14538
     }
   ]
 }

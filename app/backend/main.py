@@ -766,6 +766,7 @@ def kennisbank_document_detail(doc_id: str, _: TokenRecord = Depends(require_adm
 
 
 @app.post("/api/v1/signon", response_model=BearerTokenResponse)
+@app.post("/api/v1/sigon", response_model=BearerTokenResponse, include_in_schema=False)
 def api_signon(req: SignOnRequest):
     device = devices_repo.find_by_username(req.user_name)
     if device is None or device.user_name != req.user_name:
@@ -849,6 +850,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         history=history,
         documents=documents,
         final_prompt_override=final_prompt,
+        citations=context_details.get("citations", []),
     )
     message = response.get("message", "")
 
@@ -1072,6 +1074,7 @@ async def sse_stream_generator(
             "done": True,
             "message": assistant_text,
             "thinking": thinking_text,
+            "citations": context_details.get("citations", []),
         }
     )
     yield f"data: {event_data}\n\n"

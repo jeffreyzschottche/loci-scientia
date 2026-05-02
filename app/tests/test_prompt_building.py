@@ -64,6 +64,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend import apiAsk  # noqa: E402
 from backend.apiAsk import ParsedDocument  # noqa: E402
 from backend.chat_history import ChatHistoryStore  # noqa: E402
+from backend.devices_repo import DevicesRepository  # noqa: E402
 from backend.schemas import ChatMessage, HistoryDocument  # noqa: E402
 
 
@@ -178,6 +179,12 @@ class PromptBuildingTests(unittest.TestCase):
         self.assertEqual(len(history), 2)
         self.assertEqual(history[1].images, ["img-1"])
         self.assertEqual(history[1].documents[0].filename, "notitie.txt")
+
+    def test_device_search_returns_empty_when_embeddings_are_unavailable(self):
+        repo = DevicesRepository()
+
+        with patch("backend.devices_repo.embed_text", side_effect=RuntimeError("missing model")):
+            self.assertEqual(repo.search_devices("waar is mijn apparaat?"), [])
 
 
 if __name__ == "__main__":
