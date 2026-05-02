@@ -26,6 +26,10 @@ class DocumentSerializer
             'dateModified' => $document->updated_at->toIso8601String(),
         ];
 
+        if ($document->original_filename) {
+            $jsonLd['originalFilename'] = $document->original_filename;
+        }
+
         if ($document->description) {
             $jsonLd['description'] = $document->description;
         }

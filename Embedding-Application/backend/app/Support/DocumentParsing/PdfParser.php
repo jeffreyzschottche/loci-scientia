@@ -27,7 +27,6 @@ class PdfParser implements DocumentParserInterface
         $docId = $options['doc_id'] ?? Str::slug(pathinfo($path, PATHINFO_FILENAME));
         $title = $options['title'] ?? $details['Title'] ?? pathinfo($path, PATHINFO_FILENAME);
 
-        // Try to detect chapters/sections from the text structure
         $sections = $this->extractSections($pages, $docId);
 
         $metadata = [
@@ -59,33 +58,55 @@ class PdfParser implements DocumentParserInterface
     }
 
     /**
-     * Extract sections from PDF pages.
-     * Basic implementation - creates one section per page or combines into body.
+     * Build one section from all pages, recording per-page char ranges into the
+     * concatenated text so chunks can later be mapped back to source pages.
+     *
+     * @param array $pages
      */
     private function extractSections(array $pages, string $docId): array
     {
-        // For now, combine all pages into a single body section
-        // Future: detect headers/chapters using font size analysis
-        $fullText = '';
-        foreach ($pages as $page) {
-            $fullText .= $page->getText() . "\n\n";
+        $separator = "\n\n";
+        $separatorLen = strlen($separator);
+        $combined = '';
+        $pageRanges = [];
+
+        foreach ($pages as $index => $page) {
+            $pageNumber = $index + 1;
+            $pageText = $this->normalizeText($page->getText() ?? '');
+            if ($pageText === '') {
+                continue;
+            }
+
+            $start = strlen($combined);
+            $combined .= $pageText;
+            $end = strlen($combined);
+
+            $pageRanges[] = [
+                'page' => $pageNumber,
+                'start' => $start,
+                'end' => $end,
+            ];
+
+            $combined .= $separator;
         }
 
-        $fullText = $this->normalizeText($fullText);
+        // Trim trailing separator and adjust last range end if needed.
+        if (str_ends_with($combined, $separator)) {
+            $combined = substr($combined, 0, -$separatorLen);
+        }
 
         return [
             [
                 'title' => 'Inhoud',
                 'slug' => 'inhoud',
                 'order_index' => 0,
-                'text' => $fullText,
+                'text' => $combined,
                 'metadata' => [
                     'start_page' => 1,
                     'end_page' => count($pages),
+                    'page_ranges' => $pageRanges,
                 ],
             ],
         ];
     }
-
-    // Image extraction intentionally removed; parser focuses on text only.
 }

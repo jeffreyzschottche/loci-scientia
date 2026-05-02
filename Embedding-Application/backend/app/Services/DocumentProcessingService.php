@@ -120,15 +120,22 @@ class DocumentProcessingService
 
                 // Create chunks for this section
                 $chunks = $this->chunker->chunk($sectionData['text']);
+                $pageRanges = $sectionData['metadata']['page_ranges'] ?? [];
 
                 foreach ($chunks as $chunkIndex => $chunkData) {
                     $chunkText = $chunkData['text'];
                     $tokenCount = $chunkData['token_count'] ?? $this->chunker->estimateTokenCount($chunkText);
+                    $pages = $this->mapChunkToPages(
+                        $chunkData['char_start'] ?? null,
+                        $chunkData['char_end'] ?? null,
+                        $pageRanges
+                    );
                     $chunkMetadata = array_filter([
                         'word_count' => $chunkData['word_count'] ?? null,
                         'content_date' => $contentDate,
                         'embedding_model' => config('embedding.model'),
-                    ]);
+                        'pages' => $pages ?: null,
+                    ], static fn ($value) => $value !== null);
 
                     $chunkId = $this->idGenerator->generate(
                         $document->doc_id,
@@ -205,6 +212,31 @@ class DocumentProcessingService
         ]);
     }
 
+    /**
+     * Find which page numbers a chunk's char range overlaps. Empty array if
+     * the section has no page-range metadata (non-PDF sources).
+     *
+     * @param array<int, array{page:int,start:int,end:int}> $pageRanges
+     * @return array<int, int>
+     */
+    private function mapChunkToPages(?int $chunkStart, ?int $chunkEnd, array $pageRanges): array
+    {
+        if ($chunkStart === null || $chunkEnd === null || empty($pageRanges)) {
+            return [];
+        }
+
+        $pages = [];
+        foreach ($pageRanges as $range) {
+            $start = (int) ($range['start'] ?? 0);
+            $end = (int) ($range['end'] ?? 0);
+            if ($chunkStart < $end && $chunkEnd > $start) {
+                $pages[] = (int) $range['page'];
+            }
+        }
+
+        return array_values(array_unique($pages));
+    }
+
     private function mergeMetadata(Document $document, array $payload): array
     {
         $existing = $document->metadata;
@@ -221,8 +253,8 @@ class DocumentProcessingService
         return [
             'model' => config('embedding.model'),
             'vector_dimension' => (int) config('embedding.vector_dimension', 768),
-            'chunk_tokens' => (int) config('embedding.chunk_tokens', 448),
-            'chunk_overlap_tokens' => (int) config('embedding.chunk_overlap_tokens', 96),
+            'chunk_tokens' => (int) config('embedding.chunk_tokens', 150),
+            'chunk_overlap_tokens' => (int) config('embedding.chunk_overlap_tokens', 80),
         ];
     }
 

@@ -84,6 +84,7 @@ class ChatSignals(QObject):
     response_token = Signal(int, str)
     thinking_token = Signal(int, str)
     final_payload = Signal(int, str, str)
+    citations = Signal(int, list)
     done = Signal(int)
     queue_position = Signal(int, int)
 
@@ -280,6 +281,86 @@ class AutoSizingMarkdownView(QTextBrowser):
             self._syncing_height = False
 
 
+class CitationsCard(QFrame):
+    """Small footer card under an assistant reply listing source chunks used."""
+
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet(
+            "QFrame {"
+            "  background:#f9fafb;"
+            "  border:1px solid #e5e7eb;"
+            "  border-radius:14px;"
+            "}"
+        )
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(12, 10, 12, 12)
+        self._layout.setSpacing(6)
+
+        self._title = QLabel(t("chat_sources_title"))
+        self._title.setStyleSheet(
+            "color:#6b7280; letter-spacing:0.18em; font-size:11px; font-weight:700;"
+            " background:transparent; border:none;"
+        )
+        self._layout.addWidget(self._title)
+
+        self._items_widget = QWidget()
+        self._items_widget.setStyleSheet("background:transparent;")
+        self._items_layout = QVBoxLayout(self._items_widget)
+        self._items_layout.setContentsMargins(0, 0, 0, 0)
+        self._items_layout.setSpacing(2)
+        self._layout.addWidget(self._items_widget)
+        self.hide()
+
+    def set_citations(self, citations: list[dict]) -> None:
+        while self._items_layout.count():
+            item = self._items_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        if not citations:
+            self.hide()
+            return
+
+        for citation in citations:
+            label = self._format_citation(citation)
+            if not label:
+                continue
+            row = QLabel(label)
+            row.setWordWrap(True)
+            row.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            row.setStyleSheet(
+                "color:#374151; font-size:12px; background:transparent; border:none;"
+            )
+            self._items_layout.addWidget(row)
+
+        if self._items_layout.count() > 0:
+            self._title.setText(t("chat_sources_title"))
+            self.show()
+        else:
+            self.hide()
+
+    @staticmethod
+    def _format_citation(citation: dict) -> str:
+        if not isinstance(citation, dict):
+            return ""
+        name = (citation.get("original_filename") or citation.get("title") or citation.get("doc_id") or "").strip()
+        if not name:
+            return ""
+        pages = citation.get("pages")
+        page_label = ""
+        if isinstance(pages, list) and pages:
+            numbers = [str(int(p)) for p in pages if isinstance(p, (int, str)) and str(p).strip().isdigit()]
+            if numbers:
+                page_label = (
+                    f" — {t('chat_sources_page', page=numbers[0])}"
+                    if len(numbers) == 1
+                    else f" — {t('chat_sources_pages', start=numbers[0], end=numbers[-1])}"
+                )
+        return f"• {name}{page_label}"
+
+
 class AssistantMessageWidget(QWidget):
     thinking_toggled = Signal(bool)
 
@@ -349,6 +430,9 @@ class AssistantMessageWidget(QWidget):
         self.feedback_label.hide()
         layout.addWidget(self.feedback_label)
 
+        self.citations_card = CitationsCard()
+        layout.addWidget(self.citations_card)
+
         self.typing_dots = TypingDotsWidget()
         layout.addWidget(self.typing_dots, 0, Qt.AlignLeft)
         self.typing_dots.hide()
@@ -365,6 +449,9 @@ class AssistantMessageWidget(QWidget):
         self.feedback_label.hide()
         self.response_view.show()
         self.response_view.set_markdown_text(self._response_text)
+
+    def set_citations(self, citations: list) -> None:
+        self.citations_card.set_citations(list(citations or []))
 
     def show_typing_indicator(self) -> None:
         self._response_text = ""
@@ -615,6 +702,7 @@ class ChatPage(QWidget):
         self.signals.response_token.connect(self._on_response_token)
         self.signals.thinking_token.connect(self._on_thinking_token)
         self.signals.final_payload.connect(self._on_final_payload)
+        self.signals.citations.connect(self._on_citations)
         self.signals.done.connect(self._on_done)
         self.signals.queue_position.connect(self._on_queue_position)
 
@@ -887,6 +975,9 @@ class ChatPage(QWidget):
                 payload.get("thinking", ""),
                 payload.get("message", ""),
             )
+            citations = payload.get("citations") or []
+            if isinstance(citations, list):
+                self.signals.citations.emit(request_id, citations)
         self.signals.done.emit(request_id)
 
     def _stream_sse(
@@ -951,6 +1042,9 @@ class ChatPage(QWidget):
                         event_data.get("thinking", "") or "",
                         event_data.get("message", "") or "",
                     )
+                    citations = event_data.get("citations") or []
+                    if isinstance(citations, list):
+                        self.signals.citations.emit(request_id, citations)
                     self.signals.done.emit(request_id)
                     return
 
@@ -990,11 +1084,15 @@ class ChatPage(QWidget):
             except ValueError:
                 return {"message": resp.text.strip() or t("chat_empty_response"), "thinking": ""}
             if isinstance(data, dict):
+                citations = data.get("citations") or []
+                if not isinstance(citations, list):
+                    citations = []
                 return {
                     "message": data.get("message") or data.get("text") or str(data),
                     "thinking": data.get("thinking") or "",
+                    "citations": citations,
                 }
-            return {"message": str(data), "thinking": ""}
+            return {"message": str(data), "thinking": "", "citations": []}
         raise last_error or RuntimeError(t("chat_no_valid_response"))
 
     def _format_http_error(self, exc: requests.HTTPError) -> str:
@@ -1111,6 +1209,15 @@ class ChatPage(QWidget):
         widget.set_response_text(self.current_response_text)
         if should_stick:
             self._scroll_to_bottom()
+
+    @Slot(int, list)
+    def _on_citations(self, request_id: int, citations: list) -> None:
+        if request_id != self._active_request_id:
+            return
+        if self._stop_requested:
+            return
+        widget = self._ensure_current_reply_widget()
+        widget.set_citations(citations or [])
 
     def _ensure_current_reply_widget(self) -> AssistantMessageWidget:
         if self.current_reply_widget is None:
