@@ -309,6 +309,93 @@ ensure_remote_support_service() {
     fi
 }
 
+ensure_active_wifi_profile_persistence() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    if [ "${ENABLE_WIFI_PERSISTENCE_FIX:-1}" = "0" ]; then
+        echo "ℹ️  WiFi-profiel normalisatie is uitgeschakeld via ENABLE_WIFI_PERSISTENCE_FIX=0"
+        return 0
+    fi
+
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; actieve WiFi-profielen worden niet automatisch genormaliseerd."
+        return 0
+    fi
+
+    if ! command -v nmcli >/dev/null 2>&1; then
+        echo "⚠️  nmcli niet beschikbaar, sla WiFi-profiel normalisatie over."
+        return 0
+    fi
+
+    local -a nmcli_cmd=()
+    local -a active_wifi_connections=()
+    local connection=""
+    local profile_file=""
+    local psk=""
+    local update_result=0
+    if [ "$(id -u)" -eq 0 ]; then
+        nmcli_cmd=(nmcli)
+    else
+        nmcli_cmd=(sudo nmcli)
+    fi
+
+    mapfile -t active_wifi_connections < <(
+        "${nmcli_cmd[@]}" -t -f NAME,TYPE connection show --active 2>/dev/null \
+        | awk -F: '$2=="802-11-wireless"{print $1}'
+    )
+
+    if [ "${#active_wifi_connections[@]}" -eq 0 ]; then
+        echo "ℹ️  Geen actieve WiFi-verbinding gevonden om te normaliseren."
+        return 0
+    fi
+
+    for connection in "${active_wifi_connections[@]}"; do
+        [ -n "$connection" ] || continue
+        echo "📶 Actief WiFi-profiel normaliseren: ${connection}"
+
+        psk="$("${nmcli_cmd[@]}" -s -g 802-11-wireless-security.psk connection show "$connection" 2>/dev/null || true)"
+        profile_file="$("${nmcli_cmd[@]}" -s -g connection.filename connection show "$connection" 2>/dev/null || true)"
+
+        if [ -n "$psk" ]; then
+            if "${nmcli_cmd[@]}" connection modify "$connection" \
+                connection.permissions "" \
+                connection.autoconnect yes \
+                802-11-wireless-security.psk-flags 0 \
+                802-11-wireless-security.psk "$psk" >/dev/null 2>&1; then
+                :
+            else
+                update_result=1
+            fi
+        else
+            if "${nmcli_cmd[@]}" connection modify "$connection" \
+                connection.permissions "" \
+                connection.autoconnect yes >/dev/null 2>&1; then
+                :
+            else
+                update_result=1
+            fi
+        fi
+
+        if [ "$update_result" -ne 0 ]; then
+            echo "⚠️  Kon WiFi-profiel ${connection} niet volledig bijwerken."
+            update_result=0
+            continue
+        fi
+
+        if [[ "$profile_file" == /run/NetworkManager/system-connections/netplan-* ]]; then
+            echo "✅ WiFi-profiel ${connection} is live genormaliseerd (netplan-beheerd runtime-profiel)."
+        else
+            echo "✅ WiFi-profiel ${connection} is persistent gemaakt voor NetworkManager."
+        fi
+    done
+}
+
 configure_hostname() {
     desired="${DEVICE_HOSTNAME}"
     case "$DEVICE_PLATFORM" in
@@ -463,6 +550,7 @@ start_ollama() {
 
 echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
+ensure_active_wifi_profile_persistence
 ensure_remote_support_dependencies
 ensure_remote_support_service
 configure_hostname
