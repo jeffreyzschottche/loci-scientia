@@ -36,12 +36,14 @@ from .apiAsk import (
     generate_request_id,
     handle_ask,
     history_documents_from_parsed,
+    invalid_model_output_message,
+    is_invalid_model_output,
     log_api_request,
     log_prompt,
     normalize_documents,
     normalize_images,
+    normalize_model_response,
     prepare_prompt,
-    split_ollama_response_parts,
     summarize_history,
 )
 from .chat_history import ChatHistoryStore
@@ -926,9 +928,11 @@ async def sse_stream_generator(
     )
 
     assistant_chunks: list[str] = []
+    pending_assistant_chunks: list[str] = []
     thinking_chunks: list[str] = []
     error_message: Optional[str] = None
     mock_response: Optional[str] = None
+    assistant_stream_started = False
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -986,9 +990,20 @@ async def sse_stream_generator(
                         if "response" in data:
                             token = data["response"]
                             if token:  # Only send non-empty tokens
-                                assistant_chunks.append(token)
-                                event_data = json.dumps({"token": token, "done": False})
-                                yield f"data: {event_data}\n\n"
+                                pending_assistant_chunks.append(token)
+                                partial_text = "".join(assistant_chunks + pending_assistant_chunks).strip()
+                                if is_invalid_model_output(partial_text):
+                                    assistant_chunks = [invalid_model_output_message()]
+                                    pending_assistant_chunks = []
+                                    break
+                                should_flush_pending = assistant_stream_started or len("".join(pending_assistant_chunks)) >= 120 or data.get("done", False)
+                                if should_flush_pending:
+                                    assistant_stream_started = True
+                                    for pending_token in pending_assistant_chunks:
+                                        assistant_chunks.append(pending_token)
+                                        event_data = json.dumps({"token": pending_token, "done": False})
+                                        yield f"data: {event_data}\n\n"
+                                    pending_assistant_chunks = []
 
                         # Check if done
                         if data.get("done", False):
@@ -1055,7 +1070,7 @@ async def sse_stream_generator(
 
     raw_assistant_text = "".join(assistant_chunks).strip()
     raw_thinking_text = "".join(thinking_chunks).strip()
-    thinking_text, assistant_text = split_ollama_response_parts(
+    thinking_text, assistant_text = normalize_model_response(
         response_text=raw_assistant_text,
         thinking_text=raw_thinking_text,
     )

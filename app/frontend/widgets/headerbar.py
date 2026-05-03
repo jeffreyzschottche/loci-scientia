@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QRect, Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -186,23 +186,30 @@ class PowerButton(QPushButton):
         self.setObjectName("HeaderPowerButton")
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedSize(33, 33)
-        self.setText("⏻")
         self.setContentsMargins(0, 0, 0, 0)
         self.setToolTip(t("power_dialog_title"))
-        self.setStyleSheet(
-            "QPushButton {"
-            "  background-color: #facc15;"
-            "  color: #111111;"
-            "  border: 0;"
-            "  border-radius: 16px;"
-            "  font-size: 21px;"
-            "  font-weight: 700;"
-            "  padding: 0;"
-            "  text-align: center;"
-            "}"
-            "QPushButton:hover { background-color: #fcd34d; }"
-            "QPushButton:pressed { background-color: #eab308; }"
-        )
+
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        if self.isDown():
+            fill_hex = "#eab308"
+        elif self.underMouse():
+            fill_hex = "#fcd34d"
+        else:
+            fill_hex = "#facc15"
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(fill_hex))
+        painter.drawEllipse(self.rect().adjusted(0, 0, -1, -1))
+
+        font = self.font()
+        font.setPointSize(16)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor("#111111"))
+        painter.drawText(self.rect().adjusted(0, 2, 0, 2), Qt.AlignCenter, "⏻")
 
 
 class HeaderBar(QWidget):

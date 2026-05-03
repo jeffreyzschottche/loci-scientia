@@ -181,6 +181,9 @@ class AutoSizingMarkdownView(QTextBrowser):
         super().__init__()
         self._plain_text = ""
         self._syncing_height = False
+        self._height_sync_timer = QTimer(self)
+        self._height_sync_timer.setSingleShot(True)
+        self._height_sync_timer.timeout.connect(self._sync_height)
         self.setReadOnly(True)
         self.setOpenExternalLinks(True)
         self.setFrameShape(QFrame.NoFrame)
@@ -259,7 +262,7 @@ class AutoSizingMarkdownView(QTextBrowser):
     def _queue_sync_height(self, *_args) -> None:
         if self._syncing_height:
             return
-        QTimer.singleShot(0, self._sync_height)
+        self._height_sync_timer.start(0)
 
     def _sync_height(self) -> None:
         if self._syncing_height:
@@ -1564,7 +1567,9 @@ class ChatPage(QWidget):
         label.setProperty("_plain_text", text)
 
     def _rebuild_history_view(self) -> None:
-        old_container = self.history_container
+        old_container = self.history_scroll.takeWidget()
+        if old_container is self.history_container:
+            self.history_container = None
 
         self.history_container = ChatHistoryCanvas()
         self.history_container.set_background_visible(True)
@@ -1592,7 +1597,6 @@ class ChatPage(QWidget):
 
         if old_container is not None:
             old_container.hide()
-            old_container.setParent(None)
             old_container.deleteLater()
 
     def _insert_history_row(self, row: QWidget):

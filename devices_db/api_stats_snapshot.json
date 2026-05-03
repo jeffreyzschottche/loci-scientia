@@ -1,9 +1,16 @@
 {
   "mode": "interactive_v1",
+<<<<<<< HEAD
   "date": "2026-05-01",
   "requests_today": 3,
   "latency_total_ms": 29075.491,
   "latency_count": 2,
+=======
+  "date": "2026-05-03",
+  "requests_today": 8,
+  "latency_total_ms": 382939.65,
+  "latency_count": 5,
+>>>>>>> feature/Vulkan-ondersteuning
   "active_ids": [
     "412fdfeaae695e55"
   ]
