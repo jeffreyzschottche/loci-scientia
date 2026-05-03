@@ -68,6 +68,17 @@ from backend.schemas import ChatMessage, HistoryDocument  # noqa: E402
 
 
 class PromptBuildingTests(unittest.TestCase):
+    def test_invalid_model_output_detects_known_garbage_fragments(self):
+        self.assertTrue(apiAsk.is_invalid_model_output("Hub heeft geen tools toegewezen voor deze taak."))
+
+    def test_invalid_model_output_detects_corrupted_unicode_stream(self):
+        corrupted = "���⸮⸮⸮⸮߷߷߷۞۞۞���⸮⸮⸮⸮߷߷߷۞۞۞"
+        self.assertTrue(apiAsk.is_invalid_model_output(corrupted))
+
+    def test_invalid_model_output_keeps_normal_dutch_sentence_valid(self):
+        valid = "Ik zie geen directe fout in je vraag. Kun je het exacte antwoord van het model delen?"
+        self.assertFalse(apiAsk.is_invalid_model_output(valid))
+
     def test_all_prompt_templates_start_with_required_prefix(self):
         required_prefix = "Je bent een behulpzame assistent."
         template_paths = [apiAsk.PROMPT_TEMPLATE_PATH, *sorted(apiAsk.PROMPT_TEMPLATE_DIR.glob("*.txt"))]

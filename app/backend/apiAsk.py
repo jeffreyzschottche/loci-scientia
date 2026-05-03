@@ -5,7 +5,9 @@ import logging
 import math
 import os
 import re
+import unicodedata
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,6 +59,11 @@ THINKING_MODEL_MARKERS = (
     "deepseek_r1",
     "deepseek-v3.1",
     "gpt-oss",
+)
+_KNOWN_BAD_OUTPUT_FRAGMENTS = (
+    "receptor model ad aanpassingen",
+    "hub heeft geen tools toegewezen",
+    "ik kan geen tools gebruiken",
 )
 
 
@@ -1072,6 +1079,90 @@ def split_ollama_response_parts(
     return ("\n\n".join(ordered_thinking).strip(), response)
 
 
+def _fallback_invalid_generation_response() -> str:
+    return (
+        "Het model gaf een onbruikbaar antwoord terug. "
+        "Dit wijst meestal op een instabiele model/runtime-combinatie. "
+        f"Probeer een ander model of schakel Vulkan uit en probeer opnieuw "
+        f"(huidig model: '{settings.ollama_model}')."
+    )
+
+
+def invalid_model_output_message() -> str:
+    return _fallback_invalid_generation_response()
+
+
+def _looks_like_degenerate_repetition(text: str) -> bool:
+    tokens = [token.lower() for token in _TOKEN_PATTERN.findall(text)]
+    if len(tokens) < 5:
+        return False
+    counts = Counter(tokens)
+    unique_count = len(counts)
+    most_common_count = counts.most_common(1)[0][1]
+    if unique_count <= 2 and most_common_count >= max(4, math.ceil(len(tokens) * 0.6)):
+        return True
+    return False
+
+
+def _looks_like_garbled_text(text: str) -> bool:
+    compact = (text or "").strip()
+    if len(compact) < 24:
+        return False
+
+    non_space_chars = [char for char in compact if not char.isspace()]
+    if not non_space_chars:
+        return False
+
+    letter_count = sum(1 for char in non_space_chars if char.isalpha())
+    replacement_count = sum(1 for char in non_space_chars if char == "\ufffd")
+    control_like_count = sum(
+        1
+        for char in non_space_chars
+        if unicodedata.category(char) in {"Cc", "Cf", "Cs", "Co", "Cn"}
+    )
+    word_count = len(re.findall(r"\w+", compact, flags=re.UNICODE))
+    space_ratio = sum(1 for char in compact if char.isspace()) / max(len(compact), 1)
+    letter_ratio = letter_count / len(non_space_chars)
+    corrupted_ratio = (replacement_count + control_like_count) / len(non_space_chars)
+
+    if replacement_count >= 2:
+        return True
+    if corrupted_ratio >= 0.05:
+        return True
+    if word_count <= 2 and letter_ratio < 0.55 and len(compact) >= 32:
+        return True
+    if space_ratio < 0.04 and letter_ratio < 0.65 and len(compact) >= 48:
+        return True
+    return False
+
+
+def is_invalid_model_output(text: Optional[str]) -> bool:
+    normalized = " ".join((text or "").strip().lower().split())
+    if not normalized:
+        return False
+    if any(fragment in normalized for fragment in _KNOWN_BAD_OUTPUT_FRAGMENTS):
+        return True
+    if _looks_like_degenerate_repetition(normalized):
+        return True
+    if _looks_like_garbled_text(text or ""):
+        return True
+    return False
+
+
+def normalize_model_response(
+    response_text: Optional[str],
+    thinking_text: Optional[str] = None,
+) -> tuple[str, str]:
+    thinking, response = split_ollama_response_parts(
+        response_text=response_text,
+        thinking_text=thinking_text,
+    )
+    if is_invalid_model_output(response):
+        logger.warning("Model produced invalid output preview: %r", response[:300])
+        return "", _fallback_invalid_generation_response()
+    return thinking, response
+
+
 async def _call_ollama(
     prompt: str,
     options: Optional[dict] = None,
@@ -1094,7 +1185,7 @@ async def _call_ollama(
         response = await client.post(ollama_url, json=payload)
         response.raise_for_status()
         data = response.json()
-        thinking, message = split_ollama_response_parts(
+        thinking, message = normalize_model_response(
             response_text=data.get("response"),
             thinking_text=data.get("thinking"),
         )
