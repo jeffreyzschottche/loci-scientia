@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QListView,
     QPlainTextEdit,
     QProgressDialog,
@@ -125,6 +127,19 @@ class SettingsPage(QWidget):
         self._wifi_status: QLabel | None = None
         self._wifi_open_button: QPushButton | None = None
         self._wifi_last_info: dict[str, str] | None = None
+        self._bluetooth_status: QLabel | None = None
+        self._bluetooth_list: QListWidget | None = None
+        self._bluetooth_connected_list: QListWidget | None = None
+        self._bluetooth_scan_list: QListWidget | None = None
+        self._bluetooth_content: QWidget | None = None
+        self._bluetooth_toggle: QPushButton | None = None
+        self._bluetooth_power_button: QPushButton | None = None
+        self._bluetooth_repair_button: QPushButton | None = None
+        self._bluetooth_refresh_button: QPushButton | None = None
+        self._bluetooth_scan_button: QPushButton | None = None
+        self._bluetooth_pair_button: QPushButton | None = None
+        self._bluetooth_forget_button: QPushButton | None = None
+        self._bluetooth_last_info: dict[str, object] | None = None
         self._timezone_combo: QComboBox | None = None
         self._timezone_loading = False
         self._language_combo: QComboBox | None = None
@@ -155,6 +170,9 @@ class SettingsPage(QWidget):
         self._wifi_refresh_timer = QTimer(self)
         self._wifi_refresh_timer.setInterval(15000)
         self._wifi_refresh_timer.timeout.connect(self._refresh_wifi_status)
+        self._bluetooth_refresh_timer = QTimer(self)
+        self._bluetooth_refresh_timer.setInterval(15000)
+        self._bluetooth_refresh_timer.timeout.connect(self._refresh_bluetooth_status)
         self._model_signals = ModelSwitchSignals()
         self._model_signals.progress.connect(self._on_model_progress)
         self._model_signals.done.connect(self._on_model_done)
@@ -168,6 +186,7 @@ class SettingsPage(QWidget):
         self._tabs.addTab(self._advanced_tab(), t("settings_tab_advanced"))
         self._tabs.addTab(self._ssh_tab(), t("settings_tab_ssh"))
         self._tabs.addTab(self._wifi_tab(), t("settings_tab_wifi"))
+        self._tabs.addTab(self._bluetooth_tab(), t("settings_tab_bluetooth"))
         self._tabs.tabBar().setObjectName("SettingsTabsBar")
         layout.addWidget(self._tabs, 1)
 
@@ -176,8 +195,10 @@ class SettingsPage(QWidget):
         QTimer.singleShot(0, self._load_models)
         QTimer.singleShot(0, self._load_support_status)
         QTimer.singleShot(0, self._refresh_wifi_status)
+        QTimer.singleShot(0, self._refresh_bluetooth_status)
         self._support_refresh_timer.start()
         self._wifi_refresh_timer.start()
+        self._bluetooth_refresh_timer.start()
 
     def _system_tab(self) -> QWidget:
         tab = QWidget()
@@ -483,6 +504,518 @@ class SettingsPage(QWidget):
                 continue
         show_error_dialog(self, t("error"), t("settings_wifi_open_failed"))
 
+    def _bluetooth_tab(self) -> QWidget:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        card = self._settings_card(t("settings_bluetooth_title"))
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(10)
+
+        toggle_row = QHBoxLayout()
+        toggle_row.setContentsMargins(0, 0, 0, 0)
+        self._bluetooth_intro = QLabel("")
+        self._bluetooth_intro.setVisible(False)
+        toggle_row.addStretch(1)
+        self._bluetooth_toggle = QPushButton(t("settings_bluetooth_toggle_off"))
+        self._bluetooth_toggle.setCheckable(True)
+        self._bluetooth_toggle.setCursor(Qt.PointingHandCursor)
+        self._bluetooth_toggle.setStyleSheet(self._action_button_style("secondary"))
+        self._bluetooth_toggle.clicked.connect(self._toggle_bluetooth)
+        toggle_row.addWidget(self._bluetooth_toggle, 0)
+        body_layout.addLayout(toggle_row)
+
+        self._bluetooth_content = QWidget()
+        content_layout = QVBoxLayout(self._bluetooth_content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(10)
+
+        self._bluetooth_status = QLabel("")
+        self._bluetooth_status.setWordWrap(True)
+        self._bluetooth_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._bluetooth_status.setStyleSheet("color:#6b7280; font-size:13px;")
+        content_layout.addWidget(self._bluetooth_status)
+
+        self._bluetooth_connected_title = QLabel(t("settings_bluetooth_connected_devices"))
+        self._bluetooth_connected_title.setStyleSheet("font-weight:700; color:#171717;")
+        content_layout.addWidget(self._bluetooth_connected_title)
+
+        self._bluetooth_connected_list = QListWidget()
+        self._bluetooth_connected_list.setMinimumHeight(140)
+        self._style_bluetooth_list(self._bluetooth_connected_list)
+        content_layout.addWidget(self._bluetooth_connected_list)
+
+        connected_actions = QHBoxLayout()
+        connected_actions.setContentsMargins(0, 0, 0, 0)
+        self._bluetooth_forget_button = QPushButton(t("settings_bluetooth_forget"))
+        self._bluetooth_forget_button.setCursor(Qt.PointingHandCursor)
+        self._bluetooth_forget_button.setStyleSheet(self._action_button_style("secondary"))
+        self._bluetooth_forget_button.clicked.connect(self._forget_selected_bluetooth_device)
+        connected_actions.addWidget(self._bluetooth_forget_button)
+        connected_actions.addStretch(1)
+        content_layout.addLayout(connected_actions)
+
+        self._bluetooth_scan_title = QLabel(t("settings_bluetooth_scan_results"))
+        self._bluetooth_scan_title.setStyleSheet("font-weight:700; color:#171717;")
+        content_layout.addWidget(self._bluetooth_scan_title)
+
+        self._bluetooth_scan_list = QListWidget()
+        self._bluetooth_scan_list.setMinimumHeight(180)
+        self._style_bluetooth_list(self._bluetooth_scan_list)
+        content_layout.addWidget(self._bluetooth_scan_list)
+
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(10)
+        self._bluetooth_scan_button = QPushButton(t("settings_bluetooth_scan"))
+        self._bluetooth_pair_button = QPushButton(t("settings_bluetooth_pair_connect"))
+        for button, variant in (
+            (self._bluetooth_scan_button, "secondary"),
+            (self._bluetooth_pair_button, "primary"),
+        ):
+            button.setCursor(Qt.PointingHandCursor)
+            button.setStyleSheet(self._action_button_style(variant))
+            actions.addWidget(button)
+        actions.addStretch(1)
+        self._bluetooth_scan_button.clicked.connect(self._scan_bluetooth_devices)
+        self._bluetooth_pair_button.clicked.connect(self._pair_selected_bluetooth_device)
+        content_layout.addLayout(actions)
+        body_layout.addWidget(self._bluetooth_content)
+        self._bluetooth_content.setVisible(False)
+
+        card.layout().addWidget(body)
+        layout.addWidget(card)
+        layout.addStretch(1)
+        return tab
+
+    @staticmethod
+    def _style_bluetooth_list(list_widget: QListWidget) -> None:
+        list_widget.setStyleSheet(
+            "QListWidget { background:#fffdf8; border:1px solid #efe6d8; border-radius:18px; padding:8px; }"
+            "QListWidget::item { min-height:38px; padding:8px 10px; border-radius:12px; color:#171717; }"
+            "QListWidget::item:selected { background:#facc15; color:#111111; }"
+        )
+
+    def _refresh_bluetooth_status(self) -> None:
+        if self._bluetooth_status:
+            self._bluetooth_status.setText(t("settings_bluetooth_status_loading"))
+        self._schedule_task(self._refresh_bluetooth_status_async())
+
+    async def _refresh_bluetooth_status_async(self) -> None:
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _toggle_bluetooth(self) -> None:
+        checked = bool(self._bluetooth_toggle and self._bluetooth_toggle.isChecked())
+        self._schedule_task(self._set_bluetooth_enabled_async(checked))
+
+    async def _set_bluetooth_enabled_async(self, enabled: bool) -> None:
+        if self._bluetooth_status and enabled:
+            self._bluetooth_status.setText(t("settings_bluetooth_powering_on"))
+        output = await asyncio.to_thread(self._set_bluetooth_enabled, enabled)
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        if output and info.get("powered") != ("yes" if enabled else "no"):
+            info["user_note"] = t("settings_bluetooth_toggle_failed")
+            self._log_bluetooth_error("set_enabled", output)
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _set_bluetooth_enabled(self, enabled: bool) -> str:
+        return self._run_bluetoothctl(["power", "on" if enabled else "off"], 10)
+
+    def _power_on_bluetooth(self) -> None:
+        self._schedule_task(self._power_on_bluetooth_async())
+
+    async def _power_on_bluetooth_async(self) -> None:
+        if self._bluetooth_status:
+            self._bluetooth_status.setText(t("settings_bluetooth_powering_on"))
+        power_output = await asyncio.to_thread(self._power_on_bluetooth_adapter)
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        if power_output:
+            info["note"] = power_output
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _repair_bluetooth(self) -> None:
+        self._schedule_task(self._repair_bluetooth_async())
+
+    async def _repair_bluetooth_async(self) -> None:
+        if self._bluetooth_status:
+            self._bluetooth_status.setText(t("settings_bluetooth_repairing"))
+        repair_output = await asyncio.to_thread(self._repair_bluetooth_stack)
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        if repair_output:
+            info["note"] = repair_output
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _scan_bluetooth_devices(self) -> None:
+        self._schedule_task(self._scan_bluetooth_devices_async())
+
+    async def _scan_bluetooth_devices_async(self) -> None:
+        if self._bluetooth_status:
+            self._bluetooth_status.setText(t("settings_bluetooth_scanning"))
+        scan_output = await asyncio.to_thread(self._scan_bluetooth_devices_blocking)
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        if scan_output and self._is_bluetooth_error(scan_output):
+            self._log_bluetooth_error("scan", scan_output)
+            info["user_note"] = t("settings_bluetooth_scan_failed")
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _pair_selected_bluetooth_device(self) -> None:
+        if not self._bluetooth_scan_list:
+            return
+        item = self._bluetooth_scan_list.currentItem()
+        if item is None:
+            if self._bluetooth_status:
+                self._bluetooth_status.setText(t("settings_bluetooth_select_device"))
+            return
+        mac = item.data(Qt.UserRole)
+        if not mac:
+            return
+        self._schedule_task(self._pair_bluetooth_device_async(str(mac)))
+
+    async def _pair_bluetooth_device_async(self, mac: str) -> None:
+        if self._bluetooth_status:
+            self._bluetooth_status.setText(t("settings_bluetooth_pairing", device=mac))
+        result = await asyncio.to_thread(self._pair_bluetooth_device, mac)
+        if result and self._is_bluetooth_error(result):
+            self._log_bluetooth_error("pair_connect", result)
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        if result and self._is_bluetooth_error(result):
+            info["user_note"] = t("settings_bluetooth_pair_failed")
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _forget_selected_bluetooth_device(self) -> None:
+        if not self._bluetooth_connected_list:
+            return
+        item = self._bluetooth_connected_list.currentItem()
+        if item is None:
+            if self._bluetooth_status:
+                self._bluetooth_status.setText(t("settings_bluetooth_select_device"))
+            return
+        mac = item.data(Qt.UserRole)
+        if mac:
+            self._schedule_task(self._forget_bluetooth_device_async(str(mac)))
+
+    async def _forget_bluetooth_device_async(self, mac: str) -> None:
+        result = await asyncio.to_thread(self._forget_bluetooth_device, mac)
+        if result and self._is_bluetooth_error(result):
+            self._log_bluetooth_error("forget", result)
+        info = await asyncio.to_thread(self._read_bluetooth_info)
+        if result and self._is_bluetooth_error(result):
+            info["user_note"] = t("settings_bluetooth_forget_failed")
+        self._bluetooth_last_info = info
+        self._apply_bluetooth_info(info)
+
+    def _pair_bluetooth_device(self, mac: str) -> str:
+        outputs = [
+            self._run_bluetoothctl(["agent", "KeyboardDisplay"], 10),
+            self._run_bluetoothctl(["default-agent"], 10),
+            self._run_bluetoothctl(["trust", mac], 15),
+            self._run_bluetoothctl(["pair", mac], 60),
+            self._run_bluetoothctl(["connect", mac], 30),
+            self._activate_bluetooth_audio(mac),
+            self._collect_bluetooth_profile_debug(mac),
+        ]
+        return "\n".join(output for output in outputs if output).strip()
+
+    def _forget_bluetooth_device(self, mac: str) -> str:
+        return self._run_bluetoothctl(["remove", mac], 20)
+
+    def _activate_bluetooth_audio(self, mac: str) -> str:
+        if shutil.which("pactl") is None:
+            return ""
+        sinks = self._run_command(["pactl", "list", "short", "sinks"], timeout=5)
+        mac_token = mac.replace(":", "_").lower()
+        selected_sink = ""
+        for line in sinks.splitlines():
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            sink_name = parts[1]
+            lowered = sink_name.lower()
+            if "bluez" in lowered and mac_token in lowered:
+                selected_sink = sink_name
+                break
+            if "bluetooth" in lowered and mac_token in lowered:
+                selected_sink = sink_name
+                break
+        if not selected_sink:
+            return ""
+        return self._run_command(["pactl", "set-default-sink", selected_sink], timeout=5)
+
+    def _collect_bluetooth_profile_debug(self, mac: str) -> str:
+        sections = [self._run_bluetoothctl(["info", mac], 5)]
+        if shutil.which("pactl"):
+            sections.append("pactl sinks:\n" + self._run_command(["pactl", "list", "short", "sinks"], timeout=5))
+            sections.append("pactl cards:\n" + self._run_command(["pactl", "list", "short", "cards"], timeout=5))
+        return "\n".join(section for section in sections if section).strip()
+
+    def _power_on_bluetooth_adapter(self) -> str:
+        output = self._run_bluetoothctl(["power", "on"], 10)
+        state = self._read_bluetooth_power_state()
+        if state == "yes":
+            return output
+        message = t("settings_bluetooth_power_on_failed")
+        return "\n".join(part for part in (output, message) if part).strip()
+
+    def _repair_bluetooth_stack(self) -> str:
+        outputs: list[str] = []
+        if shutil.which("rfkill"):
+            outputs.append(self._run_command(["rfkill", "unblock", "bluetooth"], timeout=10))
+        if shutil.which("systemctl"):
+            outputs.append(self._run_command(["systemctl", "start", "bluetooth"], timeout=15))
+        if shutil.which("hciconfig"):
+            outputs.append(self._run_command(["hciconfig", "hci0", "up"], timeout=10))
+        outputs.append(self._power_on_bluetooth_adapter())
+        return "\n".join(output for output in outputs if output).strip()
+
+    def _scan_bluetooth_devices_blocking(self) -> str:
+        if self._read_bluetooth_power_state() != "yes":
+            return t("settings_bluetooth_power_required")
+        return self._run_bluetoothctl(["--timeout", "12", "scan", "on"], 16)
+
+    def _read_bluetooth_power_state(self) -> str:
+        if platform.system() != "Linux" or shutil.which("bluetoothctl") is None:
+            return ""
+        for line in self._run_bluetoothctl(["show"], 5).splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Powered:"):
+                return stripped.split(":", 1)[1].strip()
+        return ""
+
+    def _read_bluetooth_info(self) -> dict[str, object]:
+        system = platform.system()
+        info: dict[str, object] = {"platform": system, "devices": []}
+        if system != "Linux":
+            info["note"] = t("settings_bluetooth_linux_only")
+            return info
+        if shutil.which("bluetoothctl") is None:
+            info["note"] = t("settings_bluetoothctl_missing")
+            return info
+
+        show_output = self._run_bluetoothctl(["show"], 5)
+        for line in show_output.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Name:"):
+                info["adapter"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Powered:"):
+                info["powered"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Discoverable:"):
+                info["discoverable"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Pairable:"):
+                info["pairable"] = stripped.split(":", 1)[1].strip()
+        service_state = self._read_bluetooth_service_state()
+        if service_state:
+            info["service"] = service_state
+        rfkill_state = self._read_bluetooth_rfkill_state()
+        if rfkill_state:
+            info["rfkill"] = rfkill_state
+
+        devices: list[dict[str, str]] = []
+        for line in self._run_bluetoothctl(["devices"], 8).splitlines():
+            match = re.match(r"Device\s+([0-9A-Fa-f:]{17})\s+(.+)", line.strip())
+            if not match:
+                continue
+            mac, name = match.groups()
+            detail = self._read_bluetooth_device_detail(mac)
+            detail.setdefault("mac", mac)
+            detail.setdefault("name", name.strip())
+            devices.append(detail)
+        info["devices"] = devices
+        return info
+
+    def _read_bluetooth_service_state(self) -> str:
+        if shutil.which("systemctl") is None:
+            return ""
+        return self._run_command(["systemctl", "is-active", "bluetooth"], timeout=5).strip()
+
+    def _read_bluetooth_rfkill_state(self) -> str:
+        if shutil.which("rfkill") is None:
+            return ""
+        output = self._run_command(["rfkill", "list", "bluetooth"], timeout=5)
+        if not output:
+            return ""
+        states = []
+        for line in output.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Soft blocked:") or stripped.startswith("Hard blocked:"):
+                states.append(stripped)
+        return ", ".join(states)
+
+    def _read_bluetooth_device_detail(self, mac: str) -> dict[str, str]:
+        detail: dict[str, str] = {}
+        for line in self._run_bluetoothctl(["info", mac], 5).splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Name:"):
+                detail["name"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Alias:"):
+                detail["alias"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Paired:"):
+                detail["paired"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Trusted:"):
+                detail["trusted"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Connected:"):
+                detail["connected"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Icon:"):
+                detail["icon"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Class:"):
+                detail["device_class"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("Modalias:"):
+                detail["modalias"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("UUID:"):
+                uuids = detail.setdefault("uuids", "")
+                uuid_value = stripped.split(":", 1)[1].strip()
+                detail["uuids"] = f"{uuids}\n{uuid_value}".strip()
+        return detail
+
+    def _run_bluetoothctl(self, args: list[str], timeout: int = 10) -> str:
+        return self._run_command(["bluetoothctl", *args], timeout=timeout)
+
+    def _apply_bluetooth_info(self, info: dict[str, object] | None) -> None:
+        powered = bool(info and info.get("powered") == "yes")
+        if self._bluetooth_toggle:
+            self._bluetooth_toggle.blockSignals(True)
+            self._bluetooth_toggle.setChecked(powered)
+            self._bluetooth_toggle.setText(
+                t("settings_bluetooth_toggle_on") if powered else t("settings_bluetooth_toggle_off")
+            )
+            self._bluetooth_toggle.setStyleSheet(self._action_button_style("primary" if powered else "secondary"))
+            self._bluetooth_toggle.blockSignals(False)
+        if self._bluetooth_content:
+            self._bluetooth_content.setVisible(powered)
+        if not powered:
+            if self._bluetooth_status:
+                self._bluetooth_status.setText("")
+            if self._bluetooth_connected_list:
+                self._bluetooth_connected_list.clear()
+            if self._bluetooth_scan_list:
+                self._bluetooth_scan_list.clear()
+            return
+
+        if self._bluetooth_status:
+            self._bluetooth_status.setText(self._format_bluetooth_status(info))
+        if self._bluetooth_connected_list:
+            self._bluetooth_connected_list.clear()
+        if self._bluetooth_scan_list:
+            self._bluetooth_scan_list.clear()
+        for device in (info or {}).get("devices", []):
+            if not isinstance(device, dict):
+                continue
+            mac = str(device.get("mac", ""))
+            name = self._bluetooth_display_name(device)
+            subtitle = self._bluetooth_display_subtitle(device)
+            flags = []
+            if device.get("connected") == "yes":
+                flags.append(t("settings_bluetooth_connected"))
+            if device.get("paired") == "yes":
+                flags.append(t("settings_bluetooth_paired"))
+            suffix = f" ({', '.join(flags)})" if flags else ""
+            item = QListWidgetItem(f"{name}{suffix}\n{subtitle}")
+            item.setData(Qt.UserRole, mac)
+            if device.get("connected") == "yes" or device.get("paired") == "yes":
+                if self._bluetooth_connected_list:
+                    self._bluetooth_connected_list.addItem(item)
+            elif self._bluetooth_scan_list:
+                self._bluetooth_scan_list.addItem(item)
+        if self._bluetooth_connected_list and self._bluetooth_connected_list.count() == 0:
+            self._bluetooth_connected_list.addItem(t("settings_bluetooth_no_connected_devices"))
+        if self._bluetooth_scan_list and self._bluetooth_scan_list.count() == 0:
+            self._bluetooth_scan_list.addItem(t("settings_bluetooth_no_scan_results"))
+
+    def _bluetooth_display_name(self, device: dict[str, str]) -> str:
+        for key in ("alias", "name"):
+            value = str(device.get(key, "")).strip()
+            if value and not self._looks_like_bluetooth_identifier(value):
+                return value
+        kind = self._bluetooth_device_kind(device)
+        return t("settings_bluetooth_unknown_device", kind=kind)
+
+    def _bluetooth_display_subtitle(self, device: dict[str, str]) -> str:
+        mac = str(device.get("mac", "")).strip()
+        raw_name = str(device.get("alias") or device.get("name") or "").strip()
+        kind = self._bluetooth_device_kind(device)
+        parts = [kind]
+        if raw_name and raw_name != mac and self._looks_like_bluetooth_identifier(raw_name):
+            parts.append(raw_name)
+        if mac:
+            parts.append(mac)
+        return " · ".join(parts)
+
+    def _bluetooth_device_kind(self, device: dict[str, str]) -> str:
+        haystack = "\n".join(
+            str(device.get(key, ""))
+            for key in ("icon", "device_class", "modalias", "uuids", "alias", "name")
+        ).lower()
+        if "keyboard" in haystack:
+            return t("settings_bluetooth_kind_keyboard")
+        if "mouse" in haystack:
+            return t("settings_bluetooth_kind_mouse")
+        if "audio" in haystack or "headset" in haystack or "headphone" in haystack or "speaker" in haystack:
+            return t("settings_bluetooth_kind_audio")
+        if "phone" in haystack:
+            return t("settings_bluetooth_kind_phone")
+        if "computer" in haystack or "laptop" in haystack:
+            return t("settings_bluetooth_kind_computer")
+        if "input" in haystack or "hid" in haystack:
+            return t("settings_bluetooth_kind_input")
+        return t("settings_bluetooth_kind_device")
+
+    @staticmethod
+    def _looks_like_bluetooth_identifier(value: str) -> bool:
+        stripped = value.strip()
+        if re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){2,5}[0-9A-Fa-f]{2}", stripped):
+            return True
+        if re.fullmatch(r"[0-9A-Fa-f]{4,}(?:::[0-9A-Fa-f]{4,})?", stripped):
+            return True
+        if re.fullmatch(r"[0-9A-Fa-f:_-]{8,}", stripped):
+            return True
+        return False
+
+    def _format_bluetooth_status(self, info: dict[str, object] | None) -> str:
+        if not info:
+            return t("settings_bluetooth_info_unavailable")
+        user_note = str(info.get("user_note", "")).strip()
+        return user_note or t("settings_bluetooth_ready")
+
+    @staticmethod
+    def _bluetooth_log_path() -> Path:
+        return Path(__file__).resolve().parents[3] / "bluetooth.log"
+
+    def _log_bluetooth_error(self, action: str, output: str) -> None:
+        if not output.strip():
+            return
+        try:
+            timestamp = datetime.now(timezone.utc).isoformat()
+            with self._bluetooth_log_path().open("a", encoding="utf-8") as handle:
+                handle.write(f"[{timestamp}] {action}\n{output.strip()}\n\n")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _is_bluetooth_error(output: str) -> bool:
+        lowered = output.lower()
+        return any(
+            marker in lowered
+            for marker in (
+                "failed",
+                "error",
+                "not available",
+                "not permitted",
+                "permission denied",
+                "blocked",
+                "no default controller",
+            )
+        )
+
     def _refresh_wifi_status(self) -> None:
         if self._wifi_status:
             self._wifi_status.setText(t("settings_wifi_status_loading"))
@@ -495,14 +1028,19 @@ class SettingsPage(QWidget):
             self._wifi_status.setText(self._format_wifi_status(info))
 
     @staticmethod
-    def _run_command(command: list[str]) -> str:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
+    def _run_command(command: list[str], timeout: int = 5) -> str:
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            stdout = (exc.stdout or "").strip()
+            stderr = (exc.stderr or "").strip()
+            return stdout or stderr
         stdout = (completed.stdout or "").strip()
         stderr = (completed.stderr or "").strip()
         return stdout or stderr
@@ -659,6 +1197,7 @@ class SettingsPage(QWidget):
             "support": 2,
             "ssh": 2,
             "wifi": 3,
+            "bluetooth": 4,
         }
         index = tab_map.get(key)
         if index is not None and hasattr(self, "_tabs"):
@@ -1593,6 +2132,7 @@ class SettingsPage(QWidget):
             self._tabs.setTabText(1, t("settings_tab_advanced"))
             self._tabs.setTabText(2, t("settings_tab_ssh"))
             self._tabs.setTabText(3, t("settings_tab_wifi"))
+            self._tabs.setTabText(4, t("settings_tab_bluetooth"))
         if hasattr(self, "_timezone_label"):
             self._timezone_label.setText(t("settings_timezone"))
         if hasattr(self, "_application_language_label"):
@@ -1634,6 +2174,35 @@ class SettingsPage(QWidget):
                 self._wifi_status.setText(self._format_wifi_status(self._wifi_last_info))
             else:
                 self._wifi_status.setText(t("settings_wifi_status_loading"))
+        if hasattr(self, "_bluetooth_intro"):
+            self._bluetooth_intro.setText(t("settings_bluetooth_intro"))
+        if hasattr(self, "_bluetooth_toggle") and self._bluetooth_toggle:
+            self._bluetooth_toggle.setText(
+                t("settings_bluetooth_toggle_on")
+                if self._bluetooth_toggle.isChecked()
+                else t("settings_bluetooth_toggle_off")
+            )
+        if hasattr(self, "_bluetooth_connected_title"):
+            self._bluetooth_connected_title.setText(t("settings_bluetooth_connected_devices"))
+        if hasattr(self, "_bluetooth_scan_title"):
+            self._bluetooth_scan_title.setText(t("settings_bluetooth_scan_results"))
+        if hasattr(self, "_bluetooth_power_button") and self._bluetooth_power_button:
+            self._bluetooth_power_button.setText(t("settings_bluetooth_power_on"))
+        if hasattr(self, "_bluetooth_repair_button") and self._bluetooth_repair_button:
+            self._bluetooth_repair_button.setText(t("settings_bluetooth_repair"))
+        if hasattr(self, "_bluetooth_refresh_button") and self._bluetooth_refresh_button:
+            self._bluetooth_refresh_button.setText(t("settings_bluetooth_refresh"))
+        if hasattr(self, "_bluetooth_scan_button") and self._bluetooth_scan_button:
+            self._bluetooth_scan_button.setText(t("settings_bluetooth_scan"))
+        if hasattr(self, "_bluetooth_pair_button") and self._bluetooth_pair_button:
+            self._bluetooth_pair_button.setText(t("settings_bluetooth_pair_connect"))
+        if hasattr(self, "_bluetooth_forget_button") and self._bluetooth_forget_button:
+            self._bluetooth_forget_button.setText(t("settings_bluetooth_forget"))
+        if hasattr(self, "_bluetooth_status"):
+            if self._bluetooth_last_info:
+                self._apply_bluetooth_info(self._bluetooth_last_info)
+            else:
+                self._bluetooth_status.setText(t("settings_bluetooth_status_loading"))
         if hasattr(self, "_system_info_labels"):
             keys = [
                 "settings_device_prefix",
