@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=AITJE
+Description=AITJE branded splash with a centered logo and yellow dot spinner.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/aitje
+ScriptFile=/usr/share/plymouth/themes/aitje/aitje.script

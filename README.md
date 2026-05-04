@@ -85,7 +85,23 @@ Clients op hetzelfde netwerk kunnen dan altijd `http://aitje-2.local:8000/...` b
 Remote support loopt nu on-demand via een reverse SSH-tunnel met `autossh` naar een Hetzner jump server.
 De tunnel staat standaard uit en wordt alleen tijdelijk geopend vanuit de UI.
 
-De volledige setup staat in [docs/remote-support.md](/home/kees/Documents/loci-scientia/docs/remote-support.md).
+De volledige setup staat in [docs/remote-support.md](docs/remote-support.md).
+
+---
+
+## 🚀 Deployment
+
+### Kiosk-modus (productie-devices)
+
+Voor klant-deployments kan een AITJE-device direct in een full-screen Wayland-sessie opstarten zonder Ubuntu-desktop. De modus is te togglen vanuit de UI én via een CLI-script. Eenmalige setup:
+
+```bash
+sudo bash scripts/kiosk/install.sh
+```
+
+Standaard staat kiosk-modus uit; toggle 'm aan via **Instellingen → Systeem → Kiosk-modus** of via `sudo aitje-kiosk-toggle enable --reboot`.
+
+Volledige documentatie inclusief recovery-procedure: [docs/kiosk-mode.md](docs/kiosk-mode.md).
 
 ---
 
