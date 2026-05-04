@@ -1875,6 +1875,74 @@ TRANSLATIONS = {
     },
 
     # ============================================
+    # KIOSK MODE
+    # ============================================
+    "settings_kiosk_title": {
+        "nl": "Kiosk-modus",
+        "en": "Kiosk mode",
+    },
+    "settings_kiosk_hint": {
+        "nl": "Kiosk-modus laat AITJE direct opstarten in volledig scherm zonder dat de Ubuntu-desktop zichtbaar is. Schakel dit uit voor onderhoud of ontwikkeling.",
+        "en": "Kiosk mode boots AITJE straight into a full-screen experience and hides the Ubuntu desktop. Disable it for maintenance or development.",
+    },
+    "settings_kiosk_status_loading": {
+        "nl": "Kiosk-status laden...",
+        "en": "Loading kiosk status...",
+    },
+    "settings_kiosk_status_enabled": {
+        "nl": "Kiosk-modus staat aan",
+        "en": "Kiosk mode is on",
+    },
+    "settings_kiosk_status_disabled": {
+        "nl": "Kiosk-modus staat uit",
+        "en": "Kiosk mode is off",
+    },
+    "settings_kiosk_status_error": {
+        "nl": "Kon kiosk-status niet laden:",
+        "en": "Could not load kiosk status:",
+    },
+    "settings_kiosk_reboot_now": {
+        "nl": "Direct herstarten na wijziging",
+        "en": "Reboot immediately after switching",
+    },
+    "settings_kiosk_enable": {
+        "nl": "Activeer kiosk-modus",
+        "en": "Enable kiosk mode",
+    },
+    "settings_kiosk_disable": {
+        "nl": "Schakel kiosk-modus uit",
+        "en": "Disable kiosk mode",
+    },
+    "settings_kiosk_enable_title": {
+        "nl": "Kiosk-modus activeren",
+        "en": "Enable kiosk mode",
+    },
+    "settings_kiosk_enable_confirm": {
+        "nl": "Bij inschakelen start het apparaat direct op in de AITJE-interface en is de Ubuntu-desktop niet meer zichtbaar. De wijziging is omkeerbaar via deze instellingen of via tty (zie de hint hieronder). Doorgaan?",
+        "en": "Once enabled, the device will boot straight into AITJE and the Ubuntu desktop will no longer be shown. You can revert from these settings or via tty (see hint below). Continue?",
+    },
+    "settings_kiosk_disable_title": {
+        "nl": "Kiosk-modus uitschakelen",
+        "en": "Disable kiosk mode",
+    },
+    "settings_kiosk_disable_confirm": {
+        "nl": "Bij uitschakelen krijgt het apparaat bij de volgende start weer de normale Ubuntu-desktop. Doorgaan?",
+        "en": "Once disabled, the device will return to the normal Ubuntu desktop on next start. Continue?",
+    },
+    "settings_kiosk_activating": {
+        "nl": "Kiosk-modus activeren...",
+        "en": "Enabling kiosk mode...",
+    },
+    "settings_kiosk_deactivating": {
+        "nl": "Kiosk-modus uitschakelen...",
+        "en": "Disabling kiosk mode...",
+    },
+    "settings_kiosk_recovery": {
+        "nl": "Recovery: druk Ctrl+Alt+F2 op een tty, log in als 'aitje' en draai 'sudo aitje-kiosk-toggle disable --reboot'.",
+        "en": "Recovery: press Ctrl+Alt+F2 on a tty, log in as 'aitje' and run 'sudo aitje-kiosk-toggle disable --reboot'.",
+    },
+
+    # ============================================
     # CONTACT FORM (additional)
     # ============================================
     "contact_form_latitude": {

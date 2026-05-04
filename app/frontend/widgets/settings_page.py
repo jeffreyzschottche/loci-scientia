@@ -16,6 +16,7 @@ import requests
 from PySide6.QtCore import QDate, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPainter
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDateEdit,
     QDialog,
@@ -149,6 +150,12 @@ class SettingsPage(QWidget):
         self._support_active = False
         self._support_duration_keys = ["settings_30_min", "settings_1_hour", "settings_2_hours"]
         self._support_duration_values = [30, 60, 120]
+        self._kiosk_status: QLabel | None = None
+        self._kiosk_enable: QPushButton | None = None
+        self._kiosk_disable: QPushButton | None = None
+        self._kiosk_reboot: QCheckBox | None = None
+        self._kiosk_recovery: QLabel | None = None
+        self._kiosk_mode: str = "disabled"
         self._support_refresh_timer = QTimer(self)
         self._support_refresh_timer.setInterval(30000)
         self._support_refresh_timer.timeout.connect(self._load_support_status)
@@ -175,6 +182,7 @@ class SettingsPage(QWidget):
 
         QTimer.singleShot(0, self._load_models)
         QTimer.singleShot(0, self._load_support_status)
+        QTimer.singleShot(0, self._load_kiosk_status)
         QTimer.singleShot(0, self._refresh_wifi_status)
         self._support_refresh_timer.start()
         self._wifi_refresh_timer.start()
@@ -285,8 +293,53 @@ class SettingsPage(QWidget):
 
         info_card.layout().addWidget(info_body)
         layout.addWidget(info_card)
+
+        layout.addWidget(self._build_kiosk_card())
         layout.addStretch(1)
         return tab
+
+    def _build_kiosk_card(self) -> QFrame:
+        card = self._settings_card(t("settings_kiosk_title"))
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(10)
+
+        self._kiosk_hint = QLabel(t("settings_kiosk_hint"))
+        self._kiosk_hint.setWordWrap(True)
+        self._kiosk_hint.setStyleSheet("color:#6b7280; font-size:12px;")
+        body_layout.addWidget(self._kiosk_hint)
+
+        self._kiosk_status = QLabel(t("settings_kiosk_status_loading"))
+        self._kiosk_status.setStyleSheet("color:#6b7280; font-size:12px;")
+        body_layout.addWidget(self._kiosk_status)
+
+        self._kiosk_reboot = QCheckBox(t("settings_kiosk_reboot_now"))
+        self._kiosk_reboot.setCursor(Qt.PointingHandCursor)
+        self._kiosk_reboot.setStyleSheet("color:#171717; font-size:13px;")
+        body_layout.addWidget(self._kiosk_reboot)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        self._kiosk_enable = QPushButton(t("settings_kiosk_enable"))
+        self._kiosk_disable = QPushButton(t("settings_kiosk_disable"))
+        for button in (self._kiosk_enable, self._kiosk_disable):
+            button.setCursor(Qt.PointingHandCursor)
+            button.setStyleSheet(self._compact_action_button_style("primary"))
+        self._kiosk_enable.clicked.connect(self._on_kiosk_enable)
+        self._kiosk_disable.clicked.connect(self._on_kiosk_disable)
+        actions.addWidget(self._kiosk_enable)
+        actions.addWidget(self._kiosk_disable)
+        actions.addStretch(1)
+        body_layout.addLayout(actions)
+
+        self._kiosk_recovery = QLabel(t("settings_kiosk_recovery"))
+        self._kiosk_recovery.setWordWrap(True)
+        self._kiosk_recovery.setStyleSheet("color:#9ca3af; font-size:11px; font-style:italic;")
+        body_layout.addWidget(self._kiosk_recovery)
+
+        card.layout().addWidget(body)
+        return card
 
     def _advanced_tab(self) -> QWidget:
         tab = QWidget()
@@ -1664,6 +1717,18 @@ class SettingsPage(QWidget):
             for key in self._support_duration_keys:
                 self._support_duration.addItem(t(key))
             self._support_duration.setCurrentIndex(current_idx)
+        if hasattr(self, "_kiosk_hint"):
+            self._kiosk_hint.setText(t("settings_kiosk_hint"))
+        if hasattr(self, "_kiosk_reboot") and self._kiosk_reboot:
+            self._kiosk_reboot.setText(t("settings_kiosk_reboot_now"))
+        if hasattr(self, "_kiosk_enable") and self._kiosk_enable:
+            self._kiosk_enable.setText(t("settings_kiosk_enable"))
+        if hasattr(self, "_kiosk_disable") and self._kiosk_disable:
+            self._kiosk_disable.setText(t("settings_kiosk_disable"))
+        if hasattr(self, "_kiosk_recovery") and self._kiosk_recovery:
+            self._kiosk_recovery.setText(t("settings_kiosk_recovery"))
+        if hasattr(self, "_kiosk_status") and self._kiosk_status:
+            self._apply_kiosk_state({"mode": self._kiosk_mode})
 
     def _sync_application_language_combo(self) -> None:
         if not self._language_combo:
@@ -1675,6 +1740,126 @@ class SettingsPage(QWidget):
                 self._language_combo.setCurrentIndex(index)
                 break
         self._language_combo.blockSignals(False)
+
+    def _load_kiosk_status(self) -> None:
+        if not self._kiosk_status:
+            return
+        self._schedule_task(self._load_kiosk_status_async())
+
+    async def _load_kiosk_status_async(self) -> None:
+        try:
+            payload = await asyncio.to_thread(self._fetch_kiosk_status)
+        except requests.HTTPError as exc:
+            self._set_kiosk_busy(False)
+            self._kiosk_status.setText(self._kiosk_error_message(exc))
+            return
+        except Exception as exc:
+            self._set_kiosk_busy(False)
+            self._kiosk_status.setText(f"{t('settings_kiosk_status_error')} {exc}")
+            return
+        self._apply_kiosk_state(payload)
+
+    def _fetch_kiosk_status(self) -> dict:
+        resp = requests.get(
+            f"{BACKEND_HTTP}/api/kiosk/mode",
+            timeout=6,
+            headers=self._auth_headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _on_kiosk_enable(self) -> None:
+        if not self._kiosk_enable:
+            return
+        if not ask_yes_no_dialog(
+            self,
+            t("settings_kiosk_enable_title"),
+            t("settings_kiosk_enable_confirm"),
+        ):
+            return
+        reboot = bool(self._kiosk_reboot and self._kiosk_reboot.isChecked())
+        self._set_kiosk_busy(True, t("settings_kiosk_activating"))
+        self._schedule_task(self._set_kiosk_async("enabled", reboot))
+
+    def _on_kiosk_disable(self) -> None:
+        if not self._kiosk_disable:
+            return
+        if not ask_yes_no_dialog(
+            self,
+            t("settings_kiosk_disable_title"),
+            t("settings_kiosk_disable_confirm"),
+        ):
+            return
+        reboot = bool(self._kiosk_reboot and self._kiosk_reboot.isChecked())
+        self._set_kiosk_busy(True, t("settings_kiosk_deactivating"))
+        self._schedule_task(self._set_kiosk_async("disabled", reboot))
+
+    async def _set_kiosk_async(self, mode: str, reboot: bool) -> None:
+        try:
+            payload = await asyncio.to_thread(self._post_kiosk_mode, mode, reboot)
+        except requests.HTTPError as exc:
+            self._set_kiosk_busy(False)
+            show_error_dialog(self, t("error"), self._kiosk_error_message(exc))
+            return
+        except Exception as exc:
+            self._set_kiosk_busy(False)
+            show_error_dialog(self, t("error"), str(exc))
+            return
+        self._set_kiosk_busy(False)
+        self._apply_kiosk_state(payload)
+
+    def _post_kiosk_mode(self, mode: str, reboot: bool) -> dict:
+        resp = requests.post(
+            f"{BACKEND_HTTP}/api/kiosk/mode",
+            json={"mode": mode, "reboot": reboot},
+            timeout=20,
+            headers=self._auth_headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _apply_kiosk_state(self, payload: dict) -> None:
+        mode = str(payload.get("mode") or "disabled").lower()
+        if mode not in ("enabled", "disabled"):
+            mode = "disabled"
+        self._kiosk_mode = mode
+        if self._kiosk_status:
+            label = (
+                t("settings_kiosk_status_enabled")
+                if mode == "enabled"
+                else t("settings_kiosk_status_disabled")
+            )
+            error = payload.get("error")
+            if error:
+                label = f"{label} — {error}"
+            self._kiosk_status.setText(label)
+        if self._kiosk_enable:
+            self._kiosk_enable.setEnabled(mode != "enabled")
+        if self._kiosk_disable:
+            self._kiosk_disable.setEnabled(mode == "enabled")
+
+    def _set_kiosk_busy(self, busy: bool, message: str | None = None) -> None:
+        if self._kiosk_enable:
+            self._kiosk_enable.setEnabled(not busy and self._kiosk_mode != "enabled")
+        if self._kiosk_disable:
+            self._kiosk_disable.setEnabled(not busy and self._kiosk_mode == "enabled")
+        if self._kiosk_reboot:
+            self._kiosk_reboot.setEnabled(not busy)
+        if message and self._kiosk_status:
+            self._kiosk_status.setText(message)
+
+    def _kiosk_error_message(self, exc: requests.HTTPError) -> str:
+        status = getattr(exc.response, "status_code", None)
+        detail = None
+        try:
+            detail = exc.response.json().get("detail")
+        except Exception:
+            detail = None
+        if status == 401:
+            return t("settings_bearer_token_required")
+        if detail:
+            return detail
+        return str(exc)
 
     @staticmethod
     def _format_support_timestamp(value: str | None) -> str:
