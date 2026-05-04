@@ -50,6 +50,7 @@ from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
 from .kennisbank_sync import read_sync_state, sync_kennisbank
+from .kiosk_mode import KioskModeError, KioskModeManager
 from .knowledge_library import get_library_overview, load_document_detail
 from .schemas import (
     BearerTokenResponse,
@@ -59,6 +60,8 @@ from .schemas import (
     Device,
     DeviceCreate,
     DevicePatch,
+    KioskModeRequest,
+    KioskModeStatus,
     OllamaModelRequest,
     SignOnRequest,
     SupportTunnelRequest,
@@ -96,6 +99,7 @@ token_store = BearerTokenStore()
 chat_history = ChatHistoryStore(max_items=20)
 ollama_switch_lock = asyncio.Lock()
 support_tunnel = SupportTunnelManager(env_path=ENV_FILE_PATH)
+kiosk_manager = KioskModeManager()
 admin_tokens = AdminTokenManager(
     token_store=token_store,
     admin_usernames=settings.admin_usernames,
@@ -671,6 +675,23 @@ def support_tunnel_action(
         else:
             state = support_tunnel.close()
     except SupportTunnelError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return state.to_response()
+
+
+@app.get("/api/kiosk/mode", response_model=KioskModeStatus)
+def kiosk_mode_status(_: TokenRecord = Depends(require_admin_token)):
+    return kiosk_manager.status().to_response()
+
+
+@app.post("/api/kiosk/mode", response_model=KioskModeStatus)
+def kiosk_mode_set(
+    req: KioskModeRequest,
+    _: TokenRecord = Depends(require_admin_token),
+):
+    try:
+        state = kiosk_manager.set_mode(req.mode, reboot=req.reboot)
+    except KioskModeError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return state.to_response()
 

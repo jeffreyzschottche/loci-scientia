@@ -108,3 +108,15 @@ class SupportTunnelStatus(BaseModel):
     expires_at: Optional[datetime] = None
     port: Optional[int] = None
     error: Optional[str] = None
+
+
+class KioskModeRequest(BaseModel):
+    mode: Literal["enabled", "disabled"]
+    reboot: bool = False
+
+
+class KioskModeStatus(BaseModel):
+    mode: Literal["enabled", "disabled"]
+    reboot_scheduled: bool = False
+    log: Optional[str] = None
+    error: Optional[str] = None
