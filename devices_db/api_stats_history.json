@@ -2,386 +2,100 @@
   "mode": "interactive_v1",
   "samples": [
     {
-<<<<<<< HEAD
-      "timestamp": "2026-04-17T19:44:49.769816+00:00",
+      "timestamp": "2026-05-03T18:27:46.106705+00:00",
       "requests_today": 1,
       "active_users_today": 1,
-      "avg_response_ms": 20701
+      "avg_response_ms": 11334
     },
     {
-      "timestamp": "2026-04-17T19:46:54.460994+00:00",
+      "timestamp": "2026-05-03T19:14:06.774483+00:00",
       "requests_today": 2,
-      "active_users_today": 2,
-      "avg_response_ms": 15946
+      "active_users_today": 1,
+      "avg_response_ms": 11609
     },
     {
-      "timestamp": "2026-04-17T19:50:54.753763+00:00",
+      "timestamp": "2026-05-03T22:55:20.306668+00:00",
       "requests_today": 3,
-      "active_users_today": 3,
-      "avg_response_ms": 14839
+      "active_users_today": 1,
+      "avg_response_ms": 11719
     },
     {
-      "timestamp": "2026-04-17T19:52:58.538974+00:00",
+      "timestamp": "2026-05-03T22:56:06.903185+00:00",
       "requests_today": 4,
-      "active_users_today": 3,
-      "avg_response_ms": 18504
+      "active_users_today": 1,
+      "avg_response_ms": 11708
     },
     {
-      "timestamp": "2026-04-17T19:57:29.341857+00:00",
+      "timestamp": "2026-05-03T22:57:01.985787+00:00",
       "requests_today": 5,
-      "active_users_today": 4,
-      "avg_response_ms": 31795
+      "active_users_today": 1,
+      "avg_response_ms": 12002
     },
     {
-      "timestamp": "2026-04-17T20:01:01.990115+00:00",
+      "timestamp": "2026-05-03T22:57:38.089110+00:00",
       "requests_today": 6,
-      "active_users_today": 4,
-      "avg_response_ms": 37489
+      "active_users_today": 1,
+      "avg_response_ms": 11309
     },
     {
-      "timestamp": "2026-04-17T20:03:12.948803+00:00",
-      "requests_today": 7,
-      "active_users_today": 4,
-      "avg_response_ms": 37885
-    },
-    {
-      "timestamp": "2026-04-17T20:05:49.007746+00:00",
-      "requests_today": 8,
-      "active_users_today": 5,
-      "avg_response_ms": 38024
-    },
-    {
-      "timestamp": "2026-04-17T20:10:33.377532+00:00",
-      "requests_today": 9,
-      "active_users_today": 5,
-      "avg_response_ms": 38250
-    },
-    {
-      "timestamp": "2026-04-17T20:11:52.442885+00:00",
-      "requests_today": 11,
-      "active_users_today": 5,
-      "avg_response_ms": 41920
-    },
-    {
-      "timestamp": "2026-04-17T20:13:05.706163+00:00",
-      "requests_today": 11,
-      "active_users_today": 5,
-      "avg_response_ms": 50470
-    },
-    {
-=======
->>>>>>> feature/Vulkan-ondersteuning
-      "timestamp": "2026-04-18T11:45:39.911113+00:00",
+      "timestamp": "2026-05-04T17:54:40.683928+00:00",
       "requests_today": 1,
       "active_users_today": 1,
-      "avg_response_ms": 21736
+      "avg_response_ms": 27549
     },
     {
-      "timestamp": "2026-04-18T11:46:10.025064+00:00",
+      "timestamp": "2026-05-04T17:58:07.159414+00:00",
       "requests_today": 2,
       "active_users_today": 1,
-      "avg_response_ms": 16592
+      "avg_response_ms": 31245
     },
     {
-      "timestamp": "2026-04-18T11:59:30.437418+00:00",
+      "timestamp": "2026-05-04T17:58:32.231774+00:00",
       "requests_today": 3,
-      "active_users_today": 2,
-      "avg_response_ms": 11344
+      "active_users_today": 1,
+      "avg_response_ms": 25181
     },
     {
-      "timestamp": "2026-04-18T11:59:52.246123+00:00",
+      "timestamp": "2026-05-04T17:59:22.265013+00:00",
       "requests_today": 4,
-      "active_users_today": 3,
-      "avg_response_ms": 9897
-    },
-    {
-      "timestamp": "2026-04-18T12:04:40.264144+00:00",
-      "requests_today": 5,
-      "active_users_today": 3,
-      "avg_response_ms": 11251
-    },
-    {
-      "timestamp": "2026-04-18T12:15:18.952656+00:00",
-      "requests_today": 6,
-      "active_users_today": 3,
-      "avg_response_ms": 12630
-    },
-    {
-      "timestamp": "2026-04-18T12:16:52.966111+00:00",
-      "requests_today": 7,
-      "active_users_today": 4,
-      "avg_response_ms": 13455
-    },
-    {
-      "timestamp": "2026-04-18T12:17:41.232368+00:00",
-      "requests_today": 8,
-      "active_users_today": 4,
-      "avg_response_ms": 14244
-    },
-    {
-      "timestamp": "2026-04-18T12:19:19.765861+00:00",
-      "requests_today": 9,
-      "active_users_today": 4,
-      "avg_response_ms": 14186
-    },
-    {
-      "timestamp": "2026-04-18T12:19:59.760724+00:00",
-      "requests_today": 11,
-      "active_users_today": 4,
-      "avg_response_ms": 13852
-    },
-    {
-      "timestamp": "2026-04-18T12:20:42.318374+00:00",
-      "requests_today": 12,
-      "active_users_today": 4,
-      "avg_response_ms": 14708
-    },
-    {
-      "timestamp": "2026-04-18T12:22:08.546513+00:00",
-      "requests_today": 13,
-      "active_users_today": 4,
-      "avg_response_ms": 15498
-    },
-    {
-      "timestamp": "2026-04-18T12:23:55.695938+00:00",
-      "requests_today": 14,
-      "active_users_today": 4,
-      "avg_response_ms": 17932
-    },
-    {
-      "timestamp": "2026-04-18T16:09:12.660505+00:00",
-      "requests_today": 15,
-      "active_users_today": 5,
-      "avg_response_ms": 19705
-    },
-    {
-      "timestamp": "2026-04-18T16:09:51.308863+00:00",
-      "requests_today": 16,
-      "active_users_today": 5,
-      "avg_response_ms": 19773
-    },
-    {
-      "timestamp": "2026-04-18T16:18:57.080729+00:00",
-      "requests_today": 17,
-      "active_users_today": 6,
-      "avg_response_ms": 23326
-    },
-    {
-      "timestamp": "2026-04-18T17:13:13.774381+00:00",
-      "requests_today": 18,
-      "active_users_today": 6,
-      "avg_response_ms": 24048
-    },
-    {
-      "timestamp": "2026-04-18T17:13:58.752956+00:00",
-      "requests_today": 19,
-      "active_users_today": 6,
-      "avg_response_ms": 23531
-    },
-    {
-      "timestamp": "2026-04-18T17:14:39.257907+00:00",
-      "requests_today": 20,
-      "active_users_today": 6,
-      "avg_response_ms": 23569
-    },
-    {
-      "timestamp": "2026-04-18T17:22:01.096313+00:00",
-      "requests_today": 25,
-      "active_users_today": 8,
-      "avg_response_ms": 23149
-    },
-    {
-      "timestamp": "2026-04-18T17:22:42.229466+00:00",
-      "requests_today": 26,
-      "active_users_today": 8,
-      "avg_response_ms": 23077
-    },
-    {
-      "timestamp": "2026-04-18T17:24:15.299681+00:00",
-      "requests_today": 28,
-      "active_users_today": 9,
-      "avg_response_ms": 22617
-    },
-    {
-      "timestamp": "2026-04-18T17:24:40.823983+00:00",
-      "requests_today": 29,
-      "active_users_today": 9,
-      "avg_response_ms": 22318
-    },
-    {
-      "timestamp": "2026-04-18T17:25:16.193261+00:00",
-      "requests_today": 30,
-      "active_users_today": 9,
-      "avg_response_ms": 22327
-    },
-    {
-      "timestamp": "2026-04-18T17:25:48.312448+00:00",
-      "requests_today": 31,
-      "active_users_today": 9,
-      "avg_response_ms": 22246
-    },
-    {
-      "timestamp": "2026-04-18T17:26:17.505687+00:00",
-      "requests_today": 32,
-      "active_users_today": 9,
-      "avg_response_ms": 22195
-    },
-    {
-      "timestamp": "2026-04-18T17:26:40.849347+00:00",
-      "requests_today": 33,
-      "active_users_today": 9,
-      "avg_response_ms": 21978
-    },
-    {
-      "timestamp": "2026-04-18T17:27:45.545970+00:00",
-      "requests_today": 34,
-      "active_users_today": 9,
-      "avg_response_ms": 22428
-    },
-    {
-      "timestamp": "2026-04-18T17:39:57.329804+00:00",
-      "requests_today": 35,
-      "active_users_today": 10,
-      "avg_response_ms": 22183
-    },
-    {
-      "timestamp": "2026-04-18T17:40:19.662456+00:00",
-      "requests_today": 36,
-      "active_users_today": 10,
-      "avg_response_ms": 21995
-    },
-    {
-      "timestamp": "2026-04-18T18:54:30.254600+00:00",
-      "requests_today": 37,
-      "active_users_today": 11,
-      "avg_response_ms": 22252
-    },
-    {
-      "timestamp": "2026-04-18T18:54:59.539324+00:00",
-      "requests_today": 38,
-      "active_users_today": 11,
-      "avg_response_ms": 22170
-    },
-    {
-      "timestamp": "2026-04-18T18:55:23.898358+00:00",
-      "requests_today": 39,
-      "active_users_today": 11,
-      "avg_response_ms": 22050
-    },
-    {
-      "timestamp": "2026-04-18T18:57:05.597578+00:00",
-      "requests_today": 40,
-      "active_users_today": 11,
-      "avg_response_ms": 22646
-    },
-    {
-      "timestamp": "2026-04-18T20:50:02.129320+00:00",
-      "requests_today": 41,
-      "active_users_today": 12,
-      "avg_response_ms": 22464
-    },
-    {
-      "timestamp": "2026-04-18T20:50:43.688237+00:00",
-      "requests_today": 42,
-      "active_users_today": 12,
-      "avg_response_ms": 22369
-    },
-    {
-      "timestamp": "2026-04-19T11:44:08.490722+00:00",
-      "requests_today": 1,
       "active_users_today": 1,
-      "avg_response_ms": 21220
+      "avg_response_ms": 24508
     },
     {
-<<<<<<< HEAD
-      "timestamp": "2026-05-01T22:46:29.510156+00:00",
-      "requests_today": 2,
-      "active_users_today": 1,
-      "avg_response_ms": 17313
-    },
-    {
-      "timestamp": "2026-05-01T22:46:55.284193+00:00",
-      "requests_today": 3,
-      "active_users_today": 1,
-      "avg_response_ms": 14538
-=======
-      "timestamp": "2026-05-02T19:38:54.932611+00:00",
-      "requests_today": 1,
-      "active_users_today": 1,
-      "avg_response_ms": 7660
-    },
-    {
-      "timestamp": "2026-05-02T19:41:43.929734+00:00",
-      "requests_today": 2,
-      "active_users_today": 1,
-      "avg_response_ms": 12918
-    },
-    {
-      "timestamp": "2026-05-02T19:50:50.729838+00:00",
+      "timestamp": "2026-05-04T18:03:37.292903+00:00",
       "requests_today": 5,
       "active_users_today": 1,
-      "avg_response_ms": 12759
+      "avg_response_ms": 25464
     },
     {
-      "timestamp": "2026-05-02T19:55:03.831675+00:00",
+      "timestamp": "2026-05-04T18:05:03.004353+00:00",
       "requests_today": 6,
       "active_users_today": 1,
-      "avg_response_ms": 10818
+      "avg_response_ms": 22906
     },
     {
-      "timestamp": "2026-05-02T19:55:33.556213+00:00",
+      "timestamp": "2026-05-04T18:05:46.584232+00:00",
       "requests_today": 7,
       "active_users_today": 1,
-      "avg_response_ms": 9394
+      "avg_response_ms": 24911
     },
     {
-      "timestamp": "2026-05-02T19:56:19.100104+00:00",
+      "timestamp": "2026-05-04T18:44:22.024412+00:00",
       "requests_today": 8,
-      "active_users_today": 1,
-      "avg_response_ms": 8508
+      "active_users_today": 2,
+      "avg_response_ms": 23206
     },
     {
-      "timestamp": "2026-05-02T19:57:01.355675+00:00",
+      "timestamp": "2026-05-04T18:45:00.300939+00:00",
       "requests_today": 9,
-      "active_users_today": 1,
-      "avg_response_ms": 10390
+      "active_users_today": 2,
+      "avg_response_ms": 23574
     },
     {
-      "timestamp": "2026-05-02T19:58:01.568962+00:00",
+      "timestamp": "2026-05-04T18:46:42.343621+00:00",
       "requests_today": 10,
-      "active_users_today": 1,
-      "avg_response_ms": 10049
-    },
-    {
-      "timestamp": "2026-05-03T12:33:56.132029+00:00",
-      "requests_today": 1,
-      "active_users_today": 1,
-      "avg_response_ms": 10183
-    },
-    {
-      "timestamp": "2026-05-03T12:34:58.341181+00:00",
-      "requests_today": 2,
-      "active_users_today": 1,
-      "avg_response_ms": 9384
-    },
-    {
-      "timestamp": "2026-05-03T12:39:18.192965+00:00",
-      "requests_today": 4,
-      "active_users_today": 1,
-      "avg_response_ms": 8442
-    },
-    {
-      "timestamp": "2026-05-03T12:51:06.172189+00:00",
-      "requests_today": 6,
-      "active_users_today": 1,
-      "avg_response_ms": 17820
-    },
-    {
-      "timestamp": "2026-05-03T12:57:50.700937+00:00",
-      "requests_today": 8,
-      "active_users_today": 1,
-      "avg_response_ms": 76588
->>>>>>> feature/Vulkan-ondersteuning
+      "active_users_today": 3,
+      "avg_response_ms": 24305
     }
   ]
 }

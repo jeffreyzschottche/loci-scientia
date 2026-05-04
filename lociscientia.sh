@@ -19,6 +19,7 @@ else
     DEVICE_HOSTNAME="${DEVICE_NAME_PREFIX}-${DEVICE_NUMBER}"
 fi
 DEVICE_MDNS="${DEVICE_MDNS:-${DEVICE_HOSTNAME}.local}"
+RESTORE_HOSTNAME_ON_EXIT="${RESTORE_HOSTNAME_ON_EXIT:-0}"
 ORIGINAL_HOSTNAME=""
 ORIGINAL_LOCAL_HOSTNAME=""
 ORIGINAL_COMPUTER_NAME=""
@@ -192,6 +193,10 @@ ensure_mdns_support() {
             if command -v systemctl >/dev/null 2>&1; then
                 sudo systemctl enable avahi-daemon >/dev/null 2>&1 || true
                 sudo systemctl restart avahi-daemon >/dev/null 2>&1 || true
+            fi
+            if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "Status: active"; then
+                echo "🔓 UFW-regel voor mDNS toestaan (UDP 5353 op lokaal netwerk)..."
+                sudo ufw allow in on wlan0 proto udp from 192.168.0.0/16 to any port 5353 comment "AITJE mDNS" >/dev/null 2>&1 || true
             fi
             ;;
         macos)
@@ -438,6 +443,10 @@ configure_hostname() {
                 ORIGINAL_HOSTNAME="${ORIGINAL_HOSTNAME:-$current}"
                 echo "🔧 Hostname instellen op ${desired}"
                 sudo hostnamectl set-hostname "$desired"
+                if command -v systemctl >/dev/null 2>&1; then
+                    echo "♻️  avahi-daemon herstarten voor mDNS-hostname ${desired}.local"
+                    sudo systemctl restart avahi-daemon >/dev/null 2>&1 || true
+                fi
             else
                 echo "✅ Hostname staat al op ${desired}"
             fi
@@ -717,7 +726,7 @@ cleanup() {
 
     case "$DEVICE_PLATFORM" in
         linux|jetson)
-            if [ -n "${ORIGINAL_HOSTNAME:-}" ]; then
+            if [ "$RESTORE_HOSTNAME_ON_EXIT" = "1" ] && [ -n "${ORIGINAL_HOSTNAME:-}" ]; then
                 echo "♻️  Hostname terugzetten naar ${ORIGINAL_HOSTNAME}"
                 sudo hostnamectl set-hostname "$ORIGINAL_HOSTNAME" >/dev/null 2>&1 || true
             fi

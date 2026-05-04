@@ -1,17 +1,12 @@
 {
   "mode": "interactive_v1",
-<<<<<<< HEAD
-  "date": "2026-05-01",
-  "requests_today": 3,
-  "latency_total_ms": 29075.491,
-  "latency_count": 2,
-=======
-  "date": "2026-05-03",
-  "requests_today": 8,
-  "latency_total_ms": 382939.65,
-  "latency_count": 5,
->>>>>>> feature/Vulkan-ondersteuning
+  "date": "2026-05-04",
+  "requests_today": 10,
+  "latency_total_ms": 243049.324,
+  "latency_count": 10,
   "active_ids": [
-    "412fdfeaae695e55"
+    "63bb03744c580aad",
+    "a433c4a1d2b16087",
+    "d8ae682ff6095421"
   ]
 }

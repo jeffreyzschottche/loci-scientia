@@ -10,7 +10,17 @@ from collections.abc import Coroutine
 import requests
 from datetime import datetime
 from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QTextDocument, QTextOption
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QPainter,
+    QPixmap,
+    QTextBlockFormat,
+    QTextCharFormat,
+    QTextCursor,
+    QTextDocument,
+    QTextOption,
+)
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -198,43 +208,77 @@ class AutoSizingMarkdownView(QTextBrowser):
         self.document().setDefaultTextOption(option)
         self.document().setDefaultStyleSheet(
             """
-            body { color:#111827; font-size:14px; line-height:1.55; overflow-wrap:anywhere; word-break:break-word; }
-            p { margin:0 0 10px 0; overflow-wrap:anywhere; word-break:break-word; }
-            h1, h2, h3, h4 { margin:14px 0 8px 0; color:#111111; font-weight:700; }
-            ul, ol { margin:0 0 10px 20px; }
-            li { margin:0 0 4px 0; overflow-wrap:anywhere; word-break:break-word; }
-            a { color:#0f766e; text-decoration:none; }
+            body {
+                color:#111827;
+                font-size:14px;
+                line-height:1.55;
+            }
+            p {
+                margin:0 0 10px 0;
+            }
+            h1, h2, h3, h4 {
+                margin:14px 0 8px 0;
+                color:#111111;
+                font-weight:700;
+            }
+            h1 { font-size:22px; }
+            h2 { font-size:18px; }
+            h3 { font-size:16px; }
+            h4 { font-size:14px; }
+            ul, ol {
+                margin:0 0 10px 20px;
+            }
+            li {
+                margin:0 0 4px 0;
+            }
+            a {
+                color:#0f766e;
+                text-decoration:none;
+            }
             blockquote {
                 margin:10px 0;
-                padding:8px 12px;
+                padding:8px 12px 8px 14px;
                 border-left:4px solid #f59e0b;
-                background:#fffbeb;
+                background-color:#fffbeb;
                 color:#44403c;
-                overflow-wrap:anywhere;
-                word-break:break-word;
             }
             code {
                 font-family:"SFMono-Regular","Cascadia Mono","DejaVu Sans Mono",monospace;
-                background:#f3f4f6;
+                background-color:#eef2f7;
+                color:#0f172a;
                 padding:2px 5px;
-                border-radius:6px;
-                overflow-wrap:anywhere;
-                word-break:break-word;
             }
             pre {
                 margin:10px 0;
                 padding:12px 14px;
-                background:#111827;
+                background-color:#111827;
                 color:#f9fafb;
-                border-radius:12px;
                 white-space:pre-wrap;
                 word-wrap:break-word;
-                overflow-wrap:anywhere;
-                word-break:break-word;
             }
             pre code {
-                background:transparent;
+                background-color:transparent;
+                color:#f9fafb;
                 padding:0;
+            }
+            table {
+                margin:10px 0;
+                border-collapse:collapse;
+            }
+            th {
+                background-color:#f3f4f6;
+                color:#111827;
+                font-weight:700;
+                padding:6px 8px;
+                border:1px solid #e5e7eb;
+            }
+            td {
+                padding:6px 8px;
+                border:1px solid #e5e7eb;
+            }
+            hr {
+                color:#e5e7eb;
+                background-color:#e5e7eb;
             }
             """
         )
@@ -246,6 +290,7 @@ class AutoSizingMarkdownView(QTextBrowser):
         self._plain_text = text or ""
         if self._plain_text.strip():
             self.setMarkdown(self._plain_text)
+            self._apply_markdown_block_highlights()
         elif placeholder:
             self.setHtml(f"<p>{html.escape(placeholder)}</p>")
         else:
@@ -254,6 +299,85 @@ class AutoSizingMarkdownView(QTextBrowser):
 
     def plain_text(self) -> str:
         return self._plain_text
+
+    def _apply_markdown_block_highlights(self) -> None:
+        highlighted_lines = self._markdown_highlight_lines(self._plain_text)
+        if not highlighted_lines:
+            return
+
+        next_highlight_idx = 0
+        block = self.document().begin()
+        while block.isValid() and next_highlight_idx < len(highlighted_lines):
+            block_text = block.text()
+            highlight_text, highlight_kind = highlighted_lines[next_highlight_idx]
+            if block_text == highlight_text:
+                self._style_document_block(block, highlight_kind)
+                next_highlight_idx += 1
+            block = block.next()
+
+    @staticmethod
+    def _markdown_highlight_lines(markdown_text: str) -> list[tuple[str, str]]:
+        highlighted: list[tuple[str, str]] = []
+        in_fence = False
+
+        for raw_line in markdown_text.splitlines():
+            stripped = raw_line.strip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                in_fence = not in_fence
+                continue
+
+            if in_fence:
+                highlighted.append((raw_line, "code"))
+                continue
+
+            if raw_line.startswith("    "):
+                highlighted.append((raw_line[4:], "code"))
+                continue
+
+            if raw_line.startswith("\t"):
+                highlighted.append((raw_line[1:], "code"))
+                continue
+
+            quote_line = raw_line.lstrip()
+            if quote_line.startswith(">"):
+                cleaned = quote_line[1:].lstrip()
+                if cleaned:
+                    highlighted.append((cleaned, "quote"))
+
+        return highlighted
+
+    @staticmethod
+    def _style_document_block(block, kind: str) -> None:
+        cursor = QTextCursor(block)
+
+        block_format = QTextBlockFormat(block.blockFormat())
+        char_format = QTextCharFormat()
+
+        if kind == "code":
+            block_format.setBackground(QColor("#111827"))
+            block_format.setLeftMargin(14)
+            block_format.setRightMargin(14)
+            block_format.setTextIndent(10)
+            block_format.setTopMargin(0)
+            block_format.setBottomMargin(0)
+            char_format.setForeground(QColor("#f9fafb"))
+            char_format.setBackground(QColor("#111827"))
+            char_format.setFontFamily("DejaVu Sans Mono")
+        elif kind == "quote":
+            block_format.setBackground(QColor("#fffbeb"))
+            block_format.setLeftMargin(14)
+            block_format.setRightMargin(14)
+            block_format.setTextIndent(10)
+            block_format.setTopMargin(4)
+            block_format.setBottomMargin(4)
+            char_format.setForeground(QColor("#44403c"))
+            char_format.setBackground(QColor("#fffbeb"))
+        else:
+            return
+
+        cursor.setBlockFormat(block_format)
+        cursor.select(QTextCursor.BlockUnderCursor)
+        cursor.mergeCharFormat(char_format)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
