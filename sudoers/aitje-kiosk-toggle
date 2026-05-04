@@ -1,0 +1,1 @@
+aitje ALL=(root) NOPASSWD: /usr/local/bin/aitje-kiosk-toggle
