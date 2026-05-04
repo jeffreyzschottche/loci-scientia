@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# aitje-kiosk-toggle — flip the device between kiosk and normal Ubuntu desktop.
+# Installed at /usr/local/bin/aitje-kiosk-toggle and invoked via sudoers.
+set -euo pipefail
+
+STATE_FILE="${AITJE_KIOSK_STATE_FILE:-/etc/aitje/kiosk-mode}"
+LOG_FILE="${AITJE_KIOSK_LOG_FILE:-/var/log/aitje-kiosk-toggle.log}"
+KIOSK_UNIT="aitje-kiosk.service"
+DM_UNIT="gdm3.service"
+
+usage() {
+    cat <<'USAGE'
+Usage: aitje-kiosk-toggle <enable|disable|status> [--reboot]
+
+  enable    Switch the device into kiosk mode (cage + AITJE UI on tty1).
+  disable   Switch back to the normal Ubuntu desktop (gdm3).
+  status    Print the current mode (enabled|disabled) and exit.
+
+  --reboot  Reboot immediately after flipping the mode.
+USAGE
+}
+
+log() {
+    local message="$1"
+    local timestamp
+    timestamp="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
+    mkdir -p "$(dirname "$LOG_FILE")"
+    printf '%s %s\n' "$timestamp" "$message" >>"$LOG_FILE"
+}
+
+require_root() {
+    if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+        echo "aitje-kiosk-toggle moet als root draaien (gebruik sudo)." >&2
+        exit 1
+    fi
+}
+
+write_state() {
+    local mode="$1"
+    mkdir -p "$(dirname "$STATE_FILE")"
+    local tmp
+    tmp="$(mktemp "${STATE_FILE}.XXXXXX")"
+    printf '%s\n' "$mode" >"$tmp"
+    chmod 0644 "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+read_state() {
+    if [[ -f "$STATE_FILE" ]]; then
+        head -n1 "$STATE_FILE" | tr -d '[:space:]'
+    else
+        echo "disabled"
+    fi
+}
+
+action_status() {
+    read_state
+}
+
+action_enable() {
+    require_root
+    log "enable: stopping ${DM_UNIT}, starting ${KIOSK_UNIT}"
+    systemctl disable --now "$DM_UNIT" || true
+    systemctl enable --now "$KIOSK_UNIT"
+    write_state "enabled"
+    log "enable: state set to enabled"
+}
+
+action_disable() {
+    require_root
+    log "disable: stopping ${KIOSK_UNIT}, starting ${DM_UNIT}"
+    systemctl disable --now "$KIOSK_UNIT" || true
+    systemctl enable --now "$DM_UNIT"
+    write_state "disabled"
+    log "disable: state set to disabled"
+}
+
+main() {
+    if [[ $# -lt 1 ]]; then
+        usage >&2
+        exit 64
+    fi
+
+    local action="$1"
+    shift || true
+    local reboot=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --reboot) reboot=1 ;;
+            -h|--help) usage; exit 0 ;;
+            *) echo "Onbekende optie: $1" >&2; usage >&2; exit 64 ;;
+        esac
+        shift
+    done
+
+    case "$action" in
+        status)
+            action_status
+            ;;
+        enable)
+            action_enable
+            ;;
+        disable)
+            action_disable
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Onbekende actie: $action" >&2
+            usage >&2
+            exit 64
+            ;;
+    esac
+
+    if [[ "$reboot" -eq 1 && "$action" != "status" ]]; then
+        log "${action}: scheduling reboot"
+        systemctl reboot
+    fi
+}
+
+main "$@"
