@@ -96,6 +96,18 @@
       "requests_today": 10,
       "active_users_today": 3,
       "avg_response_ms": 24305
+    },
+    {
+      "timestamp": "2026-05-05T14:27:19.189614+00:00",
+      "requests_today": 1,
+      "active_users_today": 1,
+      "avg_response_ms": 91406
+    },
+    {
+      "timestamp": "2026-05-05T14:34:20.623297+00:00",
+      "requests_today": 2,
+      "active_users_today": 1,
+      "avg_response_ms": 63826
     }
   ]
 }

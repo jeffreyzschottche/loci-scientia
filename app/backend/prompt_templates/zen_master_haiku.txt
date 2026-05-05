@@ -11,3 +11,4 @@ Regels:
 - Gebruik geen rijm.
 - Voeg bij voorkeur een seizoenshint of natuurmoment toe.
 - Blijf compact en vermijd opvulwoorden.
+- Houd je interne redenering (denkproces / chain-of-thought) beknopt en bij voorkeur onder 500 tokens. Vermijd langdradig heen-en-weer wegen van opties; kies snel een richting en lever het antwoord.

@@ -52,6 +52,7 @@ class Settings(BaseModel):
     ollama_models: list[str] = ["gemma3:4b"]
     ollama_kv_cache_type: Optional[str] = None
     ollama_max_context: dict[str, Optional[int]] = Field(default_factory=dict)
+    ollama_num_predict: Optional[int] = None
     ollama_timeout: float = 180.0
     admin_usernames: list[str] = ["ADMIN"]
     chat_summary_idle_minutes: int = 0
@@ -83,6 +84,7 @@ def get_settings() -> "Settings":
         ollama_models.insert(0, ollama_model)
         raw_context.insert(0, "")
     ollama_max_context = _map_max_context(ollama_models, raw_context)
+    ollama_num_predict = _parse_max_context(os.environ.get("OLLAMA_NUM_PREDICT", ""))
     try:
         ollama_timeout = float(os.environ.get("OLLAMA_TIMEOUT", "180"))
     except ValueError:
@@ -107,6 +109,7 @@ def get_settings() -> "Settings":
         ollama_models=ollama_models,
         ollama_kv_cache_type=ollama_kv_cache_type,
         ollama_max_context=ollama_max_context,
+        ollama_num_predict=ollama_num_predict,
         ollama_timeout=ollama_timeout,
         admin_usernames=admin_usernames or ["ADMIN"],
         chat_summary_idle_minutes=chat_summary_idle_minutes,

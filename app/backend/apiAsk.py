@@ -1001,9 +1001,14 @@ def build_ollama_generate_payload(
     }
     if images:
         payload["images"] = list(images)
+    options: dict[str, Any] = {}
     max_context = settings.ollama_max_context.get(settings.ollama_model)
     if isinstance(max_context, int) and max_context > 0:
-        payload["options"] = {"num_ctx": max_context}
+        options["num_ctx"] = max_context
+    if isinstance(settings.ollama_num_predict, int) and settings.ollama_num_predict > 0:
+        options["num_predict"] = settings.ollama_num_predict
+    if options:
+        payload["options"] = options
     if model_supports_ollama_thinking(settings.ollama_model):
         payload["think"] = True if thinking is None else bool(thinking)
     return payload

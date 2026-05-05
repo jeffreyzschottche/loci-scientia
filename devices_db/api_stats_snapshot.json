@@ -1,8 +1,10 @@
 {
   "mode": "interactive_v1",
   "date": "2026-05-05",
-  "requests_today": 0,
-  "latency_total_ms": 0.0,
-  "latency_count": 0,
-  "active_ids": []
+  "requests_today": 2,
+  "latency_total_ms": 127652.82,
+  "latency_count": 2,
+  "active_ids": [
+    "a433c4a1d2b16087"
+  ]
 }
