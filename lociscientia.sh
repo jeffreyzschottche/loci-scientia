@@ -426,6 +426,103 @@ ensure_active_wifi_profile_persistence() {
     done
 }
 
+ensure_bluetooth_support() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    if [ "${ENABLE_BLUETOOTH_SETUP:-1}" = "0" ]; then
+        echo "ℹ️  Bluetooth setup is uitgeschakeld via ENABLE_BLUETOOTH_SETUP=0"
+        return 0
+    fi
+
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; Bluetooth wordt niet automatisch voorbereid."
+        return 0
+    fi
+
+    if command -v apt-get >/dev/null 2>&1; then
+        local missing_packages=()
+        local package=""
+        for package in bluez bluez-obexd rfkill pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth pulseaudio-utils; do
+            if ! dpkg -s "$package" >/dev/null 2>&1; then
+                missing_packages+=("$package")
+            fi
+        done
+        if [ "${#missing_packages[@]}" -gt 0 ]; then
+            echo "📦 Bluetooth dependencies installeren: ${missing_packages[*]}"
+            if [ "$(id -u)" -eq 0 ]; then
+                apt-get install -y "${missing_packages[@]}"
+            else
+                sudo apt-get install -y "${missing_packages[@]}"
+            fi
+        else
+            echo "✅ Bluetooth dependencies zijn al geïnstalleerd"
+        fi
+    fi
+
+    local target_user="${SUDO_USER:-${USER:-}}"
+    if [ -n "$target_user" ] && id "$target_user" >/dev/null 2>&1; then
+        local group=""
+        for group in bluetooth netdev; do
+            if getent group "$group" >/dev/null 2>&1 && ! id -nG "$target_user" | tr ' ' '\n' | grep -qx "$group"; then
+                echo "🔧 Gebruiker ${target_user} toevoegen aan groep ${group}"
+                if [ "$(id -u)" -eq 0 ]; then
+                    usermod -aG "$group" "$target_user" || true
+                else
+                    sudo usermod -aG "$group" "$target_user" || true
+                fi
+            fi
+        done
+    fi
+
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "🔧 Bluetooth service inschakelen en starten"
+        if [ "$(id -u)" -eq 0 ]; then
+            systemctl enable bluetooth >/dev/null 2>&1 || true
+            systemctl start bluetooth >/dev/null 2>&1 || true
+        else
+            sudo systemctl enable bluetooth >/dev/null 2>&1 || true
+            sudo systemctl start bluetooth >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if command -v rfkill >/dev/null 2>&1; then
+        echo "🔓 Bluetooth rfkill blokkering opheffen"
+        if [ "$(id -u)" -eq 0 ]; then
+            rfkill unblock bluetooth >/dev/null 2>&1 || true
+        else
+            sudo rfkill unblock bluetooth >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if command -v bluetoothctl >/dev/null 2>&1; then
+        echo "📡 Bluetooth adapter inschakelen"
+        bluetoothctl power on >/dev/null 2>&1 || true
+        bluetoothctl agent KeyboardDisplay >/dev/null 2>&1 || true
+        bluetoothctl default-agent >/dev/null 2>&1 || true
+    fi
+
+    if command -v systemctl >/dev/null 2>&1 && [ -n "$target_user" ] && id "$target_user" >/dev/null 2>&1; then
+        local uid=""
+        uid="$(id -u "$target_user" 2>/dev/null || true)"
+        if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+            echo "🔊 Bluetooth audio services voor ${target_user} starten"
+            if [ "$(id -u)" -eq 0 ]; then
+                sudo -u "$target_user" XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user enable --now pipewire pipewire-pulse wireplumber >/dev/null 2>&1 || true
+            else
+                sudo -u "$target_user" XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user enable --now pipewire pipewire-pulse wireplumber >/dev/null 2>&1 || true
+            fi
+        else
+            echo "ℹ️  Geen actieve user runtime gevonden; PipeWire user services starten na login."
+        fi
+    fi
+}
+
 configure_hostname() {
     desired="${DEVICE_HOSTNAME}"
     case "$DEVICE_PLATFORM" in
@@ -612,6 +709,7 @@ start_ollama() {
 echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
 ensure_active_wifi_profile_persistence
+ensure_bluetooth_support
 ensure_remote_support_dependencies
 ensure_remote_support_service
 configure_hostname

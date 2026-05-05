@@ -252,6 +252,10 @@ TRANSLATIONS = {
         "nl": "Wifi",
         "en": "WiFi",
     },
+    "settings_tab_bluetooth": {
+        "nl": "Bluetooth",
+        "en": "Bluetooth",
+    },
     "settings_wifi_title": {
         "nl": "Wifi configuratie",
         "en": "WiFi configuration",
@@ -335,6 +339,198 @@ TRANSLATIONS = {
     "settings_wifi_note": {
         "nl": "Opmerking",
         "en": "Note",
+    },
+    "settings_bluetooth_title": {
+        "nl": "Bluetooth configuratie",
+        "en": "Bluetooth configuration",
+    },
+    "settings_bluetooth_intro": {
+        "nl": "Koppel en beheer Bluetooth-apparaten zonder AITJE te verlaten.",
+        "en": "Pair and manage Bluetooth devices without leaving AITJE.",
+    },
+    "settings_bluetooth_toggle_on": {
+        "nl": "Bluetooth aan",
+        "en": "Bluetooth on",
+    },
+    "settings_bluetooth_toggle_off": {
+        "nl": "Bluetooth uit",
+        "en": "Bluetooth off",
+    },
+    "settings_bluetooth_ready": {
+        "nl": "Bluetooth staat aan.",
+        "en": "Bluetooth is on.",
+    },
+    "settings_bluetooth_status_loading": {
+        "nl": "Bluetooth-informatie laden...",
+        "en": "Loading Bluetooth information...",
+    },
+    "settings_bluetooth_info_unavailable": {
+        "nl": "Bluetooth-informatie is momenteel niet beschikbaar.",
+        "en": "Bluetooth information is currently unavailable.",
+    },
+    "settings_bluetooth_refresh": {
+        "nl": "Verversen",
+        "en": "Refresh",
+    },
+    "settings_bluetooth_power_on": {
+        "nl": "Bluetooth inschakelen",
+        "en": "Turn Bluetooth on",
+    },
+    "settings_bluetooth_repair": {
+        "nl": "Bluetooth herstellen",
+        "en": "Repair Bluetooth",
+    },
+    "settings_bluetooth_repairing": {
+        "nl": "Bluetooth-stack herstellen...",
+        "en": "Repairing Bluetooth stack...",
+    },
+    "settings_bluetooth_powering_on": {
+        "nl": "Bluetooth inschakelen...",
+        "en": "Turning Bluetooth on...",
+    },
+    "settings_bluetooth_power_required": {
+        "nl": "Bluetooth staat uit. Schakel Bluetooth eerst in en scan daarna opnieuw.",
+        "en": "Bluetooth is off. Turn Bluetooth on first, then scan again.",
+    },
+    "settings_bluetooth_power_on_failed": {
+        "nl": "Bluetooth kon niet worden ingeschakeld. Controleer of de Bluetooth-service actief is en niet door rfkill is geblokkeerd.",
+        "en": "Bluetooth could not be turned on. Check that the Bluetooth service is active and not blocked by rfkill.",
+    },
+    "settings_bluetooth_scan": {
+        "nl": "Scannen",
+        "en": "Scan",
+    },
+    "settings_bluetooth_pair_connect": {
+        "nl": "Koppelen en verbinden",
+        "en": "Pair and connect",
+    },
+    "settings_bluetooth_forget": {
+        "nl": "Vergeten",
+        "en": "Forget",
+    },
+    "settings_bluetooth_connected_devices": {
+        "nl": "Verbonden apparaten",
+        "en": "Connected devices",
+    },
+    "settings_bluetooth_scan_results": {
+        "nl": "Scanresultaten",
+        "en": "Scan results",
+    },
+    "settings_bluetooth_no_connected_devices": {
+        "nl": "Geen verbonden apparaten",
+        "en": "No connected devices",
+    },
+    "settings_bluetooth_no_scan_results": {
+        "nl": "Nog geen scanresultaten",
+        "en": "No scan results yet",
+    },
+    "settings_bluetooth_unknown_device": {
+        "nl": "Onbekend {kind}",
+        "en": "Unknown {kind}",
+    },
+    "settings_bluetooth_kind_keyboard": {
+        "nl": "toetsenbord",
+        "en": "keyboard",
+    },
+    "settings_bluetooth_kind_mouse": {
+        "nl": "muis",
+        "en": "mouse",
+    },
+    "settings_bluetooth_kind_audio": {
+        "nl": "audioapparaat",
+        "en": "audio device",
+    },
+    "settings_bluetooth_kind_phone": {
+        "nl": "telefoon",
+        "en": "phone",
+    },
+    "settings_bluetooth_kind_computer": {
+        "nl": "computer",
+        "en": "computer",
+    },
+    "settings_bluetooth_kind_input": {
+        "nl": "invoerapparaat",
+        "en": "input device",
+    },
+    "settings_bluetooth_kind_device": {
+        "nl": "apparaat",
+        "en": "device",
+    },
+    "settings_bluetooth_scan_failed": {
+        "nl": "Scannen is mislukt. Details staan in bluetooth.log.",
+        "en": "Scan failed. Details are in bluetooth.log.",
+    },
+    "settings_bluetooth_pair_failed": {
+        "nl": "Koppelen of verbinden is mislukt. Details staan in bluetooth.log.",
+        "en": "Pairing or connecting failed. Details are in bluetooth.log.",
+    },
+    "settings_bluetooth_forget_failed": {
+        "nl": "Vergeten is mislukt. Details staan in bluetooth.log.",
+        "en": "Forget failed. Details are in bluetooth.log.",
+    },
+    "settings_bluetooth_toggle_failed": {
+        "nl": "Bluetooth kon niet worden omgeschakeld. Details staan in bluetooth.log.",
+        "en": "Bluetooth could not be toggled. Details are in bluetooth.log.",
+    },
+    "settings_bluetooth_scanning": {
+        "nl": "Bluetooth-apparaten zoeken...",
+        "en": "Scanning for Bluetooth devices...",
+    },
+    "settings_bluetooth_select_device": {
+        "nl": "Selecteer eerst een Bluetooth-apparaat.",
+        "en": "Select a Bluetooth device first.",
+    },
+    "settings_bluetooth_pairing": {
+        "nl": "Bluetooth-apparaat koppelen: {device}",
+        "en": "Pairing Bluetooth device: {device}",
+    },
+    "settings_bluetooth_pair_done": {
+        "nl": "Bluetooth-koppelactie afgerond.",
+        "en": "Bluetooth pairing action completed.",
+    },
+    "settings_bluetooth_linux_only": {
+        "nl": "In-app Bluetooth-koppeling is nu alleen ondersteund op Linux met bluetoothctl.",
+        "en": "In-app Bluetooth pairing is currently supported only on Linux with bluetoothctl.",
+    },
+    "settings_bluetoothctl_missing": {
+        "nl": "bluetoothctl is niet beschikbaar op dit apparaat.",
+        "en": "bluetoothctl is not available on this device.",
+    },
+    "settings_bluetooth_adapter": {
+        "nl": "Adapter",
+        "en": "Adapter",
+    },
+    "settings_bluetooth_powered": {
+        "nl": "Ingeschakeld",
+        "en": "Powered",
+    },
+    "settings_bluetooth_discoverable": {
+        "nl": "Vindbaar",
+        "en": "Discoverable",
+    },
+    "settings_bluetooth_pairable": {
+        "nl": "Koppelbaar",
+        "en": "Pairable",
+    },
+    "settings_bluetooth_service": {
+        "nl": "Service",
+        "en": "Service",
+    },
+    "settings_bluetooth_rfkill": {
+        "nl": "Blokkering",
+        "en": "Block state",
+    },
+    "settings_bluetooth_devices": {
+        "nl": "Apparaten",
+        "en": "Devices",
+    },
+    "settings_bluetooth_connected": {
+        "nl": "verbonden",
+        "en": "connected",
+    },
+    "settings_bluetooth_paired": {
+        "nl": "gekoppeld",
+        "en": "paired",
     },
     "settings_timezone": {
         "nl": "Tijdzone",
