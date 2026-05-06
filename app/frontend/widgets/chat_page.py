@@ -511,8 +511,8 @@ class WebSearchCard(QFrame):
 
         self.setStyleSheet(
             "QFrame {"
-            "  background:#eff6ff;"
-            "  border:1px solid #93c5fd;"
+            "  background:#f3f4f6;"
+            "  border:1px solid #d1d5db;"
             "  border-radius:16px;"
             "}"
         )
@@ -528,7 +528,7 @@ class WebSearchCard(QFrame):
         self.toggle_btn.setStyleSheet(
             "QToolButton {"
             "  border:none;"
-            "  color:#1d4ed8;"
+            "  color:#374151;"
             "  font-size:12px;"
             "  font-weight:700;"
             "  text-align:left;"
@@ -547,7 +547,7 @@ class WebSearchCard(QFrame):
         self.query_label.setWordWrap(True)
         self.query_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.query_label.setStyleSheet(
-            "color:#1e3a8a; font-size:12px; background:transparent; border:none;"
+            "color:#4b5563; font-size:12px; background:transparent; border:none;"
         )
         body_layout.addWidget(self.query_label)
 
@@ -677,7 +677,7 @@ class WebSearchCard(QFrame):
         row.setStyleSheet(
             "QFrame {"
             "  background:#ffffff;"
-            "  border:1px solid #dbeafe;"
+            "  border:1px solid #e5e7eb;"
             "  border-radius:12px;"
             "}"
         )
@@ -690,7 +690,7 @@ class WebSearchCard(QFrame):
         title_label.setWordWrap(True)
         title_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         title_label.setStyleSheet(
-            "color:#1d4ed8; font-weight:700; background:transparent; border:none;"
+            "color:#374151; font-weight:700; background:transparent; border:none;"
         )
         row_layout.addWidget(title_label)
 
@@ -698,7 +698,7 @@ class WebSearchCard(QFrame):
         url_label.setWordWrap(True)
         url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         url_label.setStyleSheet(
-            "color:#3b82f6; font-size:11px; background:transparent; border:none;"
+            "color:#6b7280; font-size:11px; background:transparent; border:none;"
         )
         row_layout.addWidget(url_label)
 
@@ -952,7 +952,7 @@ class ChatPage(QWidget):
         self.web_search_label.setStyleSheet("color:#111111;")
         web_search_wrap_layout.addWidget(self.web_search_label, 0, Qt.AlignVCenter)
 
-        self.web_search_btn = IosSwitch(self.web_search_enabled, on_color="#2563eb")
+        self.web_search_btn = IosSwitch(self.web_search_enabled, on_color="#9ca3af")
         self.web_search_btn.toggled.connect(self._toggle_web_search)
         web_search_wrap_layout.addWidget(self.web_search_btn, 0, Qt.AlignVCenter)
         controls.addWidget(self.web_search_toggle_wrap, 0, Qt.AlignLeft)
