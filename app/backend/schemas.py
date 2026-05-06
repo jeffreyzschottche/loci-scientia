@@ -41,6 +41,7 @@ class ChatRequest(BaseModel):
     images: list[str] = Field(default_factory=list)
     documents: list[PromptDocument] = Field(default_factory=list)
     new_chat: bool = False  # When True, clears server-side chat history first
+    web_search: bool = False  # When True, augment prompt with SearXNG results
 
 
 class Device(BaseModel):

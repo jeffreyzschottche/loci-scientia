@@ -46,6 +46,13 @@ from .apiAsk import (
     prepare_prompt,
     summarize_history,
 )
+from .web_search import (
+    WebSearchResult,
+    WebSearchUnavailable,
+    is_configured as web_search_is_configured,
+    results_to_payload as web_results_to_payload,
+    search as run_web_search,
+)
 from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
@@ -798,8 +805,18 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         chat_history.clear(history_key)
 
     history = chat_history.get(history_key)
+    web_results: list[WebSearchResult] = []
+    web_search_error: Optional[str] = None
+    if req.web_search:
+        try:
+            web_results = await run_web_search(req.prompt)
+        except WebSearchUnavailable as exc:
+            web_search_error = str(exc)
+            logger.warning("Web search unavailable: %s", exc)
     try:
-        final_prompt, images = prepare_prompt(req, history=history, documents=documents)
+        final_prompt, images = prepare_prompt(
+            req, history=history, documents=documents, web_results=web_results
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _ensure_prompt_within_context(final_prompt)
@@ -822,6 +839,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         images_count=len(images),
         documents=documents,
         mode=req.mode,
+        web_results=web_results,
     )
 
     # Create API log entry
@@ -853,7 +871,10 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
         documents=documents,
         final_prompt_override=final_prompt,
         citations=context_details.get("citations", []),
+        web_results=web_results,
     )
+    if web_search_error and not response.get("web_search_error"):
+        response["web_search_error"] = web_search_error
     message = response.get("message", "")
 
     # Update log entry with response
@@ -886,6 +907,8 @@ async def sse_stream_generator(
     generation: ActiveGeneration,
     final_prompt: Optional[str] = None,
     images: Optional[list[str]] = None,
+    web_results: Optional[list[WebSearchResult]] = None,
+    web_search_error: Optional[str] = None,
 ):
     """Generate SSE events for queue countdown and token streaming from Ollama."""
     started = time.perf_counter()
@@ -893,15 +916,47 @@ async def sse_stream_generator(
     current_images = images if images is not None else normalize_images(req.images)
     prompt_images = collect_prompt_images(history, current_images=current_images)
 
-    # Build prompt with details for logging
+    # Run web search (if requested but not yet executed) and emit progress events
+    if req.web_search and web_results is None:
+        if not web_search_is_configured():
+            web_search_error = "SearXNG is niet geconfigureerd (zet SEARXNG_URL)."
+            yield f"data: {json.dumps({'web_search': {'status': 'unavailable', 'error': web_search_error}})}\n\n"
+            web_results = []
+        else:
+            yield f"data: {json.dumps({'web_search': {'status': 'started', 'query': req.prompt}})}\n\n"
+            try:
+                web_results = await run_web_search(req.prompt)
+            except WebSearchUnavailable as exc:
+                web_search_error = str(exc)
+                web_results = []
+                yield f"data: {json.dumps({'web_search': {'status': 'error', 'error': web_search_error}})}\n\n"
+            else:
+                payload = {
+                    "web_search": {
+                        "status": "results",
+                        "query": req.prompt,
+                        "results": web_results_to_payload(web_results),
+                    }
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+    elif web_results is None:
+        web_results = []
+
+    # Build prompt with details for logging (web_results may shift the prompt,
+    # so we always rebuild here and ignore any pre-built final_prompt when
+    # web search produced extra context).
     logged_prompt, context_details = build_augmented_prompt_with_details(
         req.prompt,
         history=history,
         images_count=len(current_images),
         documents=documents,
         mode=req.mode,
+        web_results=web_results,
     )
-    final_prompt = final_prompt or logged_prompt
+    if web_results:
+        final_prompt = logged_prompt
+    else:
+        final_prompt = final_prompt or logged_prompt
     log_prompt(final_prompt)
 
     # Create API log entry
@@ -1084,15 +1139,16 @@ async def sse_stream_generator(
 
     # Finalize latency before the terminal done event is sent.
     api_stats.finish_interaction((time.perf_counter() - started) * 1000)
-    event_data = json.dumps(
-        {
-            "done": True,
-            "message": assistant_text,
-            "thinking": thinking_text,
-            "citations": context_details.get("citations", []),
-        }
-    )
-    yield f"data: {event_data}\n\n"
+    final_event = {
+        "done": True,
+        "message": assistant_text,
+        "thinking": thinking_text,
+        "citations": context_details.get("citations", []),
+        "web_results": web_results_to_payload(web_results) if web_results else [],
+    }
+    if web_search_error:
+        final_event["web_search_error"] = web_search_error
+    yield f"data: {json.dumps(final_event)}\n\n"
     active_generations.pop(request_id, None)
 
 

@@ -56,6 +56,11 @@ class Settings(BaseModel):
     admin_usernames: list[str] = ["ADMIN"]
     chat_summary_idle_minutes: int = 0
     prompt_modes: list[str] = ["Developer", "Finance", "Law", "Child"]
+    searxng_url: Optional[str] = None
+    searxng_timeout: float = 8.0
+    searxng_max_results: int = 5
+    searxng_language: str = "nl"
+    searxng_safesearch: int = 1
 
 
 def get_settings() -> "Settings":
@@ -100,6 +105,27 @@ def get_settings() -> "Settings":
     prompt_modes = [mode.strip() for mode in raw_prompt_modes.split(",") if mode.strip()]
     if not prompt_modes:
         prompt_modes = ["Developer", "Finance", "Law", "Child"]
+
+    raw_searxng_url = (os.environ.get("SEARXNG_URL") or "").strip().rstrip("/")
+    searxng_url = raw_searxng_url or None
+    try:
+        searxng_timeout = float(os.environ.get("SEARXNG_TIMEOUT", "8"))
+    except ValueError:
+        searxng_timeout = 8.0
+    try:
+        searxng_max_results = int(os.environ.get("SEARXNG_MAX_RESULTS", "5"))
+    except ValueError:
+        searxng_max_results = 5
+    if searxng_max_results <= 0:
+        searxng_max_results = 5
+    searxng_language = (os.environ.get("SEARXNG_LANGUAGE") or "nl").strip() or "nl"
+    try:
+        searxng_safesearch = int(os.environ.get("SEARXNG_SAFESEARCH", "1"))
+    except ValueError:
+        searxng_safesearch = 1
+    if searxng_safesearch not in (0, 1, 2):
+        searxng_safesearch = 1
+
     return Settings(
         offline_assets_dir=offline_assets_dir,
         ollama_base_url=ollama_base_url,
@@ -111,6 +137,11 @@ def get_settings() -> "Settings":
         admin_usernames=admin_usernames or ["ADMIN"],
         chat_summary_idle_minutes=chat_summary_idle_minutes,
         prompt_modes=prompt_modes,
+        searxng_url=searxng_url,
+        searxng_timeout=searxng_timeout,
+        searxng_max_results=searxng_max_results,
+        searxng_language=searxng_language,
+        searxng_safesearch=searxng_safesearch,
     )
 
 

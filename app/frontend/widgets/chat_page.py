@@ -97,14 +97,18 @@ class ChatSignals(QObject):
     citations = Signal(int, list)
     done = Signal(int)
     queue_position = Signal(int, int)
+    web_search_started = Signal(int, str)
+    web_search_results = Signal(int, str, list)
+    web_search_error = Signal(int, str)
 
 
 class IosSwitch(QWidget):
     toggled = Signal(bool)
 
-    def __init__(self, checked: bool = False, parent=None):
+    def __init__(self, checked: bool = False, parent=None, on_color: str = "#facc15"):
         super().__init__(parent)
         self._checked = checked
+        self._on_color = on_color
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedSize(52, 32)
 
@@ -134,8 +138,8 @@ class IosSwitch(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         track_rect = self.rect().adjusted(1, 1, -1, -1)
-        track_color = QColor("#facc15" if self._checked else "#e5e7eb")
-        border_color = QColor("#facc15" if self._checked else "#d1d5db")
+        track_color = QColor(self._on_color if self._checked else "#e5e7eb")
+        border_color = QColor(self._on_color if self._checked else "#d1d5db")
         painter.setPen(border_color)
         painter.setBrush(track_color)
         painter.drawRoundedRect(track_rect, 16, 16)
@@ -195,7 +199,8 @@ class AutoSizingMarkdownView(QTextBrowser):
         self._height_sync_timer.setSingleShot(True)
         self._height_sync_timer.timeout.connect(self._sync_height)
         self.setReadOnly(True)
-        self.setOpenExternalLinks(True)
+        self.setOpenExternalLinks(False)
+        self.setOpenLinks(False)
         self.setFrameShape(QFrame.NoFrame)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -488,6 +493,227 @@ class CitationsCard(QFrame):
         return f"• {name}{page_label}"
 
 
+class WebSearchCard(QFrame):
+    """Collapsible card that shows the SearXNG search progress and results."""
+
+    STATUS_IDLE = "idle"
+    STATUS_SEARCHING = "searching"
+    STATUS_RESULTS = "results"
+    STATUS_ERROR = "error"
+
+    def __init__(self):
+        super().__init__()
+        self._status = self.STATUS_IDLE
+        self._query = ""
+        self._results: list[dict] = []
+        self._error_text = ""
+        self._expanded = False
+
+        self.setStyleSheet(
+            "QFrame {"
+            "  background:#eff6ff;"
+            "  border:1px solid #93c5fd;"
+            "  border-radius:16px;"
+            "}"
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 10, 12, 12)
+        layout.setSpacing(8)
+
+        self.toggle_btn = QToolButton()
+        self.toggle_btn.setCheckable(True)
+        self.toggle_btn.setChecked(False)
+        self.toggle_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.toggle_btn.setStyleSheet(
+            "QToolButton {"
+            "  border:none;"
+            "  color:#1d4ed8;"
+            "  font-size:12px;"
+            "  font-weight:700;"
+            "  text-align:left;"
+            "}"
+        )
+        self.toggle_btn.clicked.connect(self._on_toggle_clicked)
+        layout.addWidget(self.toggle_btn, 0, Qt.AlignLeft)
+
+        self.body = QWidget()
+        self.body.setStyleSheet("background:transparent;")
+        body_layout = QVBoxLayout(self.body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(8)
+
+        self.query_label = QLabel()
+        self.query_label.setWordWrap(True)
+        self.query_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.query_label.setStyleSheet(
+            "color:#1e3a8a; font-size:12px; background:transparent; border:none;"
+        )
+        body_layout.addWidget(self.query_label)
+
+        self.results_box = QWidget()
+        self.results_box.setStyleSheet("background:transparent;")
+        self._results_layout = QVBoxLayout(self.results_box)
+        self._results_layout.setContentsMargins(0, 0, 0, 0)
+        self._results_layout.setSpacing(8)
+        body_layout.addWidget(self.results_box)
+
+        layout.addWidget(self.body)
+        self.body.setVisible(False)
+        self.hide()
+        self._refresh_header()
+
+    def reset(self) -> None:
+        self._status = self.STATUS_IDLE
+        self._query = ""
+        self._results = []
+        self._error_text = ""
+        self._expanded = False
+        self.toggle_btn.setChecked(False)
+        self._clear_results()
+        self.query_label.clear()
+        self.body.setVisible(False)
+        self.hide()
+
+    def set_searching(self, query: str) -> None:
+        self._status = self.STATUS_SEARCHING
+        self._query = (query or "").strip()
+        self._error_text = ""
+        self._results = []
+        self._clear_results()
+        self.show()
+        self._refresh_header()
+        self._refresh_query()
+
+    def set_results(self, query: str, results: list[dict]) -> None:
+        self._status = self.STATUS_RESULTS
+        self._query = (query or self._query).strip()
+        self._results = list(results or [])
+        self._error_text = ""
+        self.show()
+        self._refresh_header()
+        self._refresh_query()
+        self._render_results()
+        if self._results and not self._expanded:
+            self.set_expanded(True)
+
+    def set_error(self, error: str) -> None:
+        self._status = self.STATUS_ERROR
+        self._error_text = (error or "").strip() or t("chat_websearch_error_unknown")
+        self._results = []
+        self._clear_results()
+        self.show()
+        self._refresh_header()
+        self._refresh_query()
+        self.set_expanded(True)
+
+    def has_content(self) -> bool:
+        return self._status != self.STATUS_IDLE
+
+    def is_expanded(self) -> bool:
+        return self._expanded
+
+    def set_expanded(self, expanded: bool) -> None:
+        self._expanded = bool(expanded)
+        self.toggle_btn.setChecked(self._expanded)
+        self.toggle_btn.setArrowType(Qt.DownArrow if self._expanded else Qt.RightArrow)
+        self.body.setVisible(self._expanded)
+
+    def _on_toggle_clicked(self) -> None:
+        self.set_expanded(self.toggle_btn.isChecked())
+
+    def _refresh_header(self) -> None:
+        if self._status == self.STATUS_SEARCHING:
+            label = t("chat_websearch_status_searching")
+        elif self._status == self.STATUS_RESULTS:
+            label = t("chat_websearch_status_results", count=len(self._results))
+        elif self._status == self.STATUS_ERROR:
+            label = t("chat_websearch_status_error")
+        else:
+            label = t("chat_websearch_block")
+        self.toggle_btn.setText(f"🔎  {label}")
+        self.toggle_btn.setArrowType(Qt.DownArrow if self._expanded else Qt.RightArrow)
+
+    def _refresh_query(self) -> None:
+        if self._status == self.STATUS_ERROR:
+            self.query_label.setText(self._error_text)
+            return
+        if self._query:
+            self.query_label.setText(t("chat_websearch_query_label", query=self._query))
+        else:
+            self.query_label.clear()
+
+    def _clear_results(self) -> None:
+        while self._results_layout.count():
+            item = self._results_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _render_results(self) -> None:
+        self._clear_results()
+        for idx, item in enumerate(self._results, 1):
+            row = self._build_result_row(idx, item)
+            if row is not None:
+                self._results_layout.addWidget(row)
+
+    @staticmethod
+    def _truncate(text: str, limit: int = 220) -> str:
+        text = (text or "").strip()
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
+
+    def _build_result_row(self, idx: int, item: dict) -> QWidget | None:
+        if not isinstance(item, dict):
+            return None
+        url = (item.get("url") or "").strip()
+        if not url:
+            return None
+        title = (item.get("title") or url).strip()
+        snippet = self._truncate(item.get("snippet") or "", 240)
+
+        row = QFrame()
+        row.setStyleSheet(
+            "QFrame {"
+            "  background:#ffffff;"
+            "  border:1px solid #dbeafe;"
+            "  border-radius:12px;"
+            "}"
+        )
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(10, 8, 10, 8)
+        row_layout.setSpacing(4)
+
+        title_label = QLabel(f"{idx}. {title}")
+        title_label.setTextFormat(Qt.PlainText)
+        title_label.setWordWrap(True)
+        title_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        title_label.setStyleSheet(
+            "color:#1d4ed8; font-weight:700; background:transparent; border:none;"
+        )
+        row_layout.addWidget(title_label)
+
+        url_label = QLabel(html.escape(url))
+        url_label.setWordWrap(True)
+        url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        url_label.setStyleSheet(
+            "color:#3b82f6; font-size:11px; background:transparent; border:none;"
+        )
+        row_layout.addWidget(url_label)
+
+        if snippet:
+            snippet_label = QLabel(snippet)
+            snippet_label.setWordWrap(True)
+            snippet_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            snippet_label.setStyleSheet(
+                "color:#374151; font-size:12px; background:transparent; border:none;"
+            )
+            row_layout.addWidget(snippet_label)
+
+        return row
+
+
 class AssistantMessageWidget(QWidget):
     thinking_toggled = Signal(bool)
 
@@ -504,6 +730,9 @@ class AssistantMessageWidget(QWidget):
         layout.setSpacing(12)
         self.setMinimumWidth(ASSISTANT_MIN_WIDTH)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+
+        self.web_search_card = WebSearchCard()
+        layout.addWidget(self.web_search_card)
 
         self.thinking_card = QFrame()
         self.thinking_card.setStyleSheet(
@@ -579,6 +808,18 @@ class AssistantMessageWidget(QWidget):
 
     def set_citations(self, citations: list) -> None:
         self.citations_card.set_citations(list(citations or []))
+
+    def set_web_search_searching(self, query: str) -> None:
+        self.web_search_card.set_searching(query)
+
+    def set_web_search_results(self, query: str, results: list) -> None:
+        self.web_search_card.set_results(query, list(results or []))
+
+    def set_web_search_error(self, error: str) -> None:
+        self.web_search_card.set_error(error)
+
+    def reset_web_search(self) -> None:
+        self.web_search_card.reset()
 
     def show_typing_indicator(self) -> None:
         self._response_text = ""
@@ -696,6 +937,26 @@ class ChatPage(QWidget):
         self.thinking_btn.toggled.connect(self._toggle_thinking)
         thinking_wrap_layout.addWidget(self.thinking_btn, 0, Qt.AlignVCenter)
         controls.addWidget(self.thinking_toggle_wrap, 0, Qt.AlignLeft)
+
+        self.web_search_enabled = False
+        self.web_search_toggle_wrap = QWidget()
+        web_search_wrap_layout = QHBoxLayout(self.web_search_toggle_wrap)
+        web_search_wrap_layout.setContentsMargins(0, 0, 0, 0)
+        web_search_wrap_layout.setSpacing(6)
+
+        self.web_search_label = QLabel()
+        web_search_font = self.web_search_label.font()
+        web_search_font.setWeight(QFont.Bold)
+        self.web_search_label.setFont(web_search_font)
+        self.web_search_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.web_search_label.setStyleSheet("color:#111111;")
+        web_search_wrap_layout.addWidget(self.web_search_label, 0, Qt.AlignVCenter)
+
+        self.web_search_btn = IosSwitch(self.web_search_enabled, on_color="#2563eb")
+        self.web_search_btn.toggled.connect(self._toggle_web_search)
+        web_search_wrap_layout.addWidget(self.web_search_btn, 0, Qt.AlignVCenter)
+        controls.addWidget(self.web_search_toggle_wrap, 0, Qt.AlignLeft)
+
         controls.addStretch(1)
 
         self.model_wrap = QWidget()
@@ -747,6 +1008,7 @@ class ChatPage(QWidget):
         layout.addLayout(controls)
         self.new_chat_btn.setMinimumHeight(40)
         self._sync_thinking_button()
+        self._sync_web_search_button()
         self._sync_model_status()
         self._load_current_model()
 
@@ -832,6 +1094,9 @@ class ChatPage(QWidget):
         self.signals.citations.connect(self._on_citations)
         self.signals.done.connect(self._on_done)
         self.signals.queue_position.connect(self._on_queue_position)
+        self.signals.web_search_started.connect(self._on_web_search_started)
+        self.signals.web_search_results.connect(self._on_web_search_results)
+        self.signals.web_search_error.connect(self._on_web_search_error)
 
         register_language_change_callback(self._update_translations)
         self.send_btn.setStyleSheet(
@@ -861,6 +1126,7 @@ class ChatPage(QWidget):
         self.new_chat_btn.setText(t("chat_start_new"))
         self.change_model_btn.setText(t("chat_change_model"))
         self._sync_thinking_button()
+        self._sync_web_search_button()
         self._sync_model_status()
         self.input.setPlaceholderText(t("chat_placeholder"))
         self._sync_send_button()
@@ -882,6 +1148,29 @@ class ChatPage(QWidget):
     def _toggle_thinking(self, checked: bool) -> None:
         self.thinking_enabled = checked
         self._sync_thinking_button()
+
+    def _toggle_web_search(self, checked: bool) -> None:
+        self.web_search_enabled = checked
+        self._sync_web_search_button()
+
+    def _sync_web_search_button(self) -> None:
+        if self.web_search_btn.isChecked() != self.web_search_enabled:
+            self.web_search_btn.setChecked(self.web_search_enabled)
+        enabled_label = t("chat_websearch_enabled")
+        disabled_label = t("chat_websearch_disabled")
+        metrics = self.web_search_label.fontMetrics()
+        label_width = max(
+            metrics.horizontalAdvance(enabled_label),
+            metrics.horizontalAdvance(disabled_label),
+        ) + 12
+        self.web_search_label.setMinimumWidth(label_width)
+        self.web_search_label.setText(
+            enabled_label if self.web_search_enabled else disabled_label
+        )
+        self.web_search_toggle_wrap.setMinimumWidth(
+            label_width + self.web_search_btn.sizeHint().width() + 24
+        )
+        self.web_search_toggle_wrap.updateGeometry()
 
     def _sync_model_status(self) -> None:
         self.current_model_label.setText(
@@ -1042,6 +1331,7 @@ class ChatPage(QWidget):
             "request_id": str(self._active_request_id or ""),
             "conversation_id": self._conversation_id,
             "thinking": self.thinking_enabled,
+            "web_search": self.web_search_enabled,
             "max_new_tokens": 128,
         }
         if mode:
@@ -1105,6 +1395,12 @@ class ChatPage(QWidget):
             citations = payload.get("citations") or []
             if isinstance(citations, list):
                 self.signals.citations.emit(request_id, citations)
+            web_results = payload.get("web_results") or []
+            if isinstance(web_results, list) and web_results:
+                self.signals.web_search_results.emit(request_id, "", web_results)
+            web_err = payload.get("web_search_error") or ""
+            if isinstance(web_err, str) and web_err.strip():
+                self.signals.web_search_error.emit(request_id, web_err.strip())
         self.signals.done.emit(request_id)
 
     def _stream_sse(
@@ -1151,6 +1447,29 @@ class ChatPage(QWidget):
                     self.signals.queue_position.emit(request_id, position)
                     continue
 
+                web_search_event = event_data.get("web_search")
+                if isinstance(web_search_event, dict) and not event_data.get("done"):
+                    status = (web_search_event.get("status") or "").strip()
+                    if status == "started":
+                        self.signals.web_search_started.emit(
+                            request_id, web_search_event.get("query") or ""
+                        )
+                    elif status == "results":
+                        results = web_search_event.get("results") or []
+                        if not isinstance(results, list):
+                            results = []
+                        self.signals.web_search_results.emit(
+                            request_id,
+                            web_search_event.get("query") or "",
+                            results,
+                        )
+                    elif status in ("error", "unavailable"):
+                        self.signals.web_search_error.emit(
+                            request_id,
+                            str(web_search_event.get("error") or "").strip(),
+                        )
+                    continue
+
                 if "thinking" in event_data and not event_data.get("done"):
                     token = event_data.get("thinking") or ""
                     if token:
@@ -1172,6 +1491,14 @@ class ChatPage(QWidget):
                     citations = event_data.get("citations") or []
                     if isinstance(citations, list):
                         self.signals.citations.emit(request_id, citations)
+                    web_results_done = event_data.get("web_results") or []
+                    if isinstance(web_results_done, list) and web_results_done:
+                        self.signals.web_search_results.emit(
+                            request_id, "", web_results_done
+                        )
+                    web_err = event_data.get("web_search_error")
+                    if isinstance(web_err, str) and web_err.strip():
+                        self.signals.web_search_error.emit(request_id, web_err.strip())
                     self.signals.done.emit(request_id)
                     return
 
@@ -1214,12 +1541,17 @@ class ChatPage(QWidget):
                 citations = data.get("citations") or []
                 if not isinstance(citations, list):
                     citations = []
+                web_results = data.get("web_results") or []
+                if not isinstance(web_results, list):
+                    web_results = []
                 return {
                     "message": data.get("message") or data.get("text") or str(data),
                     "thinking": data.get("thinking") or "",
                     "citations": citations,
+                    "web_results": web_results,
+                    "web_search_error": data.get("web_search_error") or "",
                 }
-            return {"message": str(data), "thinking": "", "citations": []}
+            return {"message": str(data), "thinking": "", "citations": [], "web_results": []}
         raise last_error or RuntimeError(t("chat_no_valid_response"))
 
     def _format_http_error(self, exc: requests.HTTPError) -> str:
@@ -1345,6 +1677,37 @@ class ChatPage(QWidget):
             return
         widget = self._ensure_current_reply_widget()
         widget.set_citations(citations or [])
+
+    @Slot(int, str)
+    def _on_web_search_started(self, request_id: int, query: str) -> None:
+        if request_id != self._active_request_id:
+            return
+        if self._stop_requested:
+            return
+        widget = self._ensure_current_reply_widget()
+        widget.set_web_search_searching(query or "")
+        if self._is_near_bottom():
+            self._scroll_to_bottom()
+
+    @Slot(int, str, list)
+    def _on_web_search_results(self, request_id: int, query: str, results: list) -> None:
+        if request_id != self._active_request_id:
+            return
+        if self._stop_requested:
+            return
+        widget = self._ensure_current_reply_widget()
+        widget.set_web_search_results(query or "", list(results or []))
+        if self._is_near_bottom():
+            self._scroll_to_bottom()
+
+    @Slot(int, str)
+    def _on_web_search_error(self, request_id: int, error: str) -> None:
+        if request_id != self._active_request_id:
+            return
+        if self._stop_requested:
+            return
+        widget = self._ensure_current_reply_widget()
+        widget.set_web_search_error(error or "")
 
     def _ensure_current_reply_widget(self) -> AssistantMessageWidget:
         if self.current_reply_widget is None:

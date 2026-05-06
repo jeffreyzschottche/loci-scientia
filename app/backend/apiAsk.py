@@ -20,6 +20,10 @@ from .knowledge_repository import KnowledgeRepository
 from .schemas import ChatMessage, ChatRequest, Device, HistoryDocument, PromptDocument
 from .settings import settings
 from .translations import t
+from .web_search import (
+    WebSearchResult,
+    format_results_for_prompt as _format_web_results_for_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -827,6 +831,7 @@ def build_augmented_prompt(
     images_count: int = 0,
     documents: Optional[Sequence[ParsedDocument]] = None,
     mode: Optional[str] = None,
+    web_results: Optional[Sequence[WebSearchResult]] = None,
 ) -> str:
     prompt, _ = build_augmented_prompt_with_details(
         user_prompt,
@@ -834,6 +839,7 @@ def build_augmented_prompt(
         images_count=images_count,
         documents=documents,
         mode=mode,
+        web_results=web_results,
     )
     return prompt
 
@@ -844,6 +850,7 @@ def build_augmented_prompt_with_details(
     images_count: int = 0,
     documents: Optional[Sequence[ParsedDocument]] = None,
     mode: Optional[str] = None,
+    web_results: Optional[Sequence[WebSearchResult]] = None,
 ) -> tuple[str, Dict[str, List]]:
     """Build augmented prompt AND return context details for logging."""
     base_lines: list[str] = []
@@ -876,6 +883,16 @@ def build_augmented_prompt_with_details(
         base_lines.extend(context_lines)
         base_lines.append("")
 
+    if web_results:
+        web_lines = _format_web_results_for_prompt(list(web_results))
+        if web_lines:
+            base_lines.extend(web_lines)
+            base_lines.append(
+                "Gebruik bovenstaande webbronnen waar relevant en verwijs in het antwoord"
+                " naar de bron met titel of URL. Als de bronnen geen antwoord geven, zeg dat dan."
+            )
+            base_lines.append("")
+
     base_lines.append(f"{t('current_question')} {user_prompt.strip()}")
     return "\n".join(base_lines).strip(), context_details
 
@@ -884,6 +901,7 @@ def prepare_prompt(
     req: ChatRequest,
     history: Optional[Sequence[ChatMessage]] = None,
     documents: Optional[Sequence[ParsedDocument]] = None,
+    web_results: Optional[Sequence[WebSearchResult]] = None,
 ) -> tuple[str, list[str]]:
     """Normalize request payload and return the prompt used for context checks."""
     history_to_use = req.history if history is None else history
@@ -894,6 +912,7 @@ def prepare_prompt(
         images_count=len(normalized_images),
         documents=documents,
         mode=req.mode,
+        web_results=web_results,
     )
     return prompt, normalized_images
 
@@ -1168,6 +1187,7 @@ async def handle_ask(
     documents: Optional[Sequence[ParsedDocument]] = None,
     final_prompt_override: Optional[str] = None,
     citations: Optional[List[Dict[str, Any]]] = None,
+    web_results: Optional[Sequence[WebSearchResult]] = None,
 ) -> dict:
     history_to_use = req.history if history is None else history
     current_images = normalize_images(req.images)
@@ -1178,6 +1198,7 @@ async def handle_ask(
         images_count=len(current_images),
         documents=documents,
         mode=req.mode,
+        web_results=web_results,
     )
     log_prompt(final_prompt)
     thinking = ""
@@ -1212,4 +1233,12 @@ async def handle_ask(
         message = _fallback_response(req.prompt)
     if not message:
         message = t("no_response_generated")
-    return {"message": message, "thinking": thinking, "citations": list(citations or [])}
+    web_payload: List[Dict[str, Any]] = []
+    if web_results:
+        web_payload = [item.to_dict() for item in web_results]
+    return {
+        "message": message,
+        "thinking": thinking,
+        "citations": list(citations or []),
+        "web_results": web_payload,
+    }

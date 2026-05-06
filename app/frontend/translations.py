@@ -1837,6 +1837,38 @@ TRANSLATIONS = {
         "nl": "Antwoord wordt opgebouwd...",
         "en": "Response is being generated...",
     },
+    "chat_websearch_enabled": {
+        "nl": "Web search aan",
+        "en": "Web search on",
+    },
+    "chat_websearch_disabled": {
+        "nl": "Web search uit",
+        "en": "Web search off",
+    },
+    "chat_websearch_block": {
+        "nl": "Web search",
+        "en": "Web search",
+    },
+    "chat_websearch_status_searching": {
+        "nl": "Web aan het doorzoeken…",
+        "en": "Searching the web…",
+    },
+    "chat_websearch_status_results": {
+        "nl": "Web search · {count} bronnen gevonden",
+        "en": "Web search · {count} sources found",
+    },
+    "chat_websearch_status_error": {
+        "nl": "Web search niet beschikbaar",
+        "en": "Web search unavailable",
+    },
+    "chat_websearch_query_label": {
+        "nl": "Zoekopdracht: {query}",
+        "en": "Query: {query}",
+    },
+    "chat_websearch_error_unknown": {
+        "nl": "Onbekende fout bij webzoekopdracht.",
+        "en": "Unknown error during web search.",
+    },
 
     # ============================================
     # KNOWLEDGE PAGE (additional)

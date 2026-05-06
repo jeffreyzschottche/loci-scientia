@@ -26,6 +26,14 @@ ORIGINAL_COMPUTER_NAME=""
 SUDO_KEEPALIVE_PID=""
 HAVE_SUDO=0
 
+SEARXNG_PORT="${SEARXNG_PORT:-8888}"
+SEARXNG_CONTAINER_NAME="${SEARXNG_CONTAINER_NAME:-aitje-searxng}"
+SEARXNG_IMAGE="${SEARXNG_IMAGE:-searxng/searxng:latest}"
+SEARXNG_DATA_DIR="${SEARXNG_DATA_DIR:-$PROJECT_ROOT/searxng_data}"
+DOCKER_CMD=()
+searxng_started_by_us=0
+DISABLED_APT_FILES=()
+
 ensure_sudo_session() {
     if ! command -v sudo >/dev/null 2>&1; then
         return 1
@@ -706,6 +714,289 @@ start_ollama() {
     return 0
 }
 
+detect_docker_cmd() {
+    DOCKER_CMD=()
+    if ! command -v docker >/dev/null 2>&1; then
+        return 1
+    fi
+    if [ "$(id -u)" -eq 0 ] || (id -nG 2>/dev/null | tr ' ' '\n' | grep -qx docker); then
+        DOCKER_CMD=(docker)
+        return 0
+    fi
+    if docker info >/dev/null 2>&1; then
+        DOCKER_CMD=(docker)
+        return 0
+    fi
+    if [ "$HAVE_SUDO" -eq 1 ]; then
+        DOCKER_CMD=(sudo docker)
+        return 0
+    fi
+    return 1
+}
+
+_disable_broken_apt_repos() {
+    DISABLED_APT_FILES=()
+    if [ "$HAVE_SUDO" -ne 1 ]; then
+        return 0
+    fi
+    local update_output
+    update_output="$(sudo apt-get update 2>&1 || true)"
+    local broken
+    broken="$(printf '%s\n' "$update_output" \
+        | grep -E "does not have a Release file|404\s+Not Found|NO_PUBKEY|Failed to fetch" \
+        || true)"
+    if [ -z "$broken" ]; then
+        return 0
+    fi
+    local urls
+    urls="$(printf '%s\n' "$broken" \
+        | grep -oE "https?://[^[:space:]'\"]+" \
+        | sed -E 's|^https?://||' \
+        | sort -u)"
+    [ -z "$urls" ] && return 0
+    while IFS= read -r prefix; do
+        [ -z "$prefix" ] && continue
+        for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -e "$f" ] || continue
+            case "$f" in *.disabled-aitje) continue ;; esac
+            if sudo grep -Fq "$prefix" "$f" 2>/dev/null; then
+                if sudo mv "$f" "$f.disabled-aitje" 2>/dev/null; then
+                    DISABLED_APT_FILES+=("$f.disabled-aitje")
+                    echo "ℹ️  Tijdelijk uitgezet: $(basename "$f") (gebroken repo: $prefix)"
+                fi
+            fi
+        done
+    done <<< "$urls"
+    return 0
+}
+
+_restore_disabled_apt_repos() {
+    if [ "${#DISABLED_APT_FILES[@]}" -eq 0 ]; then
+        return 0
+    fi
+    for f in "${DISABLED_APT_FILES[@]}"; do
+        local original="${f%.disabled-aitje}"
+        if [ -e "$f" ]; then
+            sudo mv "$f" "$original" >/dev/null 2>&1 || true
+            echo "ℹ️  Hersteld: $(basename "$original")"
+        fi
+    done
+    DISABLED_APT_FILES=()
+}
+
+_wait_for_apt_lock() {
+    local max_wait=${1:-180}
+    local waited=0
+    local locks=(
+        /var/lib/dpkg/lock-frontend
+        /var/lib/dpkg/lock
+        /var/lib/apt/lists/lock
+        /var/cache/apt/archives/lock
+    )
+    if ! command -v fuser >/dev/null 2>&1; then
+        return 0
+    fi
+    while [ "$waited" -lt "$max_wait" ]; do
+        local busy=0
+        local owner=""
+        for lock in "${locks[@]}"; do
+            [ -e "$lock" ] || continue
+            if sudo fuser "$lock" >/dev/null 2>&1; then
+                busy=1
+                owner="$(sudo fuser "$lock" 2>/dev/null | awk '{print $1}')"
+                break
+            fi
+        done
+        if [ "$busy" -eq 0 ]; then
+            if [ "$waited" -gt 0 ]; then
+                echo "✅ apt-lock vrijgegeven, doorgaan."
+            fi
+            return 0
+        fi
+        if [ "$waited" -eq 0 ]; then
+            local owner_cmd=""
+            if [ -n "$owner" ]; then
+                owner_cmd="$(ps -p "$owner" -o cmd= 2>/dev/null || true)"
+            fi
+            if [ -n "$owner_cmd" ]; then
+                echo "⏳ apt is bezet door PID $owner ($owner_cmd); wachten tot het klaar is (max ${max_wait}s)..."
+            else
+                echo "⏳ apt is bezet door een ander proces; wachten tot het klaar is (max ${max_wait}s)..."
+            fi
+        fi
+        sleep 3
+        waited=$((waited + 3))
+    done
+    return 1
+}
+
+install_docker() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            if command -v docker >/dev/null 2>&1; then
+                echo "✅ Docker is al geïnstalleerd"
+            else
+                echo "📦 Docker niet gevonden, proberen te installeren via get.docker.com..."
+                if [ "$HAVE_SUDO" -ne 1 ]; then
+                    echo "⚠️  Geen sudo-toegang; kan Docker niet automatisch installeren."
+                    return 1
+                fi
+                if ! _wait_for_apt_lock 180; then
+                    echo "⚠️  apt blijft bezet (waarschijnlijk unattended-upgrade). Probeer het script later opnieuw, of stop het andere proces handmatig."
+                    return 1
+                fi
+                _disable_broken_apt_repos || true
+                local docker_install_rc=0
+                if ! curl -fsSL https://get.docker.com | sudo sh; then
+                    docker_install_rc=1
+                fi
+                _restore_disabled_apt_repos
+                if [ "$docker_install_rc" -ne 0 ]; then
+                    echo "⚠️  Docker installatie mislukt. Installeer Docker handmatig: https://docs.docker.com/engine/install/"
+                    return 1
+                fi
+                echo "✅ Docker geïnstalleerd"
+            fi
+            if command -v systemctl >/dev/null 2>&1; then
+                if ! systemctl is-active --quiet docker 2>/dev/null; then
+                    if [ "$HAVE_SUDO" -eq 1 ]; then
+                        echo "⏳ Docker daemon starten..."
+                        sudo systemctl enable --now docker >/dev/null 2>&1 || true
+                    fi
+                fi
+            fi
+            if [ -n "${USER:-}" ] && ! id -nG "$USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+                if [ "$HAVE_SUDO" -eq 1 ]; then
+                    if sudo usermod -aG docker "$USER" >/dev/null 2>&1; then
+                        echo "ℹ️  $USER toegevoegd aan docker-group (effect na uitloggen; sudo wordt gebruikt voor nu)."
+                    fi
+                fi
+            fi
+            return 0
+            ;;
+        macos)
+            if command -v docker >/dev/null 2>&1; then
+                return 0
+            fi
+            echo "⚠️  Docker niet gevonden. Installeer Docker Desktop voor macOS:"
+            echo "    https://www.docker.com/products/docker-desktop"
+            return 1
+            ;;
+        *)
+            command -v docker >/dev/null 2>&1
+            ;;
+    esac
+}
+
+ensure_searxng_settings() {
+    mkdir -p "$SEARXNG_DATA_DIR"
+    local settings="$SEARXNG_DATA_DIR/settings.yml"
+    if [ -s "$settings" ]; then
+        return 0
+    fi
+    local secret=""
+    if command -v openssl >/dev/null 2>&1; then
+        secret="$(openssl rand -hex 32 2>/dev/null || true)"
+    fi
+    if [ -z "$secret" ] && command -v python3 >/dev/null 2>&1; then
+        secret="$(python3 -c 'import secrets;print(secrets.token_hex(32))' 2>/dev/null || true)"
+    fi
+    if [ -z "$secret" ]; then
+        secret="$(date +%s%N | sha256sum | cut -c1-64)"
+    fi
+    cat > "$settings" <<EOF
+use_default_settings: true
+server:
+  secret_key: "$secret"
+  limiter: false
+  image_proxy: true
+  bind_address: "0.0.0.0"
+search:
+  formats:
+    - html
+    - json
+ui:
+  default_locale: nl
+EOF
+    chmod 0644 "$settings" 2>/dev/null || true
+}
+
+_wait_for_searxng() {
+    local url="http://127.0.0.1:${SEARXNG_PORT}/search?q=ping&format=json"
+    for _ in {1..40}; do
+        if curl -fs -o /dev/null "$url"; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+
+start_searxng() {
+    if [ -n "${SEARXNG_URL:-}" ]; then
+        echo "ℹ️  SEARXNG_URL al gezet ($SEARXNG_URL); externe instance wordt gebruikt."
+        return 0
+    fi
+    local autostart_raw
+    autostart_raw="$(_normalize_bool "${SEARXNG_AUTOSTART:-1}")"
+    if [ "$autostart_raw" = "0" ]; then
+        echo "ℹ️  SEARXNG_AUTOSTART=0; web search blijft uit."
+        return 1
+    fi
+    if ! detect_docker_cmd; then
+        if ! install_docker; then
+            echo "⚠️  Docker niet beschikbaar; SearXNG wordt niet gestart."
+            return 1
+        fi
+        if ! detect_docker_cmd; then
+            echo "⚠️  Docker is geïnstalleerd maar nog niet bruikbaar (mogelijk opnieuw inloggen voor docker-group)."
+            return 1
+        fi
+    fi
+    if ! "${DOCKER_CMD[@]}" info >/dev/null 2>&1; then
+        echo "⚠️  Docker daemon reageert niet; SearXNG overslaan."
+        return 1
+    fi
+
+    ensure_searxng_settings
+
+    local existing
+    existing="$("${DOCKER_CMD[@]}" ps -aq -f "name=^${SEARXNG_CONTAINER_NAME}$" 2>/dev/null || true)"
+    if [ -n "$existing" ]; then
+        if "${DOCKER_CMD[@]}" ps -q -f "name=^${SEARXNG_CONTAINER_NAME}$" | grep -q .; then
+            echo "✅ SearXNG container '${SEARXNG_CONTAINER_NAME}' draait al"
+        else
+            echo "⏳ SearXNG container '${SEARXNG_CONTAINER_NAME}' herstarten..."
+            "${DOCKER_CMD[@]}" start "$SEARXNG_CONTAINER_NAME" >/dev/null
+            searxng_started_by_us=1
+        fi
+    else
+        echo "📦 SearXNG image ophalen ($SEARXNG_IMAGE)..."
+        "${DOCKER_CMD[@]}" pull "$SEARXNG_IMAGE" >/dev/null 2>&1 || true
+        echo "⏳ SearXNG container starten op poort $SEARXNG_PORT..."
+        if ! "${DOCKER_CMD[@]}" run -d \
+            --name "$SEARXNG_CONTAINER_NAME" \
+            --restart unless-stopped \
+            -p "127.0.0.1:${SEARXNG_PORT}:8080" \
+            -v "$SEARXNG_DATA_DIR:/etc/searxng" \
+            -e "BASE_URL=http://127.0.0.1:${SEARXNG_PORT}/" \
+            -e "INSTANCE_NAME=aitje" \
+            "$SEARXNG_IMAGE" >/dev/null; then
+            echo "⚠️  Kon SearXNG container niet starten."
+            return 1
+        fi
+        searxng_started_by_us=1
+    fi
+
+    if ! _wait_for_searxng; then
+        echo "⚠️  SearXNG kwam niet binnen tijd online (poort $SEARXNG_PORT). Check 'docker logs $SEARXNG_CONTAINER_NAME'."
+        return 1
+    fi
+    export SEARXNG_URL="http://127.0.0.1:${SEARXNG_PORT}"
+    echo "✅ SearXNG online → SEARXNG_URL=$SEARXNG_URL"
+    return 0
+}
+
 echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
 ensure_active_wifi_profile_persistence
@@ -724,6 +1015,13 @@ else
     echo "⚠️  App draait zonder Ollama support"
 fi
 echo "===================="
+echo
+
+echo "=== SearXNG Setup ==="
+if ! start_searxng; then
+    echo "⚠️  Web search blijft uit (toggle in de UI heeft dan geen effect)."
+fi
+echo "====================="
 echo
 
 BACKEND_HOST="${BACKEND_HOST:-}"
@@ -821,6 +1119,15 @@ cleanup() {
         echo "🛑 Ollama stoppen..."
         kill "$ollama_pid" >/dev/null 2>&1 || true
     fi
+
+    if [ "$searxng_started_by_us" -eq 1 ] && [ "$(_normalize_bool "${SEARXNG_STOP_ON_EXIT:-0}")" = "1" ]; then
+        if [ ${#DOCKER_CMD[@]} -gt 0 ]; then
+            echo "🛑 SearXNG container stoppen..."
+            "${DOCKER_CMD[@]}" stop "$SEARXNG_CONTAINER_NAME" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    _restore_disabled_apt_repos >/dev/null 2>&1 || true
 
     case "$DEVICE_PLATFORM" in
         linux|jetson)

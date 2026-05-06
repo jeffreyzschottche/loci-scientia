@@ -197,6 +197,46 @@ class PromptBuildingTests(unittest.TestCase):
         with patch("backend.devices_repo.embed_text", side_effect=RuntimeError("missing model")):
             self.assertEqual(repo.search_devices("waar is mijn apparaat?"), [])
 
+    def test_augmented_prompt_includes_web_search_block_when_results_provided(self):
+        from backend.web_search import WebSearchResult
+
+        results = [
+            WebSearchResult(
+                title="Voorbeeld bron",
+                url="https://example.com/article",
+                snippet="Korte samenvatting van de pagina.",
+                engine="duckduckgo",
+            )
+        ]
+
+        with patch.object(
+            apiAsk,
+            "_gather_context_with_details",
+            return_value=([], {"devices": [], "knowledge": []}),
+        ):
+            prompt, _ = apiAsk.build_augmented_prompt_with_details(
+                "Wat zijn de laatste ontwikkelingen?",
+                web_results=results,
+            )
+
+        self.assertIn("> web search:", prompt)
+        self.assertIn("Voorbeeld bron", prompt)
+        self.assertIn("https://example.com/article", prompt)
+        self.assertTrue(prompt.rstrip().endswith("Huidige vraag: Wat zijn de laatste ontwikkelingen?"))
+
+    def test_augmented_prompt_omits_web_search_block_when_no_results(self):
+        with patch.object(
+            apiAsk,
+            "_gather_context_with_details",
+            return_value=([], {"devices": [], "knowledge": []}),
+        ):
+            prompt, _ = apiAsk.build_augmented_prompt_with_details(
+                "Wat zijn de laatste ontwikkelingen?",
+                web_results=[],
+            )
+
+        self.assertNotIn("> web search:", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
