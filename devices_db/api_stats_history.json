@@ -132,6 +132,48 @@
       "requests_today": 4,
       "active_users_today": 1,
       "avg_response_ms": 47556
+    },
+    {
+      "timestamp": "2026-05-07T15:35:00.154376+00:00",
+      "requests_today": 1,
+      "active_users_today": 1,
+      "avg_response_ms": 18046
+    },
+    {
+      "timestamp": "2026-05-07T15:37:17.115462+00:00",
+      "requests_today": 2,
+      "active_users_today": 1,
+      "avg_response_ms": 15806
+    },
+    {
+      "timestamp": "2026-05-07T15:43:04.702703+00:00",
+      "requests_today": 3,
+      "active_users_today": 1,
+      "avg_response_ms": 15312
+    },
+    {
+      "timestamp": "2026-05-07T15:46:18.382941+00:00",
+      "requests_today": 4,
+      "active_users_today": 1,
+      "avg_response_ms": 17299
+    },
+    {
+      "timestamp": "2026-05-07T15:46:50.141340+00:00",
+      "requests_today": 5,
+      "active_users_today": 1,
+      "avg_response_ms": 16959
+    },
+    {
+      "timestamp": "2026-05-07T15:49:56.543301+00:00",
+      "requests_today": 6,
+      "active_users_today": 1,
+      "avg_response_ms": 17505
+    },
+    {
+      "timestamp": "2026-05-07T15:52:08.476240+00:00",
+      "requests_today": 7,
+      "active_users_today": 1,
+      "avg_response_ms": 18090
     }
   ]
 }
