@@ -1000,6 +1000,30 @@ TRANSLATIONS = {
         "nl": "Status: Niet verbonden",
         "en": "Status: Not connected",
     },
+    "devices_client_url_title": {
+        "nl": "Webclient URL",
+        "en": "Web client URL",
+    },
+    "devices_client_url_subtitle": {
+        "nl": "Externe apparaten kunnen op hetzelfde netwerk hierheen surfen om in te loggen.",
+        "en": "Devices on the same network can browse to this URL to sign in.",
+    },
+    "devices_client_url_show": {
+        "nl": "Toon client URL",
+        "en": "Show client URL",
+    },
+    "devices_client_url_copy": {
+        "nl": "Kopieer URL",
+        "en": "Copy URL",
+    },
+    "devices_client_url_copied": {
+        "nl": "URL gekopieerd",
+        "en": "URL copied",
+    },
+    "devices_client_url_qr_hint": {
+        "nl": "Scan de QR-code met je telefoon.",
+        "en": "Scan the QR code with your phone.",
+    },
 
     # ============================================
     # CONTACTS PAGE

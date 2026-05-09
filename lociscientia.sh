@@ -1083,6 +1083,61 @@ if [ ! -f ".venv/.requirements_installed" ]; then
     touch .venv/.requirements_installed
 fi
 
+# --- LAN web client (Nuxt SPA) build -----------------------------------------
+# Static SPA mounted by FastAPI at /. We build only when source changed since
+# the last successful generate, so normal restarts stay fast.
+WEBCLIENT_DIR="$PROJECT_ROOT/app/webclient"
+WEBCLIENT_DIST_INDEX="$WEBCLIENT_DIR/.output/public/index.html"
+if [ -d "$WEBCLIENT_DIR" ]; then
+    if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        echo "⚠️  Node.js/npm niet gevonden — sla webclient-build over. Installeer Node 20+ om de browserclient op http://${DEVICE_MDNS}:${BACKEND_PORT}/ te hosten."
+    else
+        webclient_stamp="$WEBCLIENT_DIR/.output/.build-stamp"
+        webclient_inputs=(
+            "$WEBCLIENT_DIR/package.json"
+            "$WEBCLIENT_DIR/package-lock.json"
+            "$WEBCLIENT_DIR/nuxt.config.ts"
+            "$WEBCLIENT_DIR/tailwind.config.ts"
+            "$WEBCLIENT_DIR/tsconfig.json"
+        )
+        webclient_needs_build=0
+        if [ ! -f "$WEBCLIENT_DIST_INDEX" ] || [ ! -f "$webclient_stamp" ]; then
+            webclient_needs_build=1
+        else
+            for input in "${webclient_inputs[@]}"; do
+                if [ -f "$input" ] && [ "$input" -nt "$webclient_stamp" ]; then
+                    webclient_needs_build=1
+                    break
+                fi
+            done
+            if [ "$webclient_needs_build" -eq 0 ]; then
+                if find "$WEBCLIENT_DIR/app" "$WEBCLIENT_DIR/public" -type f -newer "$webclient_stamp" 2>/dev/null | grep -q .; then
+                    webclient_needs_build=1
+                fi
+            fi
+        fi
+
+        if [ "$webclient_needs_build" -eq 1 ]; then
+            echo "📦 Webclient build (Nuxt) — kan even duren…"
+            (
+                cd "$WEBCLIENT_DIR" || exit 1
+                if [ ! -d "node_modules" ]; then
+                    npm install --no-audit --no-fund
+                fi
+                npm run generate
+            )
+            if [ -f "$WEBCLIENT_DIST_INDEX" ]; then
+                touch "$webclient_stamp"
+                echo "✅ Webclient klaar — bereikbaar op http://${DEVICE_MDNS}:${BACKEND_PORT}/"
+            else
+                echo "⚠️  Webclient build mislukt; FastAPI start zonder SPA."
+            fi
+        else
+            echo "✅ Webclient up-to-date — bereikbaar op http://${DEVICE_MDNS}:${BACKEND_PORT}/"
+        fi
+    fi
+fi
+
 BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_BIND_HOST" --port "$BACKEND_PORT")
 backend_log="$PROJECT_ROOT/backend.log"
 

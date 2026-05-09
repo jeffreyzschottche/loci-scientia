@@ -21,8 +21,9 @@ from fastapi import (
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth_tokens import BearerTokenStore, TokenRecord
 from .apiAsk import (
@@ -1290,3 +1291,54 @@ async def ws_endpoint(ws: WebSocket):
             await ws.send_json({"done": True})
     except WebSocketDisconnect:
         return
+
+
+# ---- LAN web client (Nuxt SPA) -----------------------------------------------
+#
+# The Nuxt 3 client is generated to app/webclient/.output/public during
+# `lociscientia.sh` startup (or manually with `npm run generate`). FastAPI
+# serves it on the same port so phones/laptops on the LAN can just open
+# http://aitje-<n>.local:8000/ and log in via /api/v1/signon.
+#
+# This block must remain at the bottom of the file: the catch-all mount on "/"
+# would shadow any later-registered API route.
+
+_SPA_RESERVED_PREFIXES = ("api", "api/", "devices", "devices/", "health", "ws", "fonts/", "sprites/")
+
+
+class _SPAStaticFiles(StaticFiles):
+    """StaticFiles that falls back to index.html for unknown SPA routes,
+    but never for paths that look like API routes (so a POST-only endpoint
+    queried with GET still returns 405/404 instead of an HTML page)."""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            normalized = path.lstrip("/")
+            if normalized == "" or any(
+                normalized == prefix.rstrip("/") or normalized.startswith(prefix)
+                for prefix in _SPA_RESERVED_PREFIXES
+            ):
+                raise
+            index_path = Path(self.directory) / "index.html"
+            if index_path.is_file():
+                return FileResponse(index_path)
+            raise
+
+
+_WEBCLIENT_DIST = Path(__file__).resolve().parents[1] / "webclient" / ".output" / "public"
+if _WEBCLIENT_DIST.is_dir() and (_WEBCLIENT_DIST / "index.html").is_file():
+    app.mount(
+        "/",
+        _SPAStaticFiles(directory=str(_WEBCLIENT_DIST), html=True),
+        name="webclient",
+    )
+else:
+    logger.warning(
+        "Webclient build niet gevonden op %s; SPA niet gemount. "
+        "Run `cd app/webclient && npm install && npm run generate` of start lociscientia.sh.",
+        _WEBCLIENT_DIST,
+    )

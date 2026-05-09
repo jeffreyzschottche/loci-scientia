@@ -1,7 +1,9 @@
+import io
 from functools import partial
 from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QGuiApplication, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -19,7 +21,7 @@ from PySide6.QtWidgets import (
 
 import requests
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL
 from ..translations import t, register_language_change_callback
 from .dialog_style import (
     OverlayDialog,
@@ -27,6 +29,26 @@ from .dialog_style import (
     show_error_dialog,
     show_warning_dialog,
 )
+
+
+def _render_qr_pixmap(text: str, size: int = 220) -> Optional[QPixmap]:
+    try:
+        import qrcode  # type: ignore
+    except ImportError:
+        return None
+    try:
+        qr = qrcode.QRCode(border=2, box_size=8)
+        qr.add_data(text)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#0f172a", back_color="white").convert("RGB")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(buffer.getvalue(), "PNG"):
+            return None
+        return pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    except Exception:
+        return None
 
 
 class DeviceCard(QFrame):
@@ -136,6 +158,8 @@ class DevicesPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
+        layout.addWidget(self._build_client_url_panel())
+
         header = QHBoxLayout()
         header.addStretch(1)
         self._add_btn = QPushButton(t("devices_add_device"))
@@ -189,7 +213,143 @@ class DevicesPage(QWidget):
         """Update UI elements when language changes."""
         self._add_btn.setText(t("devices_add_device"))
         self.count_label.setText(t("devices_total_devices", count=len(self.devices)))
+        self._client_url_title.setText(t("devices_client_url_title"))
+        self._client_url_subtitle.setText(t("devices_client_url_subtitle"))
+        self._client_url_show_btn.setText(t("devices_client_url_show"))
+        self._client_url_copy_btn.setText(t("devices_client_url_copy"))
         self._render_devices()
+
+    def _build_client_url_panel(self) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("ClientUrlPanel")
+        panel.setStyleSheet(
+            "QFrame#ClientUrlPanel {"
+            "  background:#fffdf5;"
+            "  border:1px solid #facc15;"
+            "  border-radius:20px;"
+            "}"
+        )
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(16)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(4)
+        self._client_url_title = QLabel(t("devices_client_url_title"))
+        self._client_url_title.setStyleSheet("font-size:15px; font-weight:700; color:#111111;")
+        self._client_url_subtitle = QLabel(t("devices_client_url_subtitle"))
+        self._client_url_subtitle.setWordWrap(True)
+        self._client_url_subtitle.setStyleSheet("color:#6b7280; font-size:12px;")
+        self._client_url_value = QLabel(self._public_client_url())
+        self._client_url_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._client_url_value.setStyleSheet("font-size:14px; font-weight:600; color:#0f172a;")
+        text_col.addWidget(self._client_url_title)
+        text_col.addWidget(self._client_url_value)
+        text_col.addWidget(self._client_url_subtitle)
+        layout.addLayout(text_col, 1)
+
+        btn_col = QVBoxLayout()
+        btn_col.setSpacing(8)
+        self._client_url_show_btn = QPushButton(t("devices_client_url_show"))
+        self._client_url_show_btn.setCursor(Qt.PointingHandCursor)
+        self._client_url_show_btn.setFixedHeight(36)
+        self._client_url_show_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15; color:#050505;"
+            "  border:none; border-radius:18px;"
+            "  padding:6px 18px; font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
+        self._client_url_show_btn.clicked.connect(self._open_client_url_dialog)
+        self._client_url_copy_btn = QPushButton(t("devices_client_url_copy"))
+        self._client_url_copy_btn.setCursor(Qt.PointingHandCursor)
+        self._client_url_copy_btn.setFixedHeight(36)
+        self._client_url_copy_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#ffffff; color:#0f172a;"
+            "  border:1px solid #d4d4d8; border-radius:18px;"
+            "  padding:6px 18px; font-weight:600;"
+            "}"
+            "QPushButton:hover { border-color:#111111; }"
+        )
+        self._client_url_copy_btn.clicked.connect(self._copy_client_url_to_clipboard)
+        btn_col.addWidget(self._client_url_show_btn)
+        btn_col.addWidget(self._client_url_copy_btn)
+        layout.addLayout(btn_col, 0)
+
+        return panel
+
+    @staticmethod
+    def _public_client_url() -> str:
+        return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
+
+    def _copy_client_url_to_clipboard(self) -> None:
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is None:
+            return
+        clipboard.setText(self._public_client_url())
+        original = self._client_url_copy_btn.text()
+        self._client_url_copy_btn.setText(t("devices_client_url_copied"))
+        QTimer.singleShot(1500, lambda: self._client_url_copy_btn.setText(original))
+
+    def _open_client_url_dialog(self) -> None:
+        url = self._public_client_url()
+        dialog = OverlayDialog(self)
+        dialog.setWindowTitle(t("devices_client_url_title"))
+
+        title = QLabel(t("devices_client_url_title"))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size:18px; font-weight:800; color:#0f172a;")
+        dialog.card_layout.addWidget(title)
+
+        url_label = QLabel(url)
+        url_label.setAlignment(Qt.AlignCenter)
+        url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        url_label.setStyleSheet("font-size:15px; font-weight:600; color:#0f172a;")
+        url_label.setWordWrap(True)
+        dialog.card_layout.addWidget(url_label)
+
+        qr_pixmap = _render_qr_pixmap(url, size=240)
+        if qr_pixmap is not None:
+            qr_label = QLabel()
+            qr_label.setAlignment(Qt.AlignCenter)
+            qr_label.setPixmap(qr_pixmap)
+            dialog.card_layout.addWidget(qr_label, 0, Qt.AlignCenter)
+            hint = QLabel(t("devices_client_url_qr_hint"))
+            hint.setAlignment(Qt.AlignCenter)
+            hint.setStyleSheet("color:#6b7280; font-size:12px;")
+            dialog.card_layout.addWidget(hint)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+        btn_row.addStretch(1)
+        copy_btn = QPushButton(t("devices_client_url_copy"))
+        copy_btn.setCursor(Qt.PointingHandCursor)
+        copy_btn.setFixedHeight(36)
+        copy_btn.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15; color:#050505;"
+            "  border:none; border-radius:18px;"
+            "  padding:6px 22px; font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
+
+        def _copy() -> None:
+            clipboard = QGuiApplication.clipboard()
+            if clipboard is not None:
+                clipboard.setText(url)
+            copy_btn.setText(t("devices_client_url_copied"))
+            QTimer.singleShot(1500, lambda: copy_btn.setText(t("devices_client_url_copy")))
+
+        copy_btn.clicked.connect(_copy)
+        btn_row.addWidget(copy_btn)
+        btn_row.addStretch(1)
+        dialog.card_layout.addLayout(btn_row)
+        dialog.card_layout.addStretch(1)
+
+        dialog.exec()
 
     def _render_devices(self):
         while self.list_layout.count():

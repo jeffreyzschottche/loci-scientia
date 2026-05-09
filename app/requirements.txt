@@ -14,3 +14,4 @@ pypdf
 python-docx
 openpyxl
 xlrd
+qrcode[pil]
