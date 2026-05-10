@@ -36,6 +36,28 @@
               <div>{{ message.thinking }}</div>
             </div>
             <div v-if="hasAnswer" class="chat-content prose prose-sm max-w-none text-gray-800" v-html="renderedContent"></div>
+            <div v-if="hasWebSources" class="mt-3 border-t border-gray-100 pt-2">
+              <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                {{ t('chat.webSearch.sourcesHeading') }}
+              </div>
+              <ul class="space-y-1">
+                <li
+                  v-for="(source, index) in message.webSources"
+                  :key="`${message.id}-source-${index}`"
+                  class="text-xs"
+                >
+                  <a
+                    :href="source.url"
+                    :title="source.title"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-yellow-700 hover:underline"
+                  >
+                    {{ sourceHostname(source.url) }}
+                  </a>
+                </li>
+              </ul>
+            </div>
             <div class="text-xs text-gray-500 mt-2">{{ formattedTime }}</div>
           </div>
         </div>
@@ -97,7 +119,16 @@ const messageClasses = computed(() => {
 
 const hasAnswer = computed(() => props.message.content.trim().length > 0)
 const hasThinking = computed(() => props.message.thinking?.trim().length ? true : false)
-const hasVisibleAssistantContent = computed(() => hasAnswer.value || hasThinking.value)
+const hasWebSources = computed(() => (props.message.webSources?.length ?? 0) > 0)
+const hasVisibleAssistantContent = computed(() => hasAnswer.value || hasThinking.value || hasWebSources.value)
+
+const sourceHostname = (url: string) => {
+  try {
+    return new URL(url).hostname
+  } catch (_e) {
+    return url
+  }
+}
 
 const renderedContent = computed(() => {
   if (props.message.role === 'assistant') {

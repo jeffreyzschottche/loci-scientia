@@ -92,6 +92,23 @@
                     />
                   </button>
                 </div>
+                <div class="mt-2 flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                  <span class="text-sm font-medium text-gray-700">{{ t('chat.webSearch.toggleLabel') }}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="webSearchEnabled"
+                    :disabled="chatStore.isLoading"
+                    class="relative inline-flex h-6 w-11 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    :class="webSearchEnabled ? 'border-yellow-500 bg-yellow-400' : 'border-gray-300 bg-gray-200'"
+                    @click="webSearchEnabled = !webSearchEnabled"
+                  >
+                    <span
+                      class="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all"
+                      :class="webSearchEnabled ? 'translate-x-5' : 'translate-x-0'"
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -117,6 +134,34 @@
                     :class="[
                       'absolute left-0.5 h-5 w-5 rounded-full shadow-sm transition-all',
                       thinkingEnabled
+                        ? 'translate-x-5 bg-white'
+                        : 'translate-x-0 bg-white',
+                    ]"
+                  />
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="webSearchEnabled"
+                :disabled="chatStore.isLoading"
+                class="group inline-flex items-center gap-3 rounded-full border border-black/10 bg-white/75 px-2 py-1 text-xs font-semibold text-gray-900 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                @click="webSearchEnabled = !webSearchEnabled"
+              >
+                <span class="pl-1">{{ t('chat.webSearch.toggleLabel') }}</span>
+                <span
+                  :class="[
+                    'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors',
+                    webSearchEnabled
+                      ? 'border-yellow-500 bg-yellow-400'
+                      : 'border-gray-300 bg-gray-200',
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'absolute left-0.5 h-5 w-5 rounded-full shadow-sm transition-all',
+                      webSearchEnabled
                         ? 'translate-x-5 bg-white'
                         : 'translate-x-0 bg-white',
                     ]"
@@ -181,7 +226,11 @@
                 </div>
                 <div class="flex-1">
                   <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div class="flex gap-1">
+                    <div v-if="webSearchStatusLabel" class="flex items-center gap-2 text-xs text-gray-500">
+                      <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></span>
+                      <span class="italic">{{ webSearchStatusLabel }}</span>
+                    </div>
+                    <div v-else class="flex gap-1">
                       <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
                       <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
                       <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
@@ -373,7 +422,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useAuthStore } from '~/stores/auth'
 import { useChatStore } from '~/stores/chat'
-import { useAitjeApi } from '~/composables/useAitjeApi'
+import { useAitjeApi, type WebSearchStatus } from '~/composables/useAitjeApi'
 import { useChatLogger } from '~/composables/useChatLogger'
 import { useRouter } from 'vue-router'
 import ChatMessage from '~/components/chat/ChatMessage.vue'
@@ -417,6 +466,8 @@ const error = ref('')
 const showNewChatModal = ref(false)
 const inputText = ref('')
 const thinkingEnabled = ref(true)
+const webSearchEnabled = ref(false)
+const webSearchStatus = ref<WebSearchStatus | null>(null)
 const shouldResetServerChat = ref(false)
 const isMobilePlatform = ref(false)
 const isNativeMobileApp = ref(false)
@@ -455,6 +506,27 @@ const showLoadingIndicator = computed(() => {
   if (!lastMessage || lastMessage.role !== 'assistant') return true
 
   return !lastMessage.content.trim() && !lastMessage.thinking?.trim()
+})
+
+const webSearchStatusLabel = computed(() => {
+  const status = webSearchStatus.value
+  if (!status) return ''
+
+  if (status.type === 'searching') {
+    return t('chat.webSearch.searching', { query: status.query })
+  }
+
+  if (status.type === 'fetching') {
+    let host = status.url
+    try {
+      host = new URL(status.url).hostname
+    } catch (_e) {
+      // keep raw url if parse fails
+    }
+    return `${t('chat.webSearch.fetching', { index: status.index, total: status.total })} ${host}`
+  }
+
+  return t('chat.webSearch.summarizing')
 })
 
 const readFileAsDataUrl = (file: File): Promise<string> => {
@@ -654,6 +726,7 @@ const handleSendMessage = async (message: string) => {
   error.value = ''
   stoppedGeneration.value = false
   inputText.value = ''
+  webSearchStatus.value = null
   clearSelectedAttachments()
 
   chatStore.addUserMessage(
@@ -676,6 +749,7 @@ const handleSendMessage = async (message: string) => {
     const response = await ask({
       prompt: trimmedMessage,
       thinking: thinkingEnabled.value,
+      webSearch: webSearchEnabled.value,
       maxNewTokens: 128,
       history: chatStore.getRequestHistory,
       images: messageImages.map(image => image.base64),
@@ -688,11 +762,20 @@ const handleSendMessage = async (message: string) => {
       signal: askController.signal,
       onToken: (content) => {
         latestAssistantMessage = content
+        if (content) {
+          webSearchStatus.value = null
+        }
         chatStore.updateMessage(assistantMessageId, { content })
       },
       onThinking: (thinking) => {
         latestThinking = thinking
         chatStore.updateMessage(assistantMessageId, { thinking })
+      },
+      onSearchStatus: (status) => {
+        webSearchStatus.value = status
+      },
+      onWebSources: (sources) => {
+        chatStore.updateMessage(assistantMessageId, { webSources: sources })
       },
     })
 
@@ -701,7 +784,9 @@ const handleSendMessage = async (message: string) => {
     chatStore.updateMessage(assistantMessageId, {
       content: latestAssistantMessage,
       thinking: latestThinking,
+      ...(response.webSources ? { webSources: response.webSources } : {}),
     })
+    webSearchStatus.value = null
 
     const historyQuestion = trimmedMessage || t('chat.attachmentsOnly')
     chatStore.addToPromptHistory(historyQuestion, latestAssistantMessage)
@@ -725,6 +810,7 @@ const handleSendMessage = async (message: string) => {
     }
   } finally {
     activeAskController.value = null
+    webSearchStatus.value = null
     chatStore.setLoading(false)
   }
 }

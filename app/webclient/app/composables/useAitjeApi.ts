@@ -8,9 +8,21 @@ interface SignonResponse {
   expires_at: string
 }
 
+export interface WebSource {
+  title: string
+  url: string
+  snippet?: string
+}
+
+export type WebSearchStatus =
+  | { type: 'searching', query: string }
+  | { type: 'fetching', index: number, total: number, url: string }
+  | { type: 'summarizing' }
+
 interface AskStreamResponse {
   message: string
   thinking: string
+  webSources?: WebSource[]
 }
 
 interface PromptDocumentPayload {
@@ -23,6 +35,7 @@ interface AskRequest {
   prompt: string
   mode?: string | null
   thinking?: boolean
+  webSearch?: boolean
   maxNewTokens?: number
   history?: ApiHistoryMessage[]
   images?: string[]
@@ -32,6 +45,15 @@ interface AskRequest {
   onToken?: (content: string, delta: string) => void
   onThinking?: (thinking: string, delta: string) => void
   onQueue?: (position: number) => void
+  onSearchStatus?: (status: WebSearchStatus) => void
+  onWebSources?: (sources: WebSource[]) => void
+}
+
+interface BackendWebSearchEnvelope {
+  status?: string
+  query?: string
+  results?: Array<{ title?: string, url?: string, snippet?: string, engine?: string }>
+  error?: string
 }
 
 interface StreamEventPayload {
@@ -41,6 +63,9 @@ interface StreamEventPayload {
   thinking?: string
   message?: string
   done?: boolean
+  web_search?: BackendWebSearchEnvelope
+  web_results?: Array<{ title?: string, url?: string, snippet?: string, engine?: string }>
+  web_search_error?: string
 }
 
 type AitjeError = Error & { code?: string }
@@ -153,6 +178,7 @@ export const useAitjeApi = () => {
       prompt,
       mode = null,
       thinking = true,
+      webSearch = false,
       maxNewTokens = 128,
       history = [],
       images = [],
@@ -162,9 +188,11 @@ export const useAitjeApi = () => {
       onToken,
       onThinking,
       onQueue,
+      onSearchStatus,
+      onWebSources,
     } = request
 
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       prompt,
       mode,
       thinking,
@@ -175,11 +203,16 @@ export const useAitjeApi = () => {
       new_chat: newChat,
     }
 
+    if (webSearch) {
+      requestBody.web_search = true
+    }
+
     logApiPost({
       url,
       prompt,
       mode,
       thinking,
+      webSearch,
       maxNewTokens,
       historyLength: history.length,
       imagesCount: images.length,
@@ -224,10 +257,42 @@ export const useAitjeApi = () => {
       let buffer = ''
       let message = ''
       let finalThinking = ''
+      let webSources: WebSource[] | undefined
+
+      const normalizeWebSources = (
+        items?: Array<{ title?: string, url?: string, snippet?: string }>,
+      ): WebSource[] => {
+        if (!Array.isArray(items)) return []
+        return items
+          .filter(item => item && typeof item.url === 'string' && item.url.length > 0)
+          .map(item => ({
+            title: typeof item.title === 'string' && item.title ? item.title : (item.url as string),
+            url: item.url as string,
+            snippet: typeof item.snippet === 'string' ? item.snippet : undefined,
+          }))
+      }
 
       const processEventPayload = (payload: StreamEventPayload) => {
         if (payload.status === 'queued' && typeof payload.position === 'number') {
           onQueue?.(payload.position)
+          return
+        }
+
+        // Backend emits web search progress under a `web_search` envelope.
+        if (payload.web_search && typeof payload.web_search === 'object') {
+          const envelope = payload.web_search
+          if (envelope.status === 'started' && typeof envelope.query === 'string') {
+            onSearchStatus?.({ type: 'searching', query: envelope.query })
+          } else if (envelope.status === 'results') {
+            const sources = normalizeWebSources(envelope.results)
+            if (sources.length > 0) {
+              webSources = sources
+              onWebSources?.(sources)
+            }
+            onSearchStatus?.({ type: 'summarizing' })
+          }
+          // 'unavailable' / 'error' statuses fall through silently — generation continues.
+          return
         }
 
         if (payload.done === true) {
@@ -239,6 +304,14 @@ export const useAitjeApi = () => {
           if (typeof payload.thinking === 'string') {
             finalThinking = payload.thinking
             onThinking?.(finalThinking, '')
+          }
+
+          if (Array.isArray(payload.web_results) && payload.web_results.length > 0) {
+            const sources = normalizeWebSources(payload.web_results)
+            if (sources.length > 0) {
+              webSources = sources
+              onWebSources?.(sources)
+            }
           }
 
           return
@@ -297,6 +370,7 @@ export const useAitjeApi = () => {
       const data: AskStreamResponse = {
         message,
         thinking: finalThinking,
+        webSources,
       }
 
       logApiGet({

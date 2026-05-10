@@ -1,5 +1,11 @@
 import { defineStore } from 'pinia'
 
+export interface WebSource {
+  title: string
+  url: string
+  snippet?: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -7,6 +13,7 @@ export interface ChatMessage {
   thinking?: string
   images?: string[]
   documents?: AttachedDocument[]
+  webSources?: WebSource[]
   timestamp: Date
 }
 
@@ -87,7 +94,7 @@ export const useChatStore = defineStore('chat', {
       return this.addMessage('assistant', content, thinking)
     },
 
-    updateMessage(messageId: string, updates: Partial<Pick<ChatMessage, 'content' | 'thinking'>>) {
+    updateMessage(messageId: string, updates: Partial<Pick<ChatMessage, 'content' | 'thinking' | 'webSources'>>) {
       const message = this.messages.find(item => item.id === messageId)
       if (!message) return
 
@@ -97,6 +104,10 @@ export const useChatStore = defineStore('chat', {
 
       if (typeof updates.thinking === 'string') {
         message.thinking = updates.thinking
+      }
+
+      if (Array.isArray(updates.webSources)) {
+        message.webSources = updates.webSources
       }
     },
 
