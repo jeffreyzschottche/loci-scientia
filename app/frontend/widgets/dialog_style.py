@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QEventLoop, QTimer, Qt
 from PySide6.QtGui import QColor, QMouseEvent, QPainter
 from PySide6.QtWidgets import (
     QDialog,
@@ -113,12 +113,14 @@ class OverlayDialog(QDialog):
     """A frameless dialog rendered as an in-app overlay with a centered card."""
 
     def __init__(self, parent=None, *, width: int = DEFAULT_DIALOG_WIDTH, height: int = DEFAULT_DIALOG_HEIGHT):
-        super().__init__(parent)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        root_parent = self._overlay_parent(parent)
+        super().__init__(root_parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Widget)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setModal(True)
+        self.setWindowModality(Qt.ApplicationModal)
         self._card_width = width
         self._card_height = height
+        self._watched_window = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -146,13 +148,64 @@ class OverlayDialog(QDialog):
         close_row.addWidget(self._close_btn)
         self.card_layout.addLayout(close_row)
 
+    @staticmethod
+    def _overlay_parent(parent):
+        if parent is None:
+            return None
+        win = parent.window()
+        if hasattr(win, "centralWidget") and win.centralWidget() is not None:
+            return win.centralWidget()
+        return win
+
+    def exec(self) -> int:
+        self.setResult(0)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        loop = QEventLoop(self)
+        self.finished.connect(loop.quit)
+        loop.exec()
+        return self.result()
+
     def showEvent(self, event):
         super().showEvent(event)
+        self._install_parent_window_filter()
+        self._sync_to_parent_window()
+        QTimer.singleShot(0, self._sync_to_parent_window)
+
+    def hideEvent(self, event):
+        self._remove_parent_window_filter()
+        super().hideEvent(event)
+
+    def eventFilter(self, watched, event):
+        if watched is self._watched_window and event.type() in {
+            QEvent.Move,
+            QEvent.Resize,
+            QEvent.WindowStateChange,
+            QEvent.Show,
+        }:
+            QTimer.singleShot(0, self._sync_to_parent_window)
+        return super().eventFilter(watched, event)
+
+    def _install_parent_window_filter(self) -> None:
+        parent = self.parent()
+        if parent is None:
+            return
+        if parent is self._watched_window:
+            return
+        self._remove_parent_window_filter()
+        self._watched_window = parent
+        parent.installEventFilter(self)
+
+    def _remove_parent_window_filter(self) -> None:
+        if self._watched_window is not None:
+            self._watched_window.removeEventFilter(self)
+            self._watched_window = None
+
+    def _sync_to_parent_window(self) -> None:
         parent = self.parent()
         if parent is not None:
-            win = parent.window()
-            self.setFixedSize(win.size())
-            self.move(win.mapToGlobal(win.rect().topLeft()))
+            self.setGeometry(parent.rect())
 
     def paintEvent(self, event):
         painter = QPainter(self)

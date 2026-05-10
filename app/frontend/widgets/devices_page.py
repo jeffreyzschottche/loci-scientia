@@ -3,7 +3,7 @@ from functools import partial
 from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QGuiApplication, QPixmap
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -216,7 +216,6 @@ class DevicesPage(QWidget):
         self._client_url_title.setText(t("devices_client_url_title"))
         self._client_url_subtitle.setText(t("devices_client_url_subtitle"))
         self._client_url_show_btn.setText(t("devices_client_url_show"))
-        self._client_url_copy_btn.setText(t("devices_client_url_copy"))
         self._render_devices()
 
     def _build_client_url_panel(self) -> QWidget:
@@ -248,8 +247,6 @@ class DevicesPage(QWidget):
         text_col.addWidget(self._client_url_subtitle)
         layout.addLayout(text_col, 1)
 
-        btn_col = QVBoxLayout()
-        btn_col.setSpacing(8)
         self._client_url_show_btn = QPushButton(t("devices_client_url_show"))
         self._client_url_show_btn.setCursor(Qt.PointingHandCursor)
         self._client_url_show_btn.setFixedHeight(36)
@@ -262,21 +259,7 @@ class DevicesPage(QWidget):
             "QPushButton:hover { background:#050505; color:#facc15; }"
         )
         self._client_url_show_btn.clicked.connect(self._open_client_url_dialog)
-        self._client_url_copy_btn = QPushButton(t("devices_client_url_copy"))
-        self._client_url_copy_btn.setCursor(Qt.PointingHandCursor)
-        self._client_url_copy_btn.setFixedHeight(36)
-        self._client_url_copy_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#ffffff; color:#0f172a;"
-            "  border:1px solid #d4d4d8; border-radius:18px;"
-            "  padding:6px 18px; font-weight:600;"
-            "}"
-            "QPushButton:hover { border-color:#111111; }"
-        )
-        self._client_url_copy_btn.clicked.connect(self._copy_client_url_to_clipboard)
-        btn_col.addWidget(self._client_url_show_btn)
-        btn_col.addWidget(self._client_url_copy_btn)
-        layout.addLayout(btn_col, 0)
+        layout.addWidget(self._client_url_show_btn, 0, Qt.AlignVCenter)
 
         return panel
 
@@ -284,18 +267,9 @@ class DevicesPage(QWidget):
     def _public_client_url() -> str:
         return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
 
-    def _copy_client_url_to_clipboard(self) -> None:
-        clipboard = QGuiApplication.clipboard()
-        if clipboard is None:
-            return
-        clipboard.setText(self._public_client_url())
-        original = self._client_url_copy_btn.text()
-        self._client_url_copy_btn.setText(t("devices_client_url_copied"))
-        QTimer.singleShot(1500, lambda: self._client_url_copy_btn.setText(original))
-
     def _open_client_url_dialog(self) -> None:
         url = self._public_client_url()
-        dialog = OverlayDialog(self)
+        dialog = OverlayDialog(self, width=430, height=500)
         dialog.setWindowTitle(t("devices_client_url_title"))
 
         title = QLabel(t("devices_client_url_title"))
@@ -320,33 +294,12 @@ class DevicesPage(QWidget):
             hint.setAlignment(Qt.AlignCenter)
             hint.setStyleSheet("color:#6b7280; font-size:12px;")
             dialog.card_layout.addWidget(hint)
-
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(12)
-        btn_row.addStretch(1)
-        copy_btn = QPushButton(t("devices_client_url_copy"))
-        copy_btn.setCursor(Qt.PointingHandCursor)
-        copy_btn.setFixedHeight(36)
-        copy_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15; color:#050505;"
-            "  border:none; border-radius:18px;"
-            "  padding:6px 22px; font-weight:600;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-
-        def _copy() -> None:
-            clipboard = QGuiApplication.clipboard()
-            if clipboard is not None:
-                clipboard.setText(url)
-            copy_btn.setText(t("devices_client_url_copied"))
-            QTimer.singleShot(1500, lambda: copy_btn.setText(t("devices_client_url_copy")))
-
-        copy_btn.clicked.connect(_copy)
-        btn_row.addWidget(copy_btn)
-        btn_row.addStretch(1)
-        dialog.card_layout.addLayout(btn_row)
+        else:
+            error_label = QLabel("QR-code module ontbreekt. Herstart AITJE om dependencies bij te werken.")
+            error_label.setAlignment(Qt.AlignCenter)
+            error_label.setWordWrap(True)
+            error_label.setStyleSheet("color:#b45309; font-size:12px;")
+            dialog.card_layout.addWidget(error_label)
         dialog.card_layout.addStretch(1)
 
         dialog.exec()

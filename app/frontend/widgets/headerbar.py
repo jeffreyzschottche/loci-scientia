@@ -19,7 +19,7 @@ from .dialog_style import COMPACT_DIALOG_HEIGHT, COMPACT_DIALOG_WIDTH, OverlayDi
 
 class PowerDialog(OverlayDialog):
     action_requested = Signal(str)
-    DIALOG_WIDTH = max(COMPACT_DIALOG_WIDTH, 560)
+    DIALOG_WIDTH = max(COMPACT_DIALOG_WIDTH, 640)
     DIALOG_HEIGHT = COMPACT_DIALOG_HEIGHT
 
     def __init__(self, parent=None):
@@ -40,17 +40,17 @@ class PowerDialog(OverlayDialog):
         actions = QHBoxLayout()
         actions.setSpacing(12)
 
-        cancel_btn = self._build_button(t("cancel"), variant="secondary")
+        cancel_btn = self._build_button(t("cancel"), variant="secondary", minimum_width=160)
         cancel_btn.clicked.connect(self.reject)
-        actions.addWidget(cancel_btn, 1)
+        actions.addWidget(cancel_btn)
 
-        shutdown_btn = self._build_button(t("power_dialog_shutdown"))
+        shutdown_btn = self._build_button(t("power_dialog_shutdown"), minimum_width=160)
         shutdown_btn.clicked.connect(lambda: self._emit_action("shutdown"))
-        actions.addWidget(shutdown_btn, 1)
+        actions.addWidget(shutdown_btn)
 
-        restart_btn = self._build_button(t("power_dialog_restart"))
+        restart_btn = self._build_button(t("power_dialog_restart"), minimum_width=200)
         restart_btn.clicked.connect(lambda: self._emit_action("restart"))
-        actions.addWidget(restart_btn, 1)
+        actions.addWidget(restart_btn)
 
         self.card_layout.addLayout(actions)
 
@@ -59,12 +59,12 @@ class PowerDialog(OverlayDialog):
         self.accept()
 
     @staticmethod
-    def _build_button(text: str, *, variant: str = "primary") -> QPushButton:
+    def _build_button(text: str, *, variant: str = "primary", minimum_width: int = 160) -> QPushButton:
         button = QPushButton(text)
         button.setCursor(Qt.PointingHandCursor)
         button.setMinimumHeight(52)
-        button.setMinimumWidth(150)
-        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        button.setMinimumWidth(minimum_width)
+        button.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
         base_style = (
             "QPushButton {"
             "  border-radius: 18px;"

@@ -1077,7 +1077,7 @@ fi
 # shellcheck source=/dev/null
 source .venv/bin/activate
 
-if [ ! -f ".venv/.requirements_installed" ]; then
+if [ ! -f ".venv/.requirements_installed" ] || [ "app/requirements.txt" -nt ".venv/.requirements_installed" ]; then
     python -m pip install -U pip
     python -m pip install -r app/requirements.txt
     touch .venv/.requirements_installed

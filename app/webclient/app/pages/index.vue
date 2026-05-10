@@ -322,14 +322,15 @@
               <input
                 ref="fileInputRef"
                 type="file"
-                accept="image/*"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                multiple
                 class="hidden"
                 @change="handleImageSelection"
               />
               <input
                 ref="cameraInputRef"
                 type="file"
-                accept="image/*"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                 capture="environment"
                 class="hidden"
                 @change="handleImageSelection"
@@ -337,7 +338,7 @@
               <input
                 ref="documentInputRef"
                 type="file"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain"
+                accept=".png,.jpg,.jpeg,.pdf,.doc,.docx,.xls,.xlsx,.txt,image/png,image/jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain"
                 multiple
                 class="hidden"
                 @change="handleDocumentSelection"
@@ -454,6 +455,8 @@ const allowedDocumentMimeTypes = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/plain',
 ])
+const allowedImageExtensions = new Set(['png', 'jpg', 'jpeg'])
+const allowedImageMimeTypes = new Set(['image/png', 'image/jpeg'])
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
@@ -485,10 +488,22 @@ const chatInputRef = ref<HTMLInputElement | null>(null)
 const stoppedGeneration = ref(false)
 
 const connectedDeviceLabel = computed(() => {
-  if (!authStore.deviceNumber) {
-    return t('status.connectedUnknown')
+  if (authStore.deviceNumber) {
+    return t('status.connectedValue', { device: authStore.deviceNumber })
   }
-  return t('status.connectedValue', { device: authStore.deviceNumber })
+
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname
+    const aitjeMatch = hostname.match(/^aitje-(.+?)(?:\.local)?$/i)
+    if (aitjeMatch?.[1]) {
+      return t('status.connectedValue', { device: aitjeMatch[1] })
+    }
+    if (hostname) {
+      return hostname
+    }
+  }
+
+  return t('status.connectedUnknown')
 })
 
 const canSendMessage = computed(() => {
@@ -570,6 +585,12 @@ const isAllowedDocumentFile = (file: File) => {
   return allowedDocumentExtensions.has(extension) || allowedDocumentMimeTypes.has(file.type.toLowerCase())
 }
 
+const isAllowedImageFile = (file: File) => {
+  const extension = getExtension(file.name)
+  const mimeType = file.type.toLowerCase()
+  return allowedImageExtensions.has(extension) || allowedImageMimeTypes.has(mimeType)
+}
+
 const formatFileSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`
   const kb = bytes / 1024
@@ -583,9 +604,19 @@ const handleImageSelection = async (event: Event) => {
 
   if (!files || files.length === 0) return
 
+  await addSelectedImages(Array.from(files))
+  target.value = ''
+}
+
+const addSelectedImages = async (files: File[]) => {
+  let foundUnsupportedFile = false
+
   try {
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue
+    for (const file of files) {
+      if (!isAllowedImageFile(file)) {
+        foundUnsupportedFile = true
+        continue
+      }
 
       const dataUrl = await readFileAsDataUrl(file)
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
@@ -597,10 +628,12 @@ const handleImageSelection = async (event: Event) => {
         base64,
       })
     }
+
+    if (foundUnsupportedFile) {
+      error.value = t('chat.error.unsupportedImageType')
+    }
   } catch (_error) {
     error.value = t('chat.error.imageReadFailed')
-  } finally {
-    target.value = ''
   }
 }
 
@@ -614,6 +647,11 @@ const handleDocumentSelection = async (event: Event) => {
 
   try {
     for (const file of Array.from(files)) {
+      if (isAllowedImageFile(file)) {
+        await addSelectedImages([file])
+        continue
+      }
+
       if (!isAllowedDocumentFile(file)) {
         foundUnsupportedFile = true
         continue

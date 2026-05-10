@@ -192,6 +192,36 @@
       "requests_today": 3,
       "active_users_today": 2,
       "avg_response_ms": 41253
+    },
+    {
+      "timestamp": "2026-05-10T16:14:20.533415+00:00",
+      "requests_today": 4,
+      "active_users_today": 3,
+      "avg_response_ms": 52483
+    },
+    {
+      "timestamp": "2026-05-10T16:17:16.215662+00:00",
+      "requests_today": 5,
+      "active_users_today": 4,
+      "avg_response_ms": 45379
+    },
+    {
+      "timestamp": "2026-05-10T16:27:12.015274+00:00",
+      "requests_today": 6,
+      "active_users_today": 4,
+      "avg_response_ms": 46567
+    },
+    {
+      "timestamp": "2026-05-10T17:41:31.907163+00:00",
+      "requests_today": 8,
+      "active_users_today": 5,
+      "avg_response_ms": 41730
+    },
+    {
+      "timestamp": "2026-05-10T17:41:55.114045+00:00",
+      "requests_today": 9,
+      "active_users_today": 5,
+      "avg_response_ms": 37210
     }
   ]
 }
