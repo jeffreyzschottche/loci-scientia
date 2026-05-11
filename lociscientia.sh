@@ -347,6 +347,78 @@ ensure_remote_support_service() {
     fi
 }
 
+ensure_no_sleep_mode() {
+    case "$DEVICE_PLATFORM" in
+        linux|jetson)
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    if [ "${ENABLE_NO_SLEEP_MODE:-1}" = "0" ]; then
+        echo "ℹ️  Slaapstand blokkeren is uitgeschakeld via ENABLE_NO_SLEEP_MODE=0"
+        return 0
+    fi
+
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; slaapstand wordt niet automatisch geblokkeerd."
+        return 0
+    fi
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo "⚠️  systemctl niet beschikbaar, slaapstand blokkeren overgeslagen."
+        return 0
+    fi
+
+    echo "🔧 Slaapstand/hibernation blokkeren voor deze machine..."
+    local -a systemctl_cmd=()
+    if [ "$(id -u)" -eq 0 ]; then
+        systemctl_cmd=(systemctl)
+    else
+        systemctl_cmd=(sudo systemctl)
+    fi
+
+    "${systemctl_cmd[@]}" mask sleep.target suspend.target hibernate.target hybrid-sleep.target >/dev/null 2>&1 || true
+
+    local logind_dir="/etc/systemd/logind.conf.d"
+    local logind_path="$logind_dir/10-loci-scientia-no-sleep.conf"
+    local tmp_logind
+    tmp_logind="$(mktemp)"
+    cat >"$tmp_logind" <<'EOF'
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+IdleAction=ignore
+EOF
+
+    if [ "$(id -u)" -eq 0 ]; then
+        install -D -m 0644 "$tmp_logind" "$logind_path"
+    else
+        sudo install -D -m 0644 "$tmp_logind" "$logind_path"
+    fi
+    rm -f "$tmp_logind"
+
+    # Restarting systemd-logind can terminate the active graphical session.
+    # SIGHUP reloads logind configuration without forcing a new login.
+    "${systemctl_cmd[@]}" kill -s HUP systemd-logind.service >/dev/null 2>&1 || true
+
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.session idle-delay 0 >/dev/null 2>&1 || true
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' >/dev/null 2>&1 || true
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' >/dev/null 2>&1 || true
+    fi
+
+    if command -v xset >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
+        xset s off >/dev/null 2>&1 || true
+        xset s noblank >/dev/null 2>&1 || true
+        xset -dpms >/dev/null 2>&1 || true
+    fi
+
+    echo "✅ Slaapstand/schermblanking is geblokkeerd zonder logind herstart"
+}
+
 ensure_active_wifi_profile_persistence() {
     case "$DEVICE_PLATFORM" in
         linux|jetson)
@@ -1001,6 +1073,7 @@ echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
 ensure_active_wifi_profile_persistence
 ensure_bluetooth_support
+ensure_no_sleep_mode
 ensure_remote_support_dependencies
 ensure_remote_support_service
 configure_hostname
