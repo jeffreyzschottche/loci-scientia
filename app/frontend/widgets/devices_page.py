@@ -158,7 +158,7 @@ class DevicesPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        layout.addWidget(self._build_client_url_panel())
+        self.client_url_panel = self._build_client_url_panel()
 
         header = QHBoxLayout()
         header.addStretch(1)
@@ -218,6 +218,9 @@ class DevicesPage(QWidget):
         self._client_url_show_btn.setText(t("devices_client_url_show"))
         self._render_devices()
 
+    def header_widget(self) -> QWidget:
+        return self.client_url_panel
+
     def _build_client_url_panel(self) -> QWidget:
         panel = QFrame()
         panel.setObjectName("ClientUrlPanel")
@@ -228,6 +231,8 @@ class DevicesPage(QWidget):
             "  border-radius:20px;"
             "}"
         )
+        panel.setMaximumWidth(720)
+        panel.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         layout = QHBoxLayout(panel)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(16)

@@ -4,16 +4,12 @@ import sys
 from typing import Optional
 
 _boot_video_mode = os.environ.get("LOCI_BOOT_VIDEO", "auto").strip().lower()
-_boot_video_enabled = _boot_video_mode in {"1", "true", "yes", "on"}
-if _boot_video_mode == "auto":
-    _boot_video_enabled = sys.platform not in {"linux", "linux2"}
+_boot_video_enabled = _boot_video_mode not in {"0", "false", "no", "off"}
 
 from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtGui import (
-    QBrush,
     QColor,
     QIcon,
-    QLinearGradient,
     QPainter,
     QPainterPath,
     QPalette,
@@ -252,26 +248,15 @@ class BootScreen(QWidget):
         self.timer.timeout.connect(self._advance)
         self.timer.start(60)
 
-    def _build_egg_pixmap(self, width: int, height: int) -> QPixmap:
-        pixmap = QPixmap(width, height)
-        pixmap.fill(Qt.transparent)
-
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        gradient = QLinearGradient(0, 0, 0, height)
-        gradient.setColorAt(0, QColor("#ffffff"))
-        gradient.setColorAt(1, QColor("#f7f7f7"))
-        painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(QColor("#0a0a0a"), 4))
-        painter.drawEllipse(10, 10, width - 20, height - 20)
-
-        # Simple crack lines to mimic the Figma egg
-        painter.setPen(QPen(QColor("#0a0a0a"), 2))
-        painter.drawLine(width * 0.45, height * 0.35, width * 0.5, height * 0.55)
-        painter.drawLine(width * 0.55, height * 0.38, width * 0.5, height * 0.6)
-        painter.end()
-        return pixmap
+    def _poster_pixmap_for_media(self, media_path: Optional[str]) -> QPixmap:
+        if not media_path:
+            return QPixmap()
+        poster_path = os.path.splitext(media_path)[0] + "-first-frame.png"
+        if os.path.exists(poster_path):
+            return QPixmap(poster_path)
+        if os.path.exists(media_path) and not media_path.lower().endswith(".mp4"):
+            return QPixmap(media_path)
+        return QPixmap()
 
     def _build_hero_widget(self, media_path: Optional[str]) -> QWidget:
         if (
@@ -292,14 +277,11 @@ class BootScreen(QWidget):
             placeholder.setAlignment(Qt.AlignCenter)
             placeholder.setFixedSize(320, 320)
             placeholder.setStyleSheet("background:#ffffff;")
-            poster_path = os.path.splitext(media_path)[0] + "-first-frame.png"
-            poster_pixmap = QPixmap(poster_path) if os.path.exists(poster_path) else QPixmap()
+            poster_pixmap = self._poster_pixmap_for_media(media_path)
             if not poster_pixmap.isNull():
                 placeholder.setPixmap(
                     poster_pixmap.scaled(320, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 )
-            else:
-                placeholder.setPixmap(self._build_egg_pixmap(260, 320))
             stack.addWidget(placeholder)
 
             video = QVideoWidget()
@@ -323,17 +305,15 @@ class BootScreen(QWidget):
             self._media_player.play()
             return container
 
-        hero_pixmap = None
-        if media_path and os.path.exists(media_path):
-            hero_pixmap = QPixmap(media_path)
+        hero_pixmap = self._poster_pixmap_for_media(media_path)
         hero_label = QLabel()
         hero_label.setAlignment(Qt.AlignCenter)
-        if hero_pixmap and not hero_pixmap.isNull():
+        hero_label.setFixedSize(320, 320)
+        hero_label.setStyleSheet("background:#ffffff;")
+        if not hero_pixmap.isNull():
             hero_label.setPixmap(
-                hero_pixmap.scaled(260, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                hero_pixmap.scaled(320, 320, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
-        else:
-            hero_label.setPixmap(self._build_egg_pixmap(260, 320))
         return hero_label
 
     def _show_boot_video(self):
@@ -415,17 +395,31 @@ class MainWindow(QMainWindow):
 
         self.page_intro = QWidget()
         self.page_intro.setObjectName("PageIntro")
-        intro_layout = QVBoxLayout(self.page_intro)
+        intro_layout = QHBoxLayout(self.page_intro)
         intro_layout.setContentsMargins(8, 0, 8, 0)
-        intro_layout.setSpacing(2)
+        intro_layout.setSpacing(16)
+
+        title_col = QVBoxLayout()
+        title_col.setContentsMargins(0, 0, 0, 0)
+        title_col.setSpacing(2)
 
         self.page_title = QLabel()
         self.page_title.setObjectName("PageTitle")
-        intro_layout.addWidget(self.page_title)
+        title_col.addWidget(self.page_title)
 
         self.page_subtitle = QLabel()
         self.page_subtitle.setObjectName("PageSubtitle")
-        intro_layout.addWidget(self.page_subtitle)
+        title_col.addWidget(self.page_subtitle)
+        intro_layout.addLayout(title_col, 1)
+
+        self.page_header_action = QHBoxLayout()
+        self.page_header_action.setContentsMargins(0, 0, 0, 0)
+        self.page_header_action.setSpacing(0)
+        intro_layout.addLayout(self.page_header_action, 0)
+
+        self.page_header_spacer = QWidget()
+        self.page_header_spacer.setVisible(False)
+        intro_layout.addWidget(self.page_header_spacer, 0)
 
         content_layout.addWidget(self.page_intro)
 
@@ -481,6 +475,36 @@ class MainWindow(QMainWindow):
         }
         self.page_title.setText(t(title_keys.get(key, "page_title_chat")))
         self.page_subtitle.setText(t(subtitle_keys.get(key, "subtitle_local_ai_console")))
+        self._set_page_header_action(key)
+
+    def _set_page_header_action(self, key: str) -> None:
+        while self.page_header_action.count():
+            item = self.page_header_action.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.hide()
+                if widget is self.pages["devices"].header_widget():
+                    widget.setParent(self.pages.get("devices"))
+                elif widget is self.pages["net"].header_widget():
+                    widget.setParent(self.pages.get("net"))
+                else:
+                    widget.setParent(None)
+
+        intro_layout = self.page_intro.layout()
+        if isinstance(intro_layout, QHBoxLayout):
+            intro_layout.setStretch(0, 1)
+            intro_layout.setStretch(1, 0)
+            intro_layout.setStretch(2, 0)
+        self.page_header_spacer.setVisible(False)
+
+        if key == "devices":
+            header_widget = self.pages["devices"].header_widget()
+            self.page_header_action.addWidget(header_widget, 0, Qt.AlignRight | Qt.AlignTop)
+            header_widget.show()
+        elif key == "net":
+            header_widget = self.pages["net"].header_widget()
+            self.page_header_action.addWidget(header_widget, 0, Qt.AlignRight | Qt.AlignVCenter)
+            header_widget.show()
 
     def _go_home(self):
         self.sidebar.set_current("chat")

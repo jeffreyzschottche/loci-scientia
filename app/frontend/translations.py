@@ -593,8 +593,8 @@ TRANSLATIONS = {
         "en": "Ollama base URL",
     },
     "settings_ollama_model_label": {
-        "nl": "Ollama model",
-        "en": "Ollama model",
+        "nl": "Taal model",
+        "en": "Language model",
     },
     "settings_qdrant_devices_path": {
         "nl": "Qdrant devices pad",
@@ -1005,7 +1005,7 @@ TRANSLATIONS = {
         "en": "Web client URL",
     },
     "devices_client_url_subtitle": {
-        "nl": "Externe apparaten kunnen op hetzelfde netwerk hierheen surfen om in te loggen.",
+        "nl": "Externe apparaten kunnen op hetzelfde netwerk deze URL openen in een browser of webbrowser om in te loggen.",
         "en": "Devices on the same network can browse to this URL to sign in.",
     },
     "devices_client_url_show": {
@@ -1195,6 +1195,162 @@ TRANSLATIONS = {
     "network_open_wifi_config": {
         "nl": "Open WiFi configuratie",
         "en": "Open WiFi configuration",
+    },
+    "network_details_title": {
+        "nl": "Netwerkdetails",
+        "en": "Network details",
+    },
+    "network_status_loading": {
+        "nl": "Status laden...",
+        "en": "Loading status...",
+    },
+    "network_info_wifi": {
+        "nl": "WIFI-STATUS",
+        "en": "WIFI STATUS",
+    },
+    "network_info_backend": {
+        "nl": "BACKEND/API",
+        "en": "BACKEND/API",
+    },
+    "network_info_activity": {
+        "nl": "ACTIVITEIT",
+        "en": "ACTIVITY",
+    },
+    "network_info_knowledge": {
+        "nl": "KENNISBANK",
+        "en": "KNOWLEDGE BASE",
+    },
+    "network_info_local": {
+        "nl": "LOKALE TOEGANG",
+        "en": "LOCAL ACCESS",
+    },
+    "network_info_performance": {
+        "nl": "PRESTATIES",
+        "en": "PERFORMANCE",
+    },
+    "network_status": {
+        "nl": "Status",
+        "en": "Status",
+    },
+    "network_status_online": {
+        "nl": "Online",
+        "en": "Online",
+    },
+    "network_status_offline": {
+        "nl": "Offline",
+        "en": "Offline",
+    },
+    "network_status_unknown": {
+        "nl": "Onbekend",
+        "en": "Unknown",
+    },
+    "network_status_unavailable": {
+        "nl": "Niet beschikbaar",
+        "en": "Unavailable",
+    },
+    "network_nmcli_missing": {
+        "nl": "nmcli niet gevonden",
+        "en": "nmcli not found",
+    },
+    "network_wifi_ssid": {
+        "nl": "Netwerk",
+        "en": "Network",
+    },
+    "network_wifi_signal": {
+        "nl": "Signaal",
+        "en": "Signal",
+    },
+    "network_wifi_interface": {
+        "nl": "Interface",
+        "en": "Interface",
+    },
+    "network_wifi_ipv4": {
+        "nl": "IP-adres",
+        "en": "IP address",
+    },
+    "network_wifi_gateway": {
+        "nl": "Gateway",
+        "en": "Gateway",
+    },
+    "network_wifi_security": {
+        "nl": "Beveiliging",
+        "en": "Security",
+    },
+    "network_backend_url": {
+        "nl": "Backend",
+        "en": "Backend",
+    },
+    "network_backend_check": {
+        "nl": "Laatste check",
+        "en": "Last check",
+    },
+    "network_requests_today": {
+        "nl": "API-calls vandaag",
+        "en": "API calls today",
+    },
+    "network_active_today": {
+        "nl": "Actief vandaag",
+        "en": "Active today",
+    },
+    "network_error_rate": {
+        "nl": "Foutpercentage",
+        "en": "Error rate",
+    },
+    "network_connections": {
+        "nl": "Verbindingen",
+        "en": "Connections",
+    },
+    "network_not_tracked": {
+        "nl": "Nog niet gemeten",
+        "en": "Not tracked yet",
+    },
+    "network_documents": {
+        "nl": "Documenten",
+        "en": "Documents",
+    },
+    "network_categories": {
+        "nl": "Categorieen",
+        "en": "Categories",
+    },
+    "network_last_sync": {
+        "nl": "Laatste sync",
+        "en": "Last sync",
+    },
+    "network_sync_never": {
+        "nl": "Nog nooit",
+        "en": "Never",
+    },
+    "network_hostname": {
+        "nl": "Hostnaam",
+        "en": "Hostname",
+    },
+    "network_local_ip": {
+        "nl": "Lokaal IP",
+        "en": "Local IP",
+    },
+    "network_local_url": {
+        "nl": "Lokale URL",
+        "en": "Local URL",
+    },
+    "network_mdns_url": {
+        "nl": "mDNS",
+        "en": "mDNS",
+    },
+    "network_uptime": {
+        "nl": "Uptime",
+        "en": "Uptime",
+    },
+    "network_avg_response_short": {
+        "nl": "Gem. antwoord",
+        "en": "Avg. response",
+    },
+    "network_tokens_per_second": {
+        "nl": "Tokens/sec",
+        "en": "Tokens/sec",
+    },
+    "network_no_ollama_metric": {
+        "nl": "Na volgend antwoord",
+        "en": "After next response",
     },
     "network_resources_title": {
         "nl": "Systeemverbruik",
@@ -2110,8 +2266,8 @@ TRANSLATIONS = {
     # SETTINGS PAGE (additional)
     # ============================================
     "settings_ollama_model": {
-        "nl": "Ollama model",
-        "en": "Ollama model",
+        "nl": "Taal model",
+        "en": "Language model",
     },
     "settings_focus_mode": {
         "nl": "Focus mode",

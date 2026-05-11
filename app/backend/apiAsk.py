@@ -28,7 +28,20 @@ from .web_search import (
 logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_ITEMS = 3
-MIN_CONTEXT_SCORE = 0.45
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning("Ongeldige waarde voor %s=%r; gebruik default %.2f", name, raw, default)
+        return default
+
+
+MIN_CONTEXT_SCORE = _float_env("RAG_MIN_CONTEXT_SCORE", 0.30)
 KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
@@ -1137,7 +1150,7 @@ async def _call_ollama(
     options: Optional[dict] = None,
     images: Optional[Sequence[str]] = None,
     thinking: Optional[bool] = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     ollama_url = f"{settings.ollama_base_url}/api/generate"
     payload = build_ollama_generate_payload(
         prompt,
@@ -1158,7 +1171,12 @@ async def _call_ollama(
             response_text=data.get("response"),
             thinking_text=data.get("thinking"),
         )
-        return {"thinking": thinking, "message": message}
+        return {
+            "thinking": thinking,
+            "message": message,
+            "eval_count": data.get("eval_count"),
+            "eval_duration": data.get("eval_duration"),
+        }
 
 
 def _fallback_response(original_prompt: str) -> str:
@@ -1202,10 +1220,14 @@ async def handle_ask(
     )
     log_prompt(final_prompt)
     thinking = ""
+    eval_count = None
+    eval_duration = None
     try:
         result = await _call_ollama(final_prompt, images=prompt_images, thinking=req.thinking)
         message = result.get("message", "").strip()
         thinking = result.get("thinking", "").strip()
+        eval_count = result.get("eval_count")
+        eval_duration = result.get("eval_duration")
     except httpx.TimeoutException as exc:  # pragma: no cover - netwerkfout
         logger.warning(
             "Timeout bij Ollama (timeout=%ss, url=%s, model=%s): %r",
@@ -1241,4 +1263,6 @@ async def handle_ask(
         "thinking": thinking,
         "citations": list(citations or []),
         "web_results": web_payload,
+        "eval_count": eval_count if isinstance(eval_count, (int, float)) else None,
+        "eval_duration": eval_duration if isinstance(eval_duration, (int, float)) else None,
     }

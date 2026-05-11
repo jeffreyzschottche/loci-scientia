@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
+import socket
+import subprocess
+from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import psutil
 import requests
@@ -120,6 +125,9 @@ class NetworkStatusPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
 
+        self._wifi_button = self._build_wifi_button()
+        self._wifi_button.clicked.connect(self._open_wifi_settings)
+
         self.stats_cards = {}
         self._stat_headings = {}
         stats_row = QHBoxLayout()
@@ -170,23 +178,30 @@ class NetworkStatusPage(QWidget):
             resources_row.addWidget(card)
         layout.addLayout(resources_row)
 
-        layout.addStretch(1)
+        self._details_heading = QLabel(t("network_details_title"))
+        self._details_heading.setStyleSheet("font-size:18px; font-weight:800; color:#111111;")
+        layout.addWidget(self._details_heading)
 
-        self._wifi_button = QPushButton(t("network_open_wifi_config"))
-        self._wifi_button.setFixedHeight(56)
-        self._wifi_button.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15;"
-            "  color:#050505;"
-            "  border-radius:24px;"
-            "  padding:8px 28px;"
-            "  font-weight:700;"
-            "  font-size:16px;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        self._wifi_button.clicked.connect(self._open_wifi_settings)
-        layout.addWidget(self._wifi_button, 0, Qt.AlignCenter)
+        self.info_cards = {}
+        self._info_headings = {}
+        details_grid = QGridLayout()
+        details_grid.setSpacing(16)
+        for index, (key, heading_key) in enumerate(
+            [
+                ("wifi", "network_info_wifi"),
+                ("backend", "network_info_backend"),
+                ("activity", "network_info_activity"),
+                ("knowledge", "network_info_knowledge"),
+                ("local", "network_info_local"),
+                ("performance", "network_info_performance"),
+            ]
+        ):
+            card, heading_label, value_label = self._build_info_card(t(heading_key))
+            self._info_headings[key] = {"heading_key": heading_key, "heading_label": heading_label}
+            self.info_cards[key] = value_label
+            details_grid.addWidget(card, index // 3, index % 3)
+        layout.addLayout(details_grid)
+
         layout.addStretch(1)
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(5000)
@@ -196,6 +211,25 @@ class NetworkStatusPage(QWidget):
 
         register_language_change_callback(self._update_translations)
 
+    def header_widget(self) -> QWidget:
+        return self._wifi_button
+
+    def _build_wifi_button(self) -> QPushButton:
+        button = QPushButton(t("network_open_wifi_config"))
+        button.setFixedHeight(44)
+        button.setStyleSheet(
+            "QPushButton {"
+            "  background:#facc15;"
+            "  color:#050505;"
+            "  border-radius:22px;"
+            "  padding:8px 24px;"
+            "  font-weight:700;"
+            "  font-size:14px;"
+            "}"
+            "QPushButton:hover { background:#050505; color:#facc15; }"
+        )
+        return button
+
     def _update_translations(self) -> None:
         """Update UI elements when language changes."""
         self._wifi_button.setText(t("network_open_wifi_config"))
@@ -204,8 +238,12 @@ class NetworkStatusPage(QWidget):
         self._resource_heading.setText(t("network_resources_title"))
         for key, data in self._resource_headings.items():
             data["heading_label"].setText(t(data["heading_key"]))
+        self._details_heading.setText(t("network_details_title"))
+        for key, data in self._info_headings.items():
+            data["heading_label"].setText(t(data["heading_key"]))
         self._update_stats([])
         self._update_resource_stats()
+        self._update_info_cards()
 
     def _build_stat_card(self, title: str, value: str, caption: str, *, with_chart: bool, with_usage_bar: bool = False):
         card = self._card()
@@ -236,6 +274,21 @@ class NetworkStatusPage(QWidget):
             card_layout.addWidget(usage_bar["track"])
         card_layout.addWidget(detail)
         return card, metric, detail, heading, chart, usage_bar
+
+    def _build_info_card(self, title: str) -> tuple[QFrame, QLabel, QLabel]:
+        card = self._card()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(20, 16, 20, 16)
+        card_layout.setSpacing(10)
+        heading = QLabel(title)
+        heading.setStyleSheet("color:#6b7280; letter-spacing:0.2em; font-size:11px;")
+        value = QLabel(t("network_status_loading"))
+        value.setWordWrap(True)
+        value.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        value.setStyleSheet("color:#374151; font-size:13px; line-height:1.35;")
+        card_layout.addWidget(heading)
+        card_layout.addWidget(value, 1)
+        return card, heading, value
 
     @staticmethod
     def _card():
@@ -399,6 +452,227 @@ class NetworkStatusPage(QWidget):
     def _reload(self):
         self._update_stats([])
         self._update_resource_stats()
+        self._update_info_cards()
+
+    def _update_info_cards(self) -> None:
+        stats = self._fetch_stats() or {}
+        self.info_cards["wifi"].setText(self._format_wifi_info(self._read_linux_wifi_info()))
+        self.info_cards["backend"].setText(self._format_backend_info())
+        self.info_cards["activity"].setText(self._format_activity_info(stats))
+        self.info_cards["knowledge"].setText(self._format_knowledge_info())
+        self.info_cards["local"].setText(self._format_local_info())
+        self.info_cards["performance"].setText(self._format_performance_info(stats))
+
+    @staticmethod
+    def _run_command(args: list[str], timeout: float = 2.0) -> str:
+        try:
+            result = subprocess.run(
+                args,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+        return result.stdout.strip()
+
+    def _read_linux_wifi_info(self) -> dict[str, str]:
+        info: dict[str, str] = {"platform": platform.system()}
+        if platform.system() != "Linux":
+            info["state"] = t("network_status_unavailable")
+            return info
+        if not shutil.which("nmcli"):
+            info["state"] = t("network_nmcli_missing")
+            return info
+
+        wifi_lines = self._run_command(
+            ["nmcli", "-t", "-f", "ACTIVE,SSID,DEVICE,SIGNAL,SECURITY", "dev", "wifi"]
+        ).splitlines()
+        for line in wifi_lines:
+            parts = line.split(":")
+            if parts and parts[0] == "yes":
+                info["state"] = t("network_status_online")
+                info["ssid"] = parts[1] if len(parts) > 1 else ""
+                info["interface"] = parts[2] if len(parts) > 2 else ""
+                info["signal"] = (parts[3] + "%") if len(parts) > 3 and parts[3] else ""
+                info["security"] = parts[4] if len(parts) > 4 else ""
+                break
+
+        device = info.get("interface")
+        if device:
+            detail_lines = self._run_command(
+                ["nmcli", "-t", "-f", "IP4.ADDRESS,IP4.GATEWAY", "device", "show", device]
+            ).splitlines()
+            for line in detail_lines:
+                if line.startswith("IP4.ADDRESS"):
+                    info["ipv4"] = line.split(":", 1)[1].split("/", 1)[0].strip()
+                elif line.startswith("IP4.GATEWAY"):
+                    info["gateway"] = line.split(":", 1)[1].strip()
+
+        if not info.get("state"):
+            info["state"] = t("network_status_offline")
+        return info
+
+    def _format_wifi_info(self, info: dict[str, str]) -> str:
+        lines = [f"{t('network_status')}: {info.get('state', t('network_status_unknown'))}"]
+        for key, label_key in [
+            ("ssid", "network_wifi_ssid"),
+            ("signal", "network_wifi_signal"),
+            ("interface", "network_wifi_interface"),
+            ("ipv4", "network_wifi_ipv4"),
+            ("gateway", "network_wifi_gateway"),
+            ("security", "network_wifi_security"),
+        ]:
+            value = info.get(key, "").strip()
+            if value:
+                lines.append(f"{t(label_key)}: {value}")
+        return "\n".join(lines)
+
+    def _format_backend_info(self) -> str:
+        started = datetime.now()
+        try:
+            response = requests.get(f"{API_BASE}/health", timeout=2)
+            healthy = response.ok and isinstance(response.json(), dict)
+        except (requests.RequestException, ValueError):
+            healthy = False
+        elapsed_ms = int((datetime.now() - started).total_seconds() * 1000)
+        status = t("network_status_online") if healthy else t("network_status_offline")
+        return "\n".join(
+            [
+                f"{t('network_status')}: {status}",
+                f"{t('network_backend_url')}: {API_BASE}",
+                f"{t('network_backend_check')}: {elapsed_ms} ms",
+            ]
+        )
+
+    def _format_activity_info(self, stats: dict) -> str:
+        requests_today = stats.get("requests_today")
+        active_users = stats.get("active_users_today")
+        error_rate = stats.get("error_rate")
+        if isinstance(error_rate, (int, float)):
+            error_rate_text = f"{float(error_rate):.1f}%".replace(".", ",")
+        else:
+            error_rate_text = t("network_na")
+        return "\n".join(
+            [
+                f"{t('network_requests_today')}: {requests_today if isinstance(requests_today, int) else t('network_na')}",
+                f"{t('network_active_today')}: {active_users if isinstance(active_users, int) else t('network_na')}",
+                f"{t('network_error_rate')}: {error_rate_text}",
+                f"{t('network_connections')}: {self._connection_count()}",
+            ]
+        )
+
+    def _format_knowledge_info(self) -> str:
+        library = self._fetch_json("/api/v1/kennisbank/library") or {}
+        sync_state = self._fetch_json("/api/v1/kennisbank/sync-state") or {}
+        documents = library.get("documents") if isinstance(library, dict) else []
+        categories = library.get("categories") if isinstance(library, dict) else []
+        synced_at = sync_state.get("synced_at") if isinstance(sync_state, dict) else None
+        return "\n".join(
+            [
+                f"{t('network_documents')}: {len(documents) if isinstance(documents, list) else t('network_na')}",
+                f"{t('network_categories')}: {len(categories) if isinstance(categories, list) else t('network_na')}",
+                f"{t('network_last_sync')}: {self._format_timestamp(synced_at)}",
+            ]
+        )
+
+    def _format_local_info(self) -> str:
+        host_name = socket.gethostname()
+        local_ip = self._local_ip_address()
+        parsed = urlparse(API_BASE)
+        port = f":{parsed.port}" if parsed.port else ""
+        scheme = parsed.scheme or "http"
+        local_url = f"{scheme}://{local_ip}{port}" if local_ip else API_BASE
+        mdns_url = f"{scheme}://{host_name}.local{port}" if host_name else t("network_na")
+        return "\n".join(
+            [
+                f"{t('network_hostname')}: {host_name or t('network_na')}",
+                f"{t('network_local_ip')}: {local_ip or t('network_na')}",
+                f"{t('network_local_url')}: {local_url}",
+                f"{t('network_mdns_url')}: {mdns_url}",
+            ]
+        )
+
+    def _format_performance_info(self, stats: dict) -> str:
+        avg_response = stats.get("avg_response_ms")
+        tokens_per_second = stats.get("tokens_per_second")
+        if isinstance(avg_response, (int, float)):
+            response_text = f"{int(round(float(avg_response)))} ms"
+        else:
+            response_text = t("network_na")
+        if isinstance(tokens_per_second, (int, float)):
+            tokens_text = f"{float(tokens_per_second):.1f}".replace(".", ",")
+        else:
+            tokens_text = t("network_no_ollama_metric")
+        return "\n".join(
+            [
+                f"{t('network_uptime')}: {self._system_uptime()}",
+                f"{t('network_avg_response_short')}: {response_text}",
+                f"{t('network_tokens_per_second')}: {tokens_text}",
+            ]
+        )
+
+    def _fetch_json(self, path: str) -> dict | None:
+        try:
+            response = requests.get(
+                f"{API_BASE}{path}",
+                timeout=3,
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data if isinstance(data, dict) else None
+        except (requests.RequestException, ValueError):
+            return None
+
+    @staticmethod
+    def _local_ip_address() -> str:
+        output = NetworkStatusPage._run_command(["hostname", "-I"])
+        if output:
+            for value in output.split():
+                if "." in value:
+                    return value
+        return ""
+
+    @staticmethod
+    def _connection_count() -> str:
+        try:
+            connections = psutil.net_connections(kind="inet")
+        except (psutil.AccessDenied, OSError):
+            return t("network_status_unavailable")
+        active = [
+            connection
+            for connection in connections
+            if connection.status in {psutil.CONN_ESTABLISHED, psutil.CONN_LISTEN}
+        ]
+        return str(len(active))
+
+    @staticmethod
+    def _system_uptime() -> str:
+        try:
+            uptime_seconds = float(Path("/proc/uptime").read_text(encoding="utf-8").split()[0])
+        except (OSError, ValueError, IndexError):
+            return t("network_status_unavailable")
+        days = int(uptime_seconds // 86400)
+        hours = int((uptime_seconds % 86400) // 3600)
+        minutes = int((uptime_seconds % 3600) // 60)
+        if days:
+            return f"{days}d {hours}u"
+        if hours:
+            return f"{hours}u {minutes}m"
+        return f"{minutes}m"
+
+    @staticmethod
+    def _format_timestamp(value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            return t("network_sync_never")
+        normalized = value.strip().replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            return value.strip()
+        return parsed.strftime("%Y-%m-%d %H:%M")
 
     @staticmethod
     def _linux_power_now_watts() -> float | None:

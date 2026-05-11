@@ -1,0 +1,12 @@
+use_default_settings: true
+server:
+  secret_key: "3c14f77989f53f818e4b9dbf97d898d8b9148a6fa4aee7472df33e03d9206b7f"
+  limiter: false
+  image_proxy: true
+  bind_address: "0.0.0.0"
+search:
+  formats:
+    - html
+    - json
+ui:
+  default_locale: nl

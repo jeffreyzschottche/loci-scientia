@@ -186,8 +186,11 @@ class ApiStats:
         self._state_path = state_path
         self._day = datetime.now(timezone.utc).date()
         self._requests_today = 0
+        self._errors_today = 0
         self._latency_total_ms = 0.0
         self._latency_count = 0
+        self._output_tokens_total = 0.0
+        self._generation_seconds_total = 0.0
         self._active_ids: set[str] = set()
         self._load_state()
 
@@ -213,8 +216,11 @@ class ApiStats:
             except ValueError:
                 self._day = datetime.now(timezone.utc).date()
         self._requests_today = int(payload.get("requests_today") or 0)
+        self._errors_today = int(payload.get("errors_today") or 0)
         self._latency_total_ms = float(payload.get("latency_total_ms") or 0.0)
         self._latency_count = int(payload.get("latency_count") or 0)
+        self._output_tokens_total = float(payload.get("output_tokens_total") or 0.0)
+        self._generation_seconds_total = float(payload.get("generation_seconds_total") or 0.0)
         active_ids = payload.get("active_ids") or []
         if isinstance(active_ids, list):
             self._active_ids = {str(item) for item in active_ids if str(item).strip()}
@@ -225,8 +231,11 @@ class ApiStats:
             "mode": API_STATS_MODE,
             "date": self._day.isoformat(),
             "requests_today": self._requests_today,
+            "errors_today": self._errors_today,
             "latency_total_ms": round(self._latency_total_ms, 3),
             "latency_count": self._latency_count,
+            "output_tokens_total": round(self._output_tokens_total, 3),
+            "generation_seconds_total": round(self._generation_seconds_total, 3),
             "active_ids": sorted(self._active_ids),
         }
         tmp = self._state_path.with_suffix(".tmp")
@@ -239,8 +248,11 @@ class ApiStats:
             return
         self._day = today
         self._requests_today = 0
+        self._errors_today = 0
         self._latency_total_ms = 0.0
         self._latency_count = 0
+        self._output_tokens_total = 0.0
+        self._generation_seconds_total = 0.0
         self._active_ids.clear()
         self._persist_locked()
 
@@ -254,19 +266,55 @@ class ApiStats:
                 self._active_ids.add(token_hash)
             self._persist_locked()
 
-    def finish_interaction(self, duration_ms: float) -> None:
+    def finish_interaction(
+        self,
+        duration_ms: float,
+        *,
+        error: bool = False,
+        output_chars: int = 0,
+        output_tokens: float | None = None,
+        generation_seconds: float | None = None,
+    ) -> None:
         now = datetime.now(timezone.utc)
         with self._lock:
             self._rollover(now)
+            if error:
+                self._errors_today += 1
             self._latency_total_ms += duration_ms
             self._latency_count += 1
+            estimated_tokens = (
+                max(0.0, float(output_tokens))
+                if output_tokens is not None
+                else max(0.0, float(output_chars) / 4.0)
+            )
+            duration_seconds = (
+                max(0.001, float(generation_seconds))
+                if generation_seconds is not None
+                else max(0.001, float(duration_ms) / 1000.0)
+            )
+            if estimated_tokens:
+                self._output_tokens_total += estimated_tokens
+                self._generation_seconds_total += duration_seconds
             self._persist_locked()
             avg = self._latency_total_ms / self._latency_count if self._latency_count else None
+            error_rate = (
+                (self._errors_today / self._requests_today) * 100.0
+                if self._requests_today
+                else 0.0
+            )
+            tokens_per_second = (
+                self._output_tokens_total / self._generation_seconds_total
+                if self._generation_seconds_total
+                else None
+            )
             snapshot = {
                 "date": self._day.isoformat(),
                 "requests_today": self._requests_today,
+                "errors_today": self._errors_today,
+                "error_rate": round(error_rate, 1),
                 "active_users_today": len(self._active_ids),
                 "avg_response_ms": round(avg, 1) if avg is not None else None,
+                "tokens_per_second": round(tokens_per_second, 1) if tokens_per_second is not None else None,
             }
         api_stats_history.append(snapshot)
 
@@ -280,11 +328,24 @@ class ApiStats:
                 else None
             )
             avg_ms = round(avg, 1) if avg is not None else None
+            error_rate = (
+                (self._errors_today / self._requests_today) * 100.0
+                if self._requests_today
+                else 0.0
+            )
+            tokens_per_second = (
+                self._output_tokens_total / self._generation_seconds_total
+                if self._generation_seconds_total
+                else None
+            )
             return {
                 "date": self._day.isoformat(),
                 "requests_today": self._requests_today,
+                "errors_today": self._errors_today,
+                "error_rate": round(error_rate, 1),
                 "active_users_today": len(self._active_ids),
                 "avg_response_ms": avg_ms,
+                "tokens_per_second": round(tokens_per_second, 1) if tokens_per_second is not None else None,
             }
 
 
@@ -322,8 +383,11 @@ class ApiStatsHistory:
                 {
                     "timestamp": timestamp,
                     "requests_today": int(item.get("requests_today") or 0),
+                    "errors_today": int(item.get("errors_today") or 0),
+                    "error_rate": float(item.get("error_rate") or 0.0),
                     "active_users_today": int(item.get("active_users_today") or 0),
                     "avg_response_ms": int(round(float(item.get("avg_response_ms") or 0))),
+                    "tokens_per_second": float(item.get("tokens_per_second") or 0.0),
                 }
             )
         return normalized
@@ -339,8 +403,11 @@ class ApiStatsHistory:
         sample = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "requests_today": int(snapshot.get("requests_today") or 0),
+            "errors_today": int(snapshot.get("errors_today") or 0),
+            "error_rate": float(snapshot.get("error_rate") or 0.0),
             "active_users_today": int(snapshot.get("active_users_today") or 0),
             "avg_response_ms": int(round(float(snapshot.get("avg_response_ms") or 0))),
+            "tokens_per_second": float(snapshot.get("tokens_per_second") or 0.0),
         }
         with self._lock:
             self._samples.append(sample)
@@ -883,7 +950,17 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
     log_api_request(log_entry)
 
     chat_history.append(history_key, "assistant", message)
-    api_stats.finish_interaction((time.perf_counter() - started) * 1000)
+    api_stats.finish_interaction(
+        (time.perf_counter() - started) * 1000,
+        error=bool(web_search_error or response.get("web_search_error")),
+        output_chars=len(message),
+        output_tokens=float(response["eval_count"]) if isinstance(response.get("eval_count"), (int, float)) else None,
+        generation_seconds=(
+            float(response["eval_duration"]) / 1_000_000_000
+            if isinstance(response.get("eval_duration"), (int, float)) and response.get("eval_duration")
+            else None
+        ),
+    )
     return response
 
 
@@ -989,6 +1066,8 @@ async def sse_stream_generator(
     error_message: Optional[str] = None
     mock_response: Optional[str] = None
     assistant_stream_started = False
+    eval_count: Optional[float] = None
+    eval_duration_seconds: Optional[float] = None
 
     # Short queue countdown: 2 to 0 with 1 second between each
     for position in range(2, -1, -1):
@@ -1063,6 +1142,10 @@ async def sse_stream_generator(
 
                         # Check if done
                         if data.get("done", False):
+                            if isinstance(data.get("eval_count"), (int, float)):
+                                eval_count = float(data["eval_count"])
+                            if isinstance(data.get("eval_duration"), (int, float)) and data.get("eval_duration"):
+                                eval_duration_seconds = float(data["eval_duration"]) / 1_000_000_000
                             break
 
                     except json.JSONDecodeError:
@@ -1139,7 +1222,13 @@ async def sse_stream_generator(
     log_api_request(log_entry)
 
     # Finalize latency before the terminal done event is sent.
-    api_stats.finish_interaction((time.perf_counter() - started) * 1000)
+    api_stats.finish_interaction(
+        (time.perf_counter() - started) * 1000,
+        error=bool(error_message),
+        output_chars=len(assistant_text),
+        output_tokens=eval_count,
+        generation_seconds=eval_duration_seconds,
+    )
     final_event = {
         "done": True,
         "message": assistant_text,
