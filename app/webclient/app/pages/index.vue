@@ -895,7 +895,7 @@ const handleChangeDevice = () => {
   showSettingsMenu.value = false
   stoppedGeneration.value = false
   shouldResetServerChat.value = false
-  router.push('/setup')
+  router.push({ path: '/setup', query: { changeDevice: '1' } })
 }
 
 onMounted(() => {

@@ -7,8 +7,6 @@ interface AuthState {
   username: string | null
 }
 
-// The SPA is hosted by the FastAPI backend itself, so we always call the API
-// on the same origin and never need to ask the user for a device number.
 const sameOriginBase = (): string | null => {
   if (typeof window === 'undefined') return null
   const { protocol, origin } = window.location
@@ -26,8 +24,7 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isDeviceConfigured: (state) => {
-      if (state.deviceNumber) return true
-      return sameOriginBase() !== null
+      return Boolean(state.deviceNumber)
     },
     isAuthenticated: (state) => {
       if (!state.bearerToken || !state.tokenExpiresAt) return false
@@ -47,7 +44,7 @@ export const useAuthStore = defineStore('auth', {
         }
         return `http://aitje-${state.deviceNumber}.local:8000`
       }
-      return sameOriginBase()
+      return null
     },
   },
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex justify-center px-4 pt-12 pb-8 relative md:items-center md:pt-4">
+  <div class="min-h-screen bg-gray-50 flex justify-center px-4 pt-12 pb-8 relative overflow-y-auto md:items-center md:pt-4">
     <div
       class="absolute right-4 z-20"
       :class="isNativeMobileApp ? 'top-[calc(env(safe-area-inset-top)+0.5rem)]' : 'top-4'"
@@ -73,6 +73,19 @@
           </button>
         </form>
       </div>
+
+      <p class="mt-5 text-center text-sm leading-6 text-gray-500">
+        {{ t('login.footerPrefix') }}
+        <a
+          href="https://aitje.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-medium text-gray-800 underline decoration-yellow-400 underline-offset-4 hover:text-gray-950"
+        >
+          {{ t('login.footerLink') }}
+        </a>
+        {{ t('login.footerSuffix') }}
+      </p>
     </div>
   </div>
 </template>
@@ -115,7 +128,7 @@ const handleLogin = async () => {
 
 const changeDevice = () => {
   authStore.clearAll()
-  router.push('/setup')
+  router.push({ path: '/setup', query: { changeDevice: '1' } })
 }
 
 onMounted(() => {

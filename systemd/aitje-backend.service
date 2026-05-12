@@ -1,0 +1,15 @@
+[Unit]
+Description=AITJE FastAPI backend
+After=network-online.target avahi-daemon.service
+Wants=network-online.target avahi-daemon.service
+
+[Service]
+Type=simple
+User=aitje
+WorkingDirectory=__PROJECT_ROOT__
+ExecStart=/bin/bash -lc 'set -a; source "__PROJECT_ROOT__/.env"; set +a; exec "__PROJECT_ROOT__/.venv/bin/python" -m uvicorn app.backend.main:app --host "${BACKEND_BIND_HOST:-0.0.0.0}" --port "${BACKEND_PORT:-8000}"'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

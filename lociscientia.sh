@@ -1156,6 +1156,19 @@ if [ ! -f ".venv/.requirements_installed" ] || [ "app/requirements.txt" -nt ".ve
     touch .venv/.requirements_installed
 fi
 
+if ! python - <<'PY' >/dev/null 2>&1
+import fastembed
+import qdrant_client
+import uvicorn
+import PySide6
+PY
+then
+    echo "⚠️  .venv mist backend/RAG dependencies; requirements opnieuw installeren..."
+    python -m pip install -U pip
+    python -m pip install -r app/requirements.txt
+    touch .venv/.requirements_installed
+fi
+
 # --- LAN web client (Nuxt SPA) build -----------------------------------------
 # Static SPA mounted by FastAPI at /. We build only when source changed since
 # the last successful generate, so normal restarts stay fast.

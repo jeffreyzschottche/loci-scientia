@@ -3,9 +3,15 @@ export default defineNuxtRouteMiddleware((to) => {
 
   const authStore = useAuthStore()
 
-  // The SPA is always served by FastAPI (same origin), so /setup is obsolete.
   if (to.path === '/setup') {
-    return navigateTo(authStore.isAuthenticated ? '/' : '/login')
+    if (authStore.isAuthenticated && authStore.isDeviceConfigured && to.query.changeDevice !== '1') {
+      return navigateTo('/')
+    }
+    return
+  }
+
+  if (!authStore.isDeviceConfigured) {
+    return navigateTo('/setup')
   }
 
   if (!authStore.isAuthenticated && to.path !== '/login') {

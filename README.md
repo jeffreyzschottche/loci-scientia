@@ -49,6 +49,19 @@ python -m pip install -r app/requirements.txt
 uvicorn app.backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+Wil je dat de webclient op `http://aitje-2.local:8000` bereikbaar blijft zonder de desktop-UI open te houden, installeer dan de user-service:
+
+```bash
+./scripts/install-user-backend-service.sh
+```
+
+Controle:
+
+```bash
+systemctl --user status aitje-backend.service
+curl http://aitje-2.local:8000/health
+```
+
 ### 4) Frontend starten (nieuw venster)
 
 ```bash

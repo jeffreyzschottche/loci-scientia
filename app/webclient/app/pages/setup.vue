@@ -56,11 +56,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '~/stores/auth'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from '~/composables/useI18n'
 import LanguageSwitcher from '~/components/common/LanguageSwitcher.vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
@@ -78,8 +79,8 @@ onMounted(() => {
   isNativeMobileApp.value = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 
   authStore.loadFromLocalStorage()
-  if (authStore.isDeviceConfigured) {
-    router.push('/login')
+  if (authStore.isAuthenticated && authStore.isDeviceConfigured && route.query.changeDevice !== '1') {
+    router.push('/')
   }
 })
 </script>
