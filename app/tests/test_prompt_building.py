@@ -198,14 +198,14 @@ class PromptBuildingTests(unittest.TestCase):
             self.assertEqual(repo.search_devices("waar is mijn apparaat?"), [])
 
     def test_rag_min_context_score_default_matches_current_embeddings(self):
-        self.assertEqual(apiAsk.MIN_CONTEXT_SCORE, 0.30)
+        self.assertEqual(apiAsk.MIN_CONTEXT_SCORE, 0.15)
 
     def test_float_env_uses_override_and_ignores_invalid_values(self):
         with patch.dict("os.environ", {"RAG_MIN_CONTEXT_SCORE": "0.25"}):
-            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.30), 0.25)
+            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.15), 0.25)
 
         with patch.dict("os.environ", {"RAG_MIN_CONTEXT_SCORE": "nope"}):
-            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.30), 0.30)
+            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.15), 0.15)
 
     def test_augmented_prompt_includes_web_search_block_when_results_provided(self):
         from backend.web_search import WebSearchResult
