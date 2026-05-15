@@ -12,9 +12,11 @@ import httpx
 from fastapi import (
     Depends,
     FastAPI,
+    File,
     Header,
     HTTPException,
     Request,
+    UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -57,7 +59,11 @@ from .web_search import (
 from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
-from .kennisbank_sync import read_sync_state, sync_kennisbank
+from .kennisbank_sync import (
+    KNOWLEDGE_BASE_DIRNAME,
+    import_kennisbank_from_dir,
+    read_sync_state,
+)
 from .knowledge_library import get_library_overview, load_document_detail
 from .schemas import (
     BearerTokenResponse,
@@ -458,7 +464,7 @@ def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRe
 def _empty_sync_state() -> dict:
     return {
         "synced": False,
-        "git": None,
+        "source": None,
         "qdrant": None,
         "sqlite": None,
         "stats": None,
@@ -758,21 +764,102 @@ def kennisbank_sync_state(_: TokenRecord = Depends(require_admin_token)):
     return {**state, "synced": True}
 
 
-@app.post("/api/v1/kennisbank/sync")
-async def kennisbank_sync_endpoint(_: TokenRecord = Depends(require_admin_token)):
+def _unpack_kennisbank_bundle(file_bytes: bytes, dest_dir: Path) -> Path:
+    """Pak een knowledge_base export-bundle uit naar een tijdelijke map.
+
+    De bundle is een ZIP geproduceerd door de embedder
+    (`Services\\DeviceSyncService::buildBundle`). Hij kan met of zonder
+    `knowledge_base/` top-level dir komen — we normaliseren naar een pad
+    dat documents/, chunks/, model.json etc bevat.
+    """
+    import zipfile
+
+    bundle_path = dest_dir / "bundle.zip"
+    bundle_path.write_bytes(file_bytes)
+    extract_to = dest_dir / "extracted"
+    extract_to.mkdir(parents=True, exist_ok=True)
     try:
-        result = await run_in_threadpool(sync_kennisbank)
-    except Exception as exc:  # pragma: no cover - onverwachte git/qdrant fouten
-        logger.exception("Kennisbank sync faalde: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Kennisbank sync mislukt: {exc}") from exc
+        with zipfile.ZipFile(bundle_path) as zf:
+            for name in zf.namelist():
+                # Bescherm tegen path traversal / absolute paden.
+                normalized = name.replace("\\", "/")
+                if normalized.startswith("/") or ".." in Path(normalized).parts:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Onveilig pad in bundle: {name}",
+                    )
+            zf.extractall(extract_to)
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Bundle is geen geldig ZIP-bestand") from exc
+
+    inner = extract_to / KNOWLEDGE_BASE_DIRNAME
+    if inner.is_dir():
+        return inner
+    if (extract_to / "documents").is_dir() or (extract_to / "model.json").is_file():
+        return extract_to
+    candidates = [p for p in extract_to.iterdir() if p.is_dir()]
+    if len(candidates) == 1 and (candidates[0] / "documents").is_dir():
+        return candidates[0]
+    raise HTTPException(
+        status_code=400,
+        detail="Bundle bevat geen herkenbare knowledge_base structuur",
+    )
+
+
+@app.post("/api/v1/kennisbank/import")
+async def kennisbank_import_endpoint(
+    bundle: UploadFile = File(...),
+    _: TokenRecord = Depends(require_admin_token),
+):
+    """Ontvang een knowledge_base ZIP-bundle van de embedder-app en importeer
+    incrementeel naar Qdrant + SQLite. Vervangt de oude git-pull sync."""
+    import tempfile
+
+    file_bytes = await bundle.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Lege bundle ontvangen")
+
+    source = {
+        "filename": bundle.filename,
+        "content_type": bundle.content_type,
+        "size_bytes": len(file_bytes),
+    }
+
+    def _run() -> dict:
+        with tempfile.TemporaryDirectory(prefix="aitje-import-") as tmp:
+            tmp_path = Path(tmp)
+            export_base = _unpack_kennisbank_bundle(file_bytes, tmp_path)
+            return import_kennisbank_from_dir(export_base, source=source)
+
+    try:
+        result = await run_in_threadpool(_run)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - onverwachte qdrant/embed fouten
+        logger.exception("Kennisbank import faalde: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Kennisbank import mislukt: {exc}") from exc
     return {**result, "synced": True}
 
 
-@app.post("/api/v1/kennisbank/sync/stream")
-async def kennisbank_sync_stream(_: TokenRecord = Depends(require_admin_token)):
-    """Stream SSE progress updates tijdens kennisbank sync."""
+@app.post("/api/v1/kennisbank/import/stream")
+async def kennisbank_import_stream(
+    bundle: UploadFile = File(...),
+    _: TokenRecord = Depends(require_admin_token),
+):
+    """Stream SSE progress events terwijl de bundle wordt geïmporteerd."""
     import queue
+    import tempfile
     import threading
+
+    file_bytes = await bundle.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Lege bundle ontvangen")
+
+    source = {
+        "filename": bundle.filename,
+        "content_type": bundle.content_type,
+        "size_bytes": len(file_bytes),
+    }
 
     progress_queue: queue.Queue = queue.Queue()
     result_holder: dict = {}
@@ -781,50 +868,45 @@ async def kennisbank_sync_stream(_: TokenRecord = Depends(require_admin_token)):
     def progress_callback(current: int, total: int, message: str):
         progress_queue.put({"progress": current, "total": total, "status": message})
 
-    def run_sync():
+    def run_import():
         try:
-            result = sync_kennisbank(progress_callback=progress_callback)
-            result_holder["result"] = result
+            with tempfile.TemporaryDirectory(prefix="aitje-import-") as tmp:
+                tmp_path = Path(tmp)
+                export_base = _unpack_kennisbank_bundle(file_bytes, tmp_path)
+                result = import_kennisbank_from_dir(
+                    export_base,
+                    source=source,
+                    progress_callback=progress_callback,
+                )
+                result_holder["result"] = result
+        except HTTPException as exc:
+            error_holder.append(exc.detail)
         except Exception as exc:
             error_holder.append(str(exc))
-            logger.exception("Kennisbank sync faalde: %s", exc)
+            logger.exception("Kennisbank import faalde: %s", exc)
 
     async def event_stream():
-        # Start sync in background thread
-        thread = threading.Thread(target=run_sync, daemon=True)
+        thread = threading.Thread(target=run_import, daemon=True)
         thread.start()
-
-        # Stream progress updates
         while thread.is_alive() or not progress_queue.empty():
             try:
                 update = progress_queue.get(timeout=0.5)
-                payload = json.dumps(update)
-                yield f"data: {payload}\n\n"
+                yield f"data: {json.dumps(update)}\n\n"
             except queue.Empty:
                 continue
-
-        # Check for errors
         if error_holder:
-            payload = json.dumps({"error": error_holder[0], "done": True})
-            yield f"data: {payload}\n\n"
+            yield f"data: {json.dumps({'error': error_holder[0], 'done': True})}\n\n"
             return
-
-        # Send final result
         if "result" in result_holder:
             final = {**result_holder["result"], "synced": True, "done": True}
-            payload = json.dumps(final)
-            yield f"data: {payload}\n\n"
+            yield f"data: {json.dumps(final)}\n\n"
         else:
-            payload = json.dumps({"error": "Onbekende fout", "done": True})
-            yield f"data: {payload}\n\n"
+            yield f"data: {json.dumps({'error': 'Onbekende fout', 'done': True})}\n\n"
 
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
 
@@ -1382,6 +1464,85 @@ async def ws_endpoint(ws: WebSocket):
         return
 
 
+# ---- LAN embedder app (Laravel + Nuxt SPA) ----------------------------------
+#
+# De Aitje Embedding Application is geïnternaliseerd onder /embedder. De
+# Laravel-backend draait lokaal op 127.0.0.1:${EMBEDDER_PORT} (gestart door
+# lociscientia.sh) en de Nuxt SPA wordt statisch gegenereerd naar
+# app/embedder/frontend/.output/public en gemount op /embedder/. We proxien
+# /embedder/api/* naar Laravel zodat alles same-origin op poort 8000 zit.
+
+_EMBEDDER_PROXY_HOP_HEADERS = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+    "host",
+    "content-length",
+}
+
+
+async def _embedder_proxy(request: Request, full_path: str):
+    # Laravel registreert zijn routes onder /embedder/api/* (apiPrefix in
+    # bootstrap/app.php). We forwarden het volledige pad zodat de URL die
+    # Laravel ziet exact overeenkomt met de URL waarmee signed routes
+    # gegenereerd zijn — anders mismatchen email-verify signatures.
+    upstream = f"http://127.0.0.1:{settings.embedder_port}/embedder/api/{full_path}"
+    body = await request.body()
+    forwarded_headers = {
+        name: value
+        for name, value in request.headers.items()
+        if name.lower() not in _EMBEDDER_PROXY_HOP_HEADERS
+    }
+    forwarded_headers["X-Forwarded-Host"] = request.headers.get(
+        "host", forwarded_headers.get("host", "")
+    )
+    forwarded_headers["X-Forwarded-Proto"] = request.url.scheme
+    forwarded_headers["X-Forwarded-Prefix"] = "/embedder"
+
+    try:
+        async with httpx.AsyncClient(timeout=settings.embedder_timeout) as client:
+            upstream_response = await client.request(
+                request.method,
+                upstream,
+                params=request.query_params,
+                content=body,
+                headers=forwarded_headers,
+            )
+    except httpx.ConnectError:
+        raise HTTPException(
+            status_code=502,
+            detail="Embedder-backend (Laravel) niet bereikbaar.",
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Embedder proxy error: {exc}") from exc
+
+    response_headers = {
+        name: value
+        for name, value in upstream_response.headers.items()
+        if name.lower() not in _EMBEDDER_PROXY_HOP_HEADERS
+    }
+    return StreamingResponse(
+        content=iter([upstream_response.content]),
+        status_code=upstream_response.status_code,
+        headers=response_headers,
+        media_type=upstream_response.headers.get("content-type"),
+    )
+
+
+@app.api_route(
+    "/embedder/api/{full_path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    include_in_schema=False,
+)
+async def embedder_api_proxy(request: Request, full_path: str):
+    return await _embedder_proxy(request, full_path)
+
+
 # ---- LAN web client (Nuxt SPA) -----------------------------------------------
 #
 # The Nuxt 3 client is generated to app/webclient/.output/public during
@@ -1392,7 +1553,7 @@ async def ws_endpoint(ws: WebSocket):
 # This block must remain at the bottom of the file: the catch-all mount on "/"
 # would shadow any later-registered API route.
 
-_SPA_RESERVED_PREFIXES = ("api", "api/", "devices", "devices/", "health", "ws", "fonts/", "sprites/")
+_SPA_RESERVED_PREFIXES = ("api", "api/", "devices", "devices/", "health", "ws", "fonts/", "sprites/", "embedder", "embedder/")
 
 
 class _SPAStaticFiles(StaticFiles):
@@ -1417,6 +1578,23 @@ class _SPAStaticFiles(StaticFiles):
                 return FileResponse(index_path)
             raise
 
+
+_EMBEDDER_DIST = Path(__file__).resolve().parents[1] / "embedder" / "frontend" / ".output" / "public"
+if _EMBEDDER_DIST.is_dir() and (_EMBEDDER_DIST / "index.html").is_file():
+    # Reserve geen extra prefixes: alle requests die hier landen zitten al
+    # onder /embedder/, en de api-proxy hierboven vangt /embedder/api/* af
+    # voordat deze mount aan de beurt is.
+    app.mount(
+        "/embedder",
+        _SPAStaticFiles(directory=str(_EMBEDDER_DIST), html=True),
+        name="embedder",
+    )
+else:
+    logger.warning(
+        "Embedder build niet gevonden op %s; /embedder SPA niet gemount. "
+        "Run `cd app/embedder/frontend && npm install && npm run generate` of start lociscientia.sh.",
+        _EMBEDDER_DIST,
+    )
 
 _WEBCLIENT_DIST = Path(__file__).resolve().parents[1] / "webclient" / ".output" / "public"
 if _WEBCLIENT_DIST.is_dir() and (_WEBCLIENT_DIST / "index.html").is_file():

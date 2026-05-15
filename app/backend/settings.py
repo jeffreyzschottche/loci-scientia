@@ -61,6 +61,8 @@ class Settings(BaseModel):
     searxng_max_results: int = 5
     searxng_language: str = "nl"
     searxng_safesearch: int = 1
+    embedder_port: int = 8001
+    embedder_timeout: float = 120.0
 
 
 def get_settings() -> "Settings":
@@ -126,6 +128,17 @@ def get_settings() -> "Settings":
     if searxng_safesearch not in (0, 1, 2):
         searxng_safesearch = 1
 
+    try:
+        embedder_port = int(os.environ.get("EMBEDDER_PORT", "8001"))
+    except ValueError:
+        embedder_port = 8001
+    if embedder_port <= 0:
+        embedder_port = 8001
+    try:
+        embedder_timeout = float(os.environ.get("EMBEDDER_TIMEOUT", "120"))
+    except ValueError:
+        embedder_timeout = 120.0
+
     return Settings(
         offline_assets_dir=offline_assets_dir,
         ollama_base_url=ollama_base_url,
@@ -142,6 +155,8 @@ def get_settings() -> "Settings":
         searxng_max_results=searxng_max_results,
         searxng_language=searxng_language,
         searxng_safesearch=searxng_safesearch,
+        embedder_port=embedder_port,
+        embedder_timeout=embedder_timeout,
     )
 
 

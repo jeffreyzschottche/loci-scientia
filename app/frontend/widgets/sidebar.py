@@ -14,6 +14,7 @@ class Sidebar(QWidget):
         ("kb", "📚", "nav_knowledge_bank"),
         ("net", "🌐", "nav_network"),
         ("devices", "👥", "nav_devices"),
+        ("embedder", "🧬", "nav_embedder"),
         ("settings", "⚙️", "nav_settings"),
     ]
 

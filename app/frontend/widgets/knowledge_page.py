@@ -1,148 +1,32 @@
 from __future__ import annotations
 
-import json
 import os
 import shutil
-import threading
 from datetime import datetime
 from pathlib import Path
-from queue import Queue, Empty
 
 import requests
-from PySide6.QtCore import Qt, QTimer, Signal, QObject
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QProgressBar,
-    QProgressDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QHeaderView,
-    QProgressBar,
 )
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, BACKEND_TIMEOUT
 from ..translations import t, register_language_change_callback
 from ...backend.kennisbank_sync import _knowledge_embedded_path
 from .dialog_style import OverlayDialog, show_error_dialog
-
-
-class SyncProgressDialog(QDialog):
-    """Progress dialog voor kennisbank sync met SSE streaming."""
-
-    progress_updated = Signal(int, str)
-    sync_finished = Signal(dict)
-    sync_error = Signal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t("kb_syncing"))
-        self.setModal(True)
-        self.setFixedSize(400, 150)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        self._status_label = QLabel(t("kb_sync_starting"))
-        self._status_label.setStyleSheet("font-size: 14px; font-weight: 600;")
-        layout.addWidget(self._status_label)
-
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setRange(0, 100)
-        self._progress_bar.setValue(0)
-        self._progress_bar.setTextVisible(True)
-        self._progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #e5e7eb;
-                border-radius: 8px;
-                background: #f3f4f6;
-                height: 24px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background: #facc15;
-                border-radius: 7px;
-            }
-        """)
-        layout.addWidget(self._progress_bar)
-
-        self._detail_label = QLabel("")
-        self._detail_label.setStyleSheet("color: #6b7280; font-size: 12px;")
-        layout.addWidget(self._detail_label)
-
-        # Connect signals
-        self.progress_updated.connect(self._on_progress)
-        self.sync_finished.connect(self._on_finished)
-        self.sync_error.connect(self._on_error)
-
-        self._result = None
-        self._error = None
-
-    def _on_progress(self, progress: int, status: str):
-        self._progress_bar.setValue(progress)
-        self._status_label.setText(status)
-
-    def _on_finished(self, result: dict):
-        self._result = result
-        self.accept()
-
-    def _on_error(self, error: str):
-        self._error = error
-        self.reject()
-
-    def start_sync(self):
-        """Start de sync in een background thread."""
-        thread = threading.Thread(target=self._run_sync, daemon=True)
-        thread.start()
-
-    def _run_sync(self):
-        """Voer de sync uit en stream progress updates."""
-        headers = {"Accept": "text/event-stream"}
-        if BACKEND_BEARER_TOKEN:
-            headers["Authorization"] = f"Bearer {BACKEND_BEARER_TOKEN}"
-
-        try:
-            with requests.post(
-                f"{BACKEND_HTTP}/api/v1/kennisbank/sync/stream",
-                headers=headers,
-                stream=True,
-                timeout=600,  # 10 minuten timeout
-            ) as resp:
-                resp.raise_for_status()
-                for line in resp.iter_lines(decode_unicode=True):
-                    if not line or not line.startswith("data: "):
-                        continue
-                    try:
-                        data = json.loads(line[6:])  # Strip "data: " prefix
-                    except json.JSONDecodeError:
-                        continue
-
-                    if "error" in data:
-                        self.sync_error.emit(data["error"])
-                        return
-
-                    if data.get("done"):
-                        self.sync_finished.emit(data)
-                        return
-
-                    progress = data.get("progress", 0)
-                    status = data.get("status", "")
-                    self.progress_updated.emit(progress, status)
-
-        except requests.RequestException as exc:
-            self.sync_error.emit(str(exc))
 
 
 class KnowledgePage(QWidget):
@@ -874,31 +758,14 @@ class KnowledgePage(QWidget):
 
     def _friendly_sync_error(self, message: str | None) -> str:
         raw = (message or "").strip()
-        if "KENNISBANK_GIT_REPO" in raw:
-            return t("kb_sync_repo_missing")
         if not raw:
             return t("kb_sync_support_suffix")
         return f"{raw}\n\n{t('kb_sync_support_suffix')}"
 
     def _trigger_sync(self) -> None:
-        if not BACKEND_BEARER_TOKEN:
-            show_error_dialog(self, t("kb_sync_error"), self._friendly_sync_error(t("kb_sync_need_token")), compact=True)
-            return
-        if not self._sync_button:
-            return
-
-        # Open progress dialog
-        dialog = SyncProgressDialog(self)
-        dialog.start_sync()
-        result = dialog.exec()
-
-        if result == QDialog.Accepted and dialog._result:
-            data = dialog._result
-            self._sync_state = data
-            self._update_sync_labels(data)
-            stats = data.get("stats") or {}
-            self._update_stats_view(stats, data.get("qdrant"))
-            self._update_vector_view(stats, data.get("qdrant"))
-            self._refresh_library()
-        elif dialog._error:
-            show_error_dialog(self, t("kb_sync_error"), self._friendly_sync_error(dialog._error), compact=True)
+        # De device ontvangt nu een push vanuit de embedder-app (zie
+        # /api/v1/kennisbank/import) — er is geen handmatige sync meer vanaf
+        # deze UI. De knop herlaadt de status + bibliotheek zodat een net
+        # gepuste bundel meteen zichtbaar wordt.
+        self._refresh_sync_state()
+        self._refresh_library()

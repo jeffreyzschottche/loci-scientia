@@ -80,6 +80,10 @@ TRANSLATIONS = {
         "nl": "Gebruikersbeheer",
         "en": "User Management",
     },
+    "nav_embedder": {
+        "nl": "Embedder",
+        "en": "Embedder",
+    },
     "nav_settings": {
         "nl": "Instellingen",
         "en": "Settings",
@@ -148,6 +152,10 @@ TRANSLATIONS = {
         "nl": "Gebruikersbeheer",
         "en": "User Management",
     },
+    "page_title_embedder": {
+        "nl": "Embedder",
+        "en": "Embedder",
+    },
     "page_title_settings": {
         "nl": "Instellingen",
         "en": "Settings",
@@ -183,6 +191,10 @@ TRANSLATIONS = {
     "page_subtitle_devices": {
         "nl": "Beheer verbonden apparaten en gebruikersaccounts",
         "en": "Manage connected devices and user accounts",
+    },
+    "page_subtitle_embedder": {
+        "nl": "Open de embedding-applicatie op een ander apparaat in het netwerk",
+        "en": "Open the embedding application on another device in the network",
     },
     "page_subtitle_settings": {
         "nl": "Beheer de systeeminstellingen en voorkeuren",
@@ -1026,6 +1038,38 @@ TRANSLATIONS = {
     },
 
     # ============================================
+    # EMBEDDER PAGE
+    # ============================================
+    "embedder_intro": {
+        "nl": "De Embedding Application draait op dit apparaat en is bereikbaar voor andere computers in hetzelfde netwerk. Scan de QR-code op een laptop of tablet om in te loggen en kennisbankdocumenten te beheren — zonder Git, zonder cloud.",
+        "en": "The Embedding Application runs on this device and is reachable from other computers on the same network. Scan the QR code from a laptop or tablet to sign in and manage knowledge-base documents — no Git, no cloud.",
+    },
+    "embedder_qr_hint": {
+        "nl": "Scan met de camera-app of een QR-scanner.",
+        "en": "Scan with your camera app or a QR scanner.",
+    },
+    "embedder_qr_missing": {
+        "nl": "QR-module ontbreekt — herstart AITJE om dependencies bij te werken.",
+        "en": "QR module missing — restart AITJE to refresh dependencies.",
+    },
+    "embedder_copy_url": {
+        "nl": "Kopieer URL",
+        "en": "Copy URL",
+    },
+    "embedder_copy_url_copied": {
+        "nl": "Gekopieerd",
+        "en": "Copied",
+    },
+    "embedder_status_online": {
+        "nl": "ONLINE",
+        "en": "ONLINE",
+    },
+    "embedder_status_offline": {
+        "nl": "OFFLINE",
+        "en": "OFFLINE",
+    },
+
+    # ============================================
     # CONTACTS PAGE
     # ============================================
     "contacts_unknown": {
@@ -1650,8 +1694,8 @@ TRANSLATIONS = {
         "en": "Sync failed",
     },
     "kb_sync_repo_missing": {
-        "nl": "De kennisbank Git-configuratie ontbreekt. Neem contact op met het team van Aitje via aitje.com.",
-        "en": "The knowledge base Git configuration is missing. Please contact the Aitje team via aitje.com.",
+        "nl": "Nog geen kennisbank ontvangen — laat de embedder-app op een laptop in dit netwerk de kennisbank pushen.",
+        "en": "No knowledge base received yet — let the embedder app on a laptop in this network push the knowledge base.",
     },
     "kb_sync_support_suffix": {
         "nl": "Neem contact op met het team van Aitje via aitje.com.",

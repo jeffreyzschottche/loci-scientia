@@ -1,7 +1,9 @@
-"""Synchroniseer de kennisbank repo en embed JSON-LD exports naar Qdrant + SQLite.
+"""Embed JSON-LD kennisbank exports naar Qdrant + SQLite.
 
-Incrementele sync: alleen gewijzigde chunks worden opnieuw geëmbed.
-Content hashes worden bijgehouden om wijzigingen te detecteren.
+De export wordt door de embedder-app (zie app/embedder/) over LAN naar
+`POST /api/v1/kennisbank/import` gepusht; geen git-bridge meer. Incrementele
+import: alleen gewijzigde chunks worden opnieuw geëmbed. Content hashes
+worden bijgehouden om wijzigingen te detecteren.
 """
 
 from __future__ import annotations
@@ -11,7 +13,6 @@ import json
 import logging
 import os
 import sqlite3
-import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,13 +26,22 @@ from .rag.embedder import embed_text
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-KENNISBANK_REPO_DIR = _PROJECT_ROOT / "kennisbank_repo"
 KNOWLEDGE_BASE_DIRNAME = "knowledge_base"
 KNOWLEDGE_MODEL_FILE = "model.json"
 KNOWLEDGE_COLLECTION = os.getenv("QDRANT_KNOWLEDGE_COLLECTION", "kennisbank")
 KNOWLEDGE_SQLITE_CACHE = _PROJECT_ROOT / "kennisbank_cache.db"
-SYNC_STATE_FILE = KENNISBANK_REPO_DIR / ".sync_state.json"
+# Laatste succesvol geïmporteerde knowledge_base tree, op disk bewaard zodat
+# `knowledge_library.load_document_detail` de originele JSON-LD weer kan
+# uitlezen voor de preview-UI. Vervangt het oude `kennisbank_repo/` git
+# checkout pad.
+KENNISBANK_LATEST_DIR = _PROJECT_ROOT / "devices_db" / "kennisbank_latest"
+SYNC_STATE_FILE = _PROJECT_ROOT / "devices_db" / "kennisbank_sync_state.json"
 CHUNK_HASHES_FILE = _PROJECT_ROOT / ".kennisbank_chunk_hashes.json"
+
+
+def current_knowledge_base_root() -> Path:
+    """Pad waar de laatst-geïmporteerde knowledge_base export op disk staat."""
+    return KENNISBANK_LATEST_DIR / KNOWLEDGE_BASE_DIRNAME
 
 
 @dataclass
@@ -93,33 +103,6 @@ def _chunk_id_to_qdrant_id(chunk_id: str) -> str:
     """Converteer een chunk_id naar een geldige Qdrant UUID."""
     hash_bytes = hashlib.md5(chunk_id.encode("utf-8")).hexdigest()
     return f"{hash_bytes[:8]}-{hash_bytes[8:12]}-{hash_bytes[12:16]}-{hash_bytes[16:20]}-{hash_bytes[20:32]}"
-
-
-def _git_repo_url() -> str:
-    url = os.getenv("KENNISBANK_GIT_REPO", "").strip().strip("'\"")
-    if not url:
-        raise RuntimeError("KENNISBANK_GIT_REPO niet ingesteld in .env")
-    return url
-
-
-def _git_branch() -> str:
-    return os.getenv("KENNISBANK_GIT_BRANCH", "main").strip().strip("'\"")
-
-
-def _git_token() -> str:
-    return os.getenv("KENNISBANK_GIT_TOKEN", "").strip().strip("'\"")
-
-
-def _authenticated_url() -> str:
-    url = _git_repo_url()
-    token = _git_token()
-    if not token or token == "ghp_xxxxxxxxxxxxx":
-        raise RuntimeError("KENNISBANK_GIT_TOKEN niet correct ingesteld in .env")
-
-    if "://" in url:
-        scheme, rest = url.split("://", 1)
-        return f"{scheme}://{token}@{rest}"
-    return url
 
 
 def _knowledge_embedded_path() -> Path:
@@ -233,38 +216,6 @@ def _load_model_metadata(base_dir: Path) -> Dict:
         return _load_json(model_path)
     except json.JSONDecodeError:
         return {}
-
-
-def git_pull() -> dict:
-    branch = _git_branch()
-    auth_url = _authenticated_url()
-
-    KENNISBANK_REPO_DIR.mkdir(parents=True, exist_ok=True)
-
-    if not (KENNISBANK_REPO_DIR / ".git").exists():
-        result = subprocess.run(
-            ["git", "clone", "--branch", branch, auth_url, str(KENNISBANK_REPO_DIR)],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Git clone mislukt: {result.stderr}")
-        return {"action": "cloned", "branch": branch}
-
-    subprocess.run(
-        ["git", "remote", "set-url", "origin", auth_url],
-        cwd=str(KENNISBANK_REPO_DIR),
-        capture_output=True,
-    )
-    result = subprocess.run(
-        ["git", "pull", "origin", branch],
-        cwd=str(KENNISBANK_REPO_DIR),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Git pull mislukt: {result.stderr}")
-    return {"action": "pulled", "branch": branch}
 
 
 def _embed_chunks(
@@ -506,84 +457,86 @@ def _determine_changes(
     return chunks_to_embed, chunks_to_delete, new_hashes
 
 
-def sync_kennisbank(progress_callback: Optional[callable] = None) -> dict:
-    """Synchroniseer kennisbank met incrementele embedding.
+def import_kennisbank_from_dir(
+    export_base: Path,
+    *,
+    source: Optional[Dict] = None,
+    progress_callback: Optional[callable] = None,
+) -> dict:
+    """Importeer een knowledge_base export-tree in Qdrant + SQLite.
 
-    - Git pull de laatste wijzigingen
-    - Detecteer welke chunks gewijzigd zijn via content hashes
-    - Embed alleen nieuwe/gewijzigde chunks
-    - Verwijder verwijderde chunks uit Qdrant
-    - Behoud ongewijzigde chunks (geen re-embedding)
+    De export-tree heeft de layout die `JsonLdGenerator::generateStructuredFileMap`
+    produceert (`documents/*.json`, `chunks/*.json`, `model.json`, ...) — typisch
+    door de embedder-app als ZIP gepost naar `/api/v1/kennisbank/import` en
+    daar uitgepakt naar een tijdelijke map.
+
+    Het pad is incrementeel: alleen gewijzigde of nieuwe chunks worden
+    geëmbed, verwijderde chunks worden uit Qdrant verwijderd, ongewijzigde
+    chunks behouden hun bestaande vector via de SQLite-cache.
 
     Args:
-        progress_callback: Optional callback(current, total, message) voor progress updates
+        export_base: Map die `documents/`, `chunks/`, `model.json` etc bevat.
+        source: Optionele metadata over de oorsprong (bv. embedder versie /
+            originele filename) — wordt opgenomen in het sync-state bestand.
+        progress_callback: callback(current, total, message) voor SSE updates.
     """
     if progress_callback:
-        progress_callback(0, 100, "Git pull starten...")
-
-    git_result = git_pull()
-
-    if progress_callback:
-        progress_callback(5, 100, "Documenten laden...")
-
-    export_base = KENNISBANK_REPO_DIR / KNOWLEDGE_BASE_DIRNAME
+        progress_callback(0, 100, "Documenten laden...")
 
     documents = _load_documents(export_base / "documents")
     chunks = _load_chunks(export_base / "chunks", documents)
-
-    # Laad vorige chunk hashes
     old_hashes = _load_chunk_hashes()
 
     if not chunks:
-        # Geen chunks, verwijder alles
         chunks_to_delete = set(old_hashes.keys())
-        qdrant_result = {
+        qdrant_result = _index_in_qdrant([], documents, 0, chunks_to_delete) if chunks_to_delete else {
             "collection": KNOWLEDGE_COLLECTION,
             "points": 0,
             "upserted": 0,
-            "deleted": len(chunks_to_delete),
+            "deleted": 0,
             "vector_size": 0,
         }
-        sqlite_result = {"path": str(KNOWLEDGE_SQLITE_CACHE), "documents": len(documents), "chunks": 0}
+        sqlite_result = {
+            "path": str(KNOWLEDGE_SQLITE_CACHE),
+            "documents": len(documents),
+            "chunks": 0,
+        }
         stats = {
             "document_count": len(documents),
             "chunk_count": 0,
             "message": "Geen chunk-bestanden gevonden in knowledge_base.",
         }
-        # Clear hashes
         _save_chunk_hashes({})
         result = {
-            "git": git_result,
+            "source": source or {},
             "qdrant": qdrant_result,
             "sqlite": sqlite_result,
             "stats": stats,
             "synced_at": datetime.now(timezone.utc).isoformat(),
         }
         _write_state_file(result)
+        if progress_callback:
+            progress_callback(100, 100, "Geen documenten ontvangen — alles verwijderd.")
         return result
 
-    # Bepaal wijzigingen
     if progress_callback:
         progress_callback(10, 100, "Wijzigingen detecteren...")
 
     chunks_to_embed, chunks_to_delete, new_hashes = _determine_changes(chunks, old_hashes)
 
     logger.info(
-        "Kennisbank sync: %d totaal, %d te embedden, %d te verwijderen, %d ongewijzigd",
+        "Kennisbank import: %d totaal, %d te embedden, %d te verwijderen, %d ongewijzigd",
         len(chunks),
         len(chunks_to_embed),
         len(chunks_to_delete),
         len(chunks) - len(chunks_to_embed),
     )
 
-    # Bepaal vector size
     model_meta = _load_model_metadata(export_base)
     vector_size = int(model_meta.get("vectorDimension") or 768)
 
-    # Embed alleen gewijzigde chunks
     if chunks_to_embed:
         def embed_progress(idx, total, msg):
-            # Scale embedding progress from 15% to 85%
             pct = 15 + int((idx / max(total, 1)) * 70)
             if progress_callback:
                 progress_callback(pct, 100, f"Embedding {idx + 1}/{total} chunks...")
@@ -591,7 +544,6 @@ def sync_kennisbank(progress_callback: Optional[callable] = None) -> dict:
         embedded = _embed_chunks(chunks_to_embed, progress_callback=embed_progress)
         if not embedded and chunks_to_embed:
             raise RuntimeError("Embedding mislukt voor alle chunks; controleer fastembed setup.")
-        # Update vector size from actual embedding if available
         if embedded:
             vector_size = len(embedded[0][1])
     else:
@@ -599,25 +551,23 @@ def sync_kennisbank(progress_callback: Optional[callable] = None) -> dict:
         if progress_callback:
             progress_callback(85, 100, "Geen nieuwe chunks te embedden")
 
-    # Index in Qdrant (incrementeel)
     if progress_callback:
         progress_callback(88, 100, "Indexeren in Qdrant...")
 
     qdrant_result = _index_in_qdrant(embedded, documents, vector_size, chunks_to_delete)
 
-    # SQLite cache bijwerken - we moeten alle chunks hebben voor de cache
-    # Haal vectors van bestaande chunks uit Qdrant indien nodig
     if progress_callback:
         progress_callback(92, 100, "SQLite cache bijwerken...")
 
     all_embedded = _get_all_embedded_chunks(chunks, embedded, old_hashes)
     sqlite_result = _persist_sqlite_cache(documents, all_embedded)
 
-    # Sla nieuwe hashes op
     if progress_callback:
         progress_callback(98, 100, "Afronden...")
 
     _save_chunk_hashes(new_hashes)
+
+    _persist_latest_export(export_base)
 
     stats = {
         "document_count": len(documents),
@@ -628,7 +578,7 @@ def sync_kennisbank(progress_callback: Optional[callable] = None) -> dict:
         "model": model_meta or {"model": "unknown", "vectorDimension": vector_size},
     }
     result = {
-        "git": git_result,
+        "source": source or {},
         "qdrant": qdrant_result,
         "sqlite": sqlite_result,
         "stats": stats,
@@ -637,9 +587,37 @@ def sync_kennisbank(progress_callback: Optional[callable] = None) -> dict:
     _write_state_file(result)
 
     if progress_callback:
-        progress_callback(100, 100, "Sync voltooid!")
+        progress_callback(100, 100, "Import voltooid!")
 
     return result
+
+
+def _persist_latest_export(export_base: Path) -> None:
+    """Kopieer de net-geïmporteerde knowledge_base tree naar
+    KENNISBANK_LATEST_DIR zodat downstream code (knowledge_library) de
+    originele JSON-LD documenten kan blijven uitlezen voor previews. We
+    schrijven naar een sibling-pad en doen daarna een atomic rename zodat
+    er geen half-overschreven state op disk kan komen te staan."""
+    import shutil
+
+    if not export_base.exists():
+        return
+
+    target = KENNISBANK_LATEST_DIR / KNOWLEDGE_BASE_DIRNAME
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = target.parent / f"{target.name}.tmp-{os.getpid()}"
+    if staging.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+    try:
+        shutil.copytree(export_base, staging)
+        if target.exists():
+            previous = target.parent / f"{target.name}.old-{os.getpid()}"
+            os.replace(target, previous)
+            shutil.rmtree(previous, ignore_errors=True)
+        os.replace(staging, target)
+    except Exception as exc:  # pragma: no cover - I/O paden
+        logger.warning("Kon nieuwe knowledge_base niet persisteren: %s", exc)
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def _get_all_embedded_chunks(

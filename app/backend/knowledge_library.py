@@ -6,14 +6,13 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .kennisbank_sync import (
-    KENNISBANK_REPO_DIR,
-    KNOWLEDGE_BASE_DIRNAME,
     KNOWLEDGE_SQLITE_CACHE,
+    current_knowledge_base_root,
 )
 
 
 def _knowledge_base_root() -> Path:
-    return KENNISBANK_REPO_DIR / KNOWLEDGE_BASE_DIRNAME
+    return current_knowledge_base_root()
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
