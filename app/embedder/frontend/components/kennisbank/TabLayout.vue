@@ -44,11 +44,11 @@
           </div>
 
           <button
-            @click="syncToGit"
+            @click="syncToDevice"
             :disabled="syncing"
             class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all bg-loci-yellow text-loci-black-deep hover:bg-loci-black hover:text-loci-white disabled:opacity-50"
           >
-            {{ syncing ? translate('Synchroniseren...', 'Syncing...') : translate('Sync naar GitHub', 'Sync to GitHub') }}
+            {{ syncing ? translate('Synchroniseren...', 'Syncing...') : translate('Sync naar device', 'Sync to device') }}
           </button>
         </nav>
       </div>
@@ -87,7 +87,7 @@ function isActive(path: string) {
   return route.path.startsWith(path);
 }
 
-async function syncToGit() {
+async function syncToDevice() {
   try {
     syncing.value = true;
     syncStatus.value = { type: 'info', message: translate('Synchroniseren...', 'Syncing...') };
@@ -102,7 +102,7 @@ async function syncToGit() {
   } catch (e: any) {
     syncStatus.value = {
       type: 'error',
-      message: e?.data?.message || e?.message || translate('Sync mislukt. Controleer je Git configuratie in Mijn Account.', 'Sync failed. Check your Git configuration under My Account.'),
+      message: e?.data?.message || e?.message || translate('Sync naar device mislukt.', 'Sync to device failed.'),
     };
   } finally {
     syncing.value = false;

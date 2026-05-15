@@ -22,14 +22,6 @@ const translations: Translations = {
   },
 
   // Kennisbank page
-  pushing: {
-    nl: "Pushen...",
-    en: "Pushing...",
-  },
-  push_to_git: {
-    nl: "Sync naar OS",
-    en: "Sync to OS",
-  },
   upload_document: {
     nl: "Document Uploaden",
     en: "Upload Document",
@@ -102,34 +94,6 @@ const translations: Translations = {
     nl: "Syncen...",
     en: "Syncing...",
   },
-  last_pushed: {
-    nl: "Laatst gepusht:",
-    en: "Last pushed:",
-  },
-  git_repo_url: {
-    nl: "GitHub repo URL",
-    en: "GitHub repo URL",
-  },
-  git_branch: {
-    nl: "Branch",
-    en: "Branch",
-  },
-  git_access_token: {
-    nl: "GitHub token (PAT)",
-    en: "GitHub token (PAT)",
-  },
-  git_last_synced: {
-    nl: "Laatst gesynct",
-    en: "Last synced",
-  },
-  git_token_hint: {
-    nl: "Laat leeg om het bestaande token te behouden",
-    en: "Leave empty to keep the existing token",
-  },
-  git_config_required: {
-    nl: "Vul eerst je Git-configuratie in.",
-    en: "Please configure Git first.",
-  },
   error_loading_documents: {
     nl: "Fout bij laden documenten",
     en: "Error loading documents",
@@ -161,10 +125,6 @@ const translations: Translations = {
   delete_failed: {
     nl: "Verwijderen mislukt",
     en: "Delete failed",
-  },
-  git_config_saved: {
-    nl: "Git configuratie opgeslagen",
-    en: "Git configuration saved",
   },
   save_failed: {
     nl: "Opslaan mislukt",
