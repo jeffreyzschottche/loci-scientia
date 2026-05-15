@@ -95,13 +95,6 @@
               <b class="text-loci-black">{{ authStore.user?.name || translate('onbekend', 'unknown') }}</b>
             </span>
             <button
-              v-if="authStore.adminImpersonating"
-              @click="returnToAdmin"
-              class="rounded-full bg-loci-yellow px-4 py-2 text-sm font-semibold text-loci-black-deep transition-all hover:bg-loci-yellow-hover"
-            >
-              {{ translate('Terug naar admin', 'Back to admin') }}
-            </button>
-            <button
               @click="handleLogout"
               class="rounded-full border border-loci-gray-200 bg-loci-white px-4 py-2 text-sm font-semibold text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow hover:text-loci-black-deep"
             >
@@ -214,10 +207,6 @@ async function handleLogout() {
   }
 }
 
-function returnToAdmin() {
-  authStore.logout();
-  router.push('/admin/cms');
-}
 </script>
 
 <style scoped>

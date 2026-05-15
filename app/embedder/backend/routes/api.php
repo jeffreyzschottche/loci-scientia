@@ -1,13 +1,11 @@
 <?php
 
-use App\Http\Controllers\Api\V1\AdminController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\LibraryController;
 use App\Http\Controllers\Api\V1\InsightsController;
 use App\Http\Controllers\Api\V1\KennisbankController;
 use App\Http\Controllers\Api\V1\PriorityController;
-use App\Http\Middleware\AuthenticateAdmin;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -15,21 +13,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-    Route::post('/admin/login', [AdminController::class, 'login']);
 
     // Email verification
     Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
         ->name('verification.verify');
-
-    Route::prefix('admin')
-        ->middleware(AuthenticateAdmin::class)
-        ->group(function () {
-            Route::get('/me', [AdminController::class, 'me']);
-            Route::post('/logout', [AdminController::class, 'logout']);
-            Route::get('/users', [AdminController::class, 'users']);
-            Route::post('/users', [AdminController::class, 'createUser']);
-            Route::post('/users/{user}/impersonate', [AdminController::class, 'impersonate']);
-        });
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {

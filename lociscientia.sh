@@ -1433,11 +1433,17 @@ PY
     # die /embedder/api/* proxiet. Loopback omdat Laravel op dit device draait.
     _upsert_env_key AITJE_DEVICE_BASE_URL "http://127.0.0.1:${BACKEND_PORT}"
     _upsert_env_key AITJE_ADMIN_TOKEN_FILE "${PROJECT_ROOT}/devices_db/admin_token.json"
-    if [ -n "${ADMIN_EMAIL:-}" ]; then
-        _upsert_env_key ADMIN_EMAIL "$ADMIN_EMAIL"
+    # Single-tenant embedder-gebruiker (vervangt het oude multi-tenant Admin
+    # CMS). `php artisan aitje:bootstrap-user` (verderop) leest deze waarden
+    # en seed't de gebruiker op de eerste boot.
+    if [ -n "${EMBEDDER_USER_EMAIL:-}" ]; then
+        _upsert_env_key EMBEDDER_USER_EMAIL "$EMBEDDER_USER_EMAIL"
     fi
-    if [ -n "${ADMIN_PASSWORD_HASH:-}" ]; then
-        _upsert_env_key ADMIN_PASSWORD_HASH "$ADMIN_PASSWORD_HASH"
+    if [ -n "${EMBEDDER_USER_PASSWORD:-}" ]; then
+        _upsert_env_key EMBEDDER_USER_PASSWORD "$EMBEDDER_USER_PASSWORD"
+    fi
+    if [ -n "${EMBEDDER_USER_NAME:-}" ]; then
+        _upsert_env_key EMBEDDER_USER_NAME "$EMBEDDER_USER_NAME"
     fi
 }
 
@@ -1495,6 +1501,11 @@ start_embedder() {
         echo "⚠️  php artisan migrate mislukt; embedder wordt niet gestart."
         return 1
     }
+
+    # Seed de single-tenant gebruiker uit EMBEDDER_USER_* env vars (idempotent;
+    # zonder env vars is dit een no-op). Vervangt het oude Admin CMS dat
+    # gebruikers per klant aanmaakte.
+    (cd "$EMBEDDER_BACKEND_DIR" && php artisan aitje:bootstrap-user) || true
 
     # Nuxt SPA bouwen (incrementeel, zoals webclient).
     if [ -d "$EMBEDDER_FRONTEND_DIR" ]; then

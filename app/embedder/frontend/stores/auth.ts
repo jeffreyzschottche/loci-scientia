@@ -8,7 +8,6 @@ import type {
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null);
   const user = ref<User | null>(null);
-  const adminImpersonating = ref(false);
 
   const isLoggedIn = computed(() => !!token.value);
   const isPremium = computed(() => !!user.value?.premium);
@@ -22,25 +21,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function setAdminImpersonation(isImpersonating: boolean) {
-    adminImpersonating.value = isImpersonating;
-    if (import.meta.client) {
-      if (isImpersonating) {
-        localStorage.setItem('admin_impersonating', '1');
-      } else {
-        localStorage.removeItem('admin_impersonating');
-      }
-    }
-  }
-
   function logout() {
     token.value = null;
     user.value = null;
-    adminImpersonating.value = false;
     if (import.meta.client) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
-      localStorage.removeItem('admin_impersonating');
     }
   }
 
@@ -52,7 +38,6 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = storedToken;
         user.value = JSON.parse(storedUser);
       }
-      adminImpersonating.value = localStorage.getItem('admin_impersonating') === '1';
     }
   }
 
@@ -92,9 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     isLoggedIn,
-    adminImpersonating,
     setSession,
-    setAdminImpersonation,
     logout,
     restore,
     login,
