@@ -1052,14 +1052,6 @@ TRANSLATIONS = {
         "nl": "QR-module ontbreekt — herstart AITJE om dependencies bij te werken.",
         "en": "QR module missing — restart AITJE to refresh dependencies.",
     },
-    "embedder_copy_url": {
-        "nl": "Kopieer URL",
-        "en": "Copy URL",
-    },
-    "embedder_copy_url_copied": {
-        "nl": "Gekopieerd",
-        "en": "Copied",
-    },
     "embedder_status_online": {
         "nl": "ONLINE",
         "en": "ONLINE",
@@ -1492,26 +1484,6 @@ TRANSLATIONS = {
     # ============================================
     # KNOWLEDGE PAGE
     # ============================================
-    "kb_upload_document": {
-        "nl": "⬆ Upload Document",
-        "en": "⬆ Upload Document",
-    },
-    "kb_upload_popup_badge": {
-        "nl": "KENNISBANK PORTAAL",
-        "en": "KNOWLEDGE PORTAL",
-    },
-    "kb_upload_popup_title": {
-        "nl": "Upload documenten via je eigen kennisbank-account",
-        "en": "Upload documents via your own knowledge base account",
-    },
-    "kb_upload_popup_body": {
-        "nl": "Open kennisbank.aitje.com en log daar in met de gegevens die we je eerder hebben gestuurd. Gebruik je eigen kennis-account als je een kennisabonnement of SLA hebt. Vanuit dat portaal kun je je documenten beheren en uploaden.",
-        "en": "Open kennisbank.aitje.com and sign in with the credentials we sent you earlier. Use your own knowledge account if you have a knowledge subscription or SLA. From that portal you can manage and upload your documents.",
-    },
-    "kb_upload_popup_open": {
-        "nl": "Open portaal",
-        "en": "Open portal",
-    },
     "kb_sd_card_capacity": {
         "nl": "SD Kaart Capaciteit",
         "en": "SD Card Capacity",
@@ -1673,49 +1645,17 @@ TRANSLATIONS = {
         "nl": "Verwerken…",
         "en": "Processing…",
     },
-    "kb_sync_button": {
-        "nl": "Sync kennisbank",
-        "en": "Sync knowledge base",
-    },
-    "kb_syncing": {
-        "nl": "Sync bezig…",
-        "en": "Sync in progress…",
-    },
     "kb_sync_last": {
-        "nl": "Laatst gesynct",
-        "en": "Last synced",
+        "nl": "Laatste push",
+        "en": "Last push",
     },
     "kb_sync_never": {
-        "nl": "Nog nooit gesynct",
-        "en": "Never synced",
+        "nl": "Nog geen push ontvangen",
+        "en": "No push received yet",
     },
     "kb_sync_error": {
-        "nl": "Sync mislukt",
-        "en": "Sync failed",
-    },
-    "kb_sync_repo_missing": {
-        "nl": "Nog geen kennisbank ontvangen — laat de embedder-app op een laptop in dit netwerk de kennisbank pushen.",
-        "en": "No knowledge base received yet — let the embedder app on a laptop in this network push the knowledge base.",
-    },
-    "kb_sync_support_suffix": {
-        "nl": "Neem contact op met het team van Aitje via aitje.com.",
-        "en": "Please contact the Aitje team via aitje.com.",
-    },
-    "kb_sync_success": {
-        "nl": "Sync voltooid",
-        "en": "Sync completed",
-    },
-    "kb_sync_vectors_detail": {
-        "nl": "{count} vectors",
-        "en": "{count} vectors",
-    },
-    "kb_sync_starting": {
-        "nl": "Sync wordt gestart...",
-        "en": "Starting sync...",
-    },
-    "kb_sync_need_token": {
-        "nl": "Backend token vereist voor sync.",
-        "en": "Backend token required for sync.",
+        "nl": "Kon kennisbank niet laden",
+        "en": "Could not load knowledge base",
     },
     "kb_sync_pending": {
         "nl": "In afwachting",

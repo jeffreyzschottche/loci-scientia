@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, BACKEND_TIMEOUT
 from ..translations import t, register_language_change_callback
 from ...backend.kennisbank_sync import _knowledge_embedded_path
-from .dialog_style import OverlayDialog, show_error_dialog
+from .dialog_style import show_error_dialog
 
 
 class KnowledgePage(QWidget):
@@ -52,7 +52,6 @@ class KnowledgePage(QWidget):
         self._preview_title_label: QLabel | None = None
         self._preview_meta_label: QLabel | None = None
         self._preview_text: QTextEdit | None = None
-        self._sync_button: QPushButton | None = None
         self._sync_status_label: QLabel | None = None
         self._sync_details_label: QLabel | None = None
         self._sync_meta_label: QLabel | None = None
@@ -82,9 +81,6 @@ class KnowledgePage(QWidget):
         register_language_change_callback(self._update_translations)
 
     def _update_translations(self) -> None:
-        self._upload_btn.setText(t("kb_upload_document"))
-        if self._sync_button:
-            self._sync_button.setText(f"🔄 {t('kb_sync_button')}")
         if self._sync_status_label and self._sync_state:
             self._update_sync_labels(self._sync_state)
 
@@ -165,20 +161,14 @@ class KnowledgePage(QWidget):
         return btn
 
     def _actions_card(self) -> QFrame:
+        # Geen sync- of upload-knoppen meer: documenten worden door de
+        # embedder-app (zie Embedder-tab) over LAN gepusht. Deze kaart is
+        # nu enkel een statistiek-tegel met het aantal aanwezige documenten.
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
-
-        self._sync_button = self._pill_button(t("kb_sync_button"), primary=True)
-        self._sync_button.setText(f"🔄 {t('kb_sync_button')}")
-        self._sync_button.clicked.connect(self._trigger_sync)
-        layout.addWidget(self._sync_button)
-
-        self._upload_btn = self._pill_button(t("kb_upload_document"))
-        self._upload_btn.clicked.connect(self._show_upload_instructions)
-        layout.addWidget(self._upload_btn)
 
         documents_block = QFrame()
         documents_block.setStyleSheet(
@@ -207,63 +197,8 @@ class KnowledgePage(QWidget):
         documents_layout.addWidget(self._actions_documents_detail_label)
 
         layout.addWidget(documents_block)
+        layout.addStretch(1)
         return card
-
-    def _show_upload_instructions(self) -> None:
-        dialog = OverlayDialog(self)
-        dialog.setWindowTitle(t("kb_upload_popup_title"))
-
-        badge = QLabel(t("kb_upload_popup_badge"))
-        badge.setStyleSheet(
-            "font-size:11px; font-weight:700; letter-spacing:0.18em; color:#6b7280;"
-        )
-        dialog.card_layout.addWidget(badge)
-
-        title = QLabel(t("kb_upload_popup_title"))
-        title.setWordWrap(True)
-        title.setStyleSheet("font-size:24px; font-weight:800; color:#111111;")
-        dialog.card_layout.addWidget(title)
-
-        body = QLabel(t("kb_upload_popup_body"))
-        body.setWordWrap(True)
-        body.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        body.setStyleSheet("font-size:15px; font-weight:500; line-height:1.55; color:#374151;")
-        dialog.card_layout.addWidget(body)
-
-        url_label = QLabel("kennisbank.aitje.com")
-        url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        url_label.setStyleSheet(
-            "background:#f9fafb; border:1px solid #e5e7eb; border-radius:18px; "
-            "padding:14px 16px; font-size:16px; font-weight:700; color:#111111;"
-        )
-        dialog.card_layout.addWidget(url_label)
-
-        dialog.card_layout.addStretch(1)
-
-        actions = QHBoxLayout()
-        actions.setSpacing(12)
-
-        close_btn = QPushButton(t("close"))
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#ffffff;"
-            "  color:#111111;"
-            "  border:1px solid #e5e7eb;"
-            "  border-radius:18px;"
-            "  padding:8px 18px;"
-            "  font-weight:600;"
-            "  min-height:36px;"
-            "  text-align:center;"
-            "}"
-            "QPushButton:hover { background:#f9fafb; border-color:#d1d5db; }"
-        )
-        close_btn.clicked.connect(dialog.reject)
-
-        actions.addStretch(1)
-        actions.addWidget(close_btn)
-        dialog.card_layout.addLayout(actions)
-        dialog.exec()
 
     def _sync_status_card(self) -> QFrame:
         card = QFrame()
@@ -477,8 +412,6 @@ class KnowledgePage(QWidget):
         if not BACKEND_BEARER_TOKEN:
             if self._sync_status_label:
                 self._set_sync_status_badge("Failed", "#dc2626")
-            if self._sync_button:
-                self._sync_button.setEnabled(False)
             return
         try:
             resp = requests.get(
@@ -756,16 +689,9 @@ class KnowledgePage(QWidget):
         local_dt = dt.astimezone()
         return local_dt.strftime("%d %b %Y %H:%M")
 
-    def _friendly_sync_error(self, message: str | None) -> str:
-        raw = (message or "").strip()
-        if not raw:
-            return t("kb_sync_support_suffix")
-        return f"{raw}\n\n{t('kb_sync_support_suffix')}"
-
-    def _trigger_sync(self) -> None:
-        # De device ontvangt nu een push vanuit de embedder-app (zie
-        # /api/v1/kennisbank/import) — er is geen handmatige sync meer vanaf
-        # deze UI. De knop herlaadt de status + bibliotheek zodat een net
-        # gepuste bundel meteen zichtbaar wordt.
+    def on_page_shown(self) -> None:
+        # main.py roept dit aan wanneer de tab opent. We hebben geen handmatige
+        # sync-knop meer (de embedder pusht over LAN); deze hook is hoe de UI
+        # zich up-to-date houdt zonder polling.
         self._refresh_sync_state()
         self._refresh_library()

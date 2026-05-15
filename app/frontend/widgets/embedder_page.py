@@ -5,12 +5,10 @@ from typing import Optional
 
 import requests
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QPixmap
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFrame,
-    QHBoxLayout,
     QLabel,
-    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -132,32 +130,10 @@ class EmbedderPage(QWidget):
         )
         card_layout.addWidget(self._url_label)
 
-        # Action row — single centered yellow pill button.
-        actions = QHBoxLayout()
-        actions.setContentsMargins(0, 4, 0, 0)
-        actions.setSpacing(10)
-        actions.addStretch(1)
-        self._copy_btn = QPushButton(t("embedder_copy_url"))
-        self._copy_btn.setCursor(Qt.PointingHandCursor)
-        self._copy_btn.setFixedHeight(40)
-        self._copy_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15; color:#050505;"
-            "  border:none; border-radius:20px;"
-            "  padding:8px 26px; font-weight:600;"
-            "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
-        )
-        self._copy_btn.clicked.connect(self._on_copy_url)
-        actions.addWidget(self._copy_btn)
-        actions.addStretch(1)
-        card_layout.addLayout(actions)
-
         outer.addWidget(card, 0, Qt.AlignHCenter)
         outer.addStretch(1)
 
         # ---- Initial paint + status polling ---------------------------------
-        self._copy_revert_timer: Optional[QTimer] = None
         self._refresh_url_and_qr()
 
         self._status_timer = QTimer(self)
@@ -212,25 +188,8 @@ class EmbedderPage(QWidget):
         except requests.RequestException:
             self._set_status(False)
 
-    def _on_copy_url(self) -> None:
-        clipboard = QGuiApplication.clipboard()
-        if clipboard is None:
-            return
-        clipboard.setText(_embedder_url())
-        original = t("embedder_copy_url")
-        self._copy_btn.setText(t("embedder_copy_url_copied"))
-        if self._copy_revert_timer is not None:
-            self._copy_revert_timer.stop()
-        self._copy_revert_timer = QTimer(self)
-        self._copy_revert_timer.setSingleShot(True)
-        self._copy_revert_timer.timeout.connect(
-            lambda: self._copy_btn.setText(original)
-        )
-        self._copy_revert_timer.start(1500)
-
     def _update_translations(self) -> None:
         self._qr_hint.setText(t("embedder_qr_hint"))
-        self._copy_btn.setText(t("embedder_copy_url"))
         self._check_status()
         self._refresh_url_and_qr()
 
