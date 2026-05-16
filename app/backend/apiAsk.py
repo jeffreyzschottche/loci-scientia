@@ -27,7 +27,7 @@ from .web_search import (
 
 logger = logging.getLogger(__name__)
 
-MAX_CONTEXT_ITEMS = 3
+MAX_CONTEXT_ITEMS = 6
 
 
 def _float_env(name: str, default: float) -> float:
@@ -41,7 +41,7 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
-MIN_CONTEXT_SCORE = _float_env("RAG_MIN_CONTEXT_SCORE", 0.30)
+MIN_CONTEXT_SCORE = _float_env("RAG_MIN_CONTEXT_SCORE", 0.15)
 KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
@@ -614,21 +614,6 @@ def _gather_context_with_details(prompt_text: str) -> tuple[list[str], Dict[str,
         "knowledge": [],
         "citations": [],
     }
-
-    device_hits = devices_repo.search_devices(prompt_text, limit=5)
-    for device, score in device_hits:
-        scored.append(
-            (
-                "device",
-                _flatten_multiline(describe_device(device)),
-                float(score or 0.0),
-            )
-        )
-        details["devices"].append({
-            "user_name": device.user_name,
-            "device_name": device.device_name,
-            "score": float(score or 0.0),
-        })
 
     knowledge_hits = knowledge_repo.search_chunks(
         prompt_text,
