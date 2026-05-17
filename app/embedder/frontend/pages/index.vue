@@ -33,16 +33,6 @@
             />
           </div>
 
-          <div class="flex items-center justify-between text-sm">
-            <NuxtLink to="/account/forgot-password" class="text-loci-gray-500 hover:text-loci-black">
-              Wachtwoord vergeten?
-            </NuxtLink>
-          </div>
-
-          <p v-if="loginAttemptWarning" class="rounded-loci border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
-            {{ loginAttemptWarning }}
-          </p>
-
           <button
             type="submit"
             :disabled="loading"
@@ -53,7 +43,7 @@
         </form>
 
         <p class="mt-6 text-center text-sm text-loci-gray-500">
-          Geen toegang? We hebben ook een mail gestuurd. Bekijk je mailbox en spammap om te controleren of je de uitnodiging misschien over het hoofd hebt gezien.
+          Geen toegang? Vraag de beheerder van dit apparaat om een account toe te voegen.
         </p>
       </div>
     </div>
@@ -77,11 +67,9 @@ const form = reactive({
 
 const error = ref('');
 const loading = ref(false);
-const loginAttemptWarning = ref('');
 
 async function handleLogin() {
   error.value = '';
-  loginAttemptWarning.value = '';
   loading.value = true;
 
   try {
@@ -94,22 +82,8 @@ async function handleLogin() {
     } else {
       error.value = err.message || 'Login mislukt';
     }
-
-    loginAttemptWarning.value = buildAttemptWarning(err.data?.meta);
   } finally {
     loading.value = false;
   }
-}
-
-function buildAttemptWarning(meta?: { attempts: number; max_attempts: number; remaining: number; retry_after_seconds?: number | null }) {
-  if (!meta || meta.attempts < 3) {
-    return '';
-  }
-
-  if (meta.remaining <= 0) {
-    return '5/5 gedaan. Probeer het na een uur weer.';
-  }
-
-  return `${meta.attempts}/${meta.max_attempts} gedaan, nog ${meta.remaining} ${meta.remaining === 1 ? 'poging' : 'pogingen'} over. Na 5 mislukte pogingen wordt inloggen voor een uur geblokkeerd.`;
 }
 </script>

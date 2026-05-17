@@ -61,8 +61,11 @@ class Settings(BaseModel):
     searxng_max_results: int = 5
     searxng_language: str = "nl"
     searxng_safesearch: int = 1
-    embedder_port: int = 8001
-    embedder_timeout: float = 120.0
+    embedder_admin_email: Optional[str] = None
+    embedder_admin_password: Optional[str] = None
+    embedder_admin_name: str = "Aitje Admin"
+    embedder_db_path: Optional[Path] = None
+    embedder_upload_dir: Optional[Path] = None
 
 
 def get_settings() -> "Settings":
@@ -128,16 +131,13 @@ def get_settings() -> "Settings":
     if searxng_safesearch not in (0, 1, 2):
         searxng_safesearch = 1
 
-    try:
-        embedder_port = int(os.environ.get("EMBEDDER_PORT", "8001"))
-    except ValueError:
-        embedder_port = 8001
-    if embedder_port <= 0:
-        embedder_port = 8001
-    try:
-        embedder_timeout = float(os.environ.get("EMBEDDER_TIMEOUT", "120"))
-    except ValueError:
-        embedder_timeout = 120.0
+    project_root = Path(__file__).resolve().parents[2]
+    devices_db_dir = project_root / "devices_db"
+    embedder_db_path = devices_db_dir / "embedder.db"
+    embedder_upload_dir = devices_db_dir / "embedder_uploads"
+    embedder_admin_email = (os.environ.get("EMBEDDER_USER_EMAIL") or "").strip() or None
+    embedder_admin_password = os.environ.get("EMBEDDER_USER_PASSWORD") or None
+    embedder_admin_name = (os.environ.get("EMBEDDER_USER_NAME") or "").strip() or "Aitje Admin"
 
     return Settings(
         offline_assets_dir=offline_assets_dir,
@@ -155,8 +155,11 @@ def get_settings() -> "Settings":
         searxng_max_results=searxng_max_results,
         searxng_language=searxng_language,
         searxng_safesearch=searxng_safesearch,
-        embedder_port=embedder_port,
-        embedder_timeout=embedder_timeout,
+        embedder_admin_email=embedder_admin_email,
+        embedder_admin_password=embedder_admin_password,
+        embedder_admin_name=embedder_admin_name,
+        embedder_db_path=embedder_db_path,
+        embedder_upload_dir=embedder_upload_dir,
     )
 
 

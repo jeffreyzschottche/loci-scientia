@@ -27,16 +27,11 @@ promptlog.log
 
 ollama.pid
 
-kennisbank_repo/
-kennisbank_cache.db
-kennis_chunk_hashes.json
-devices_db/kennisbank_latest/
 devices_db/kennisbank_sync_state.json
-
-# Embedder app (Laravel + Nuxt) runtime / build artefacten
-embedder.log
-embedder.pid
-app/embedder/backend/vendor/
+devices_db/embedder.db
+devices_db/embedder.db-journal
+devices_db/embedder_tokens.json
+devices_db/embedder_uploads/
 app/embedder/backend/bootstrap/cache/*.php
 app/embedder/backend/storage/logs/*.log
 app/embedder/backend/storage/framework/cache/data/*

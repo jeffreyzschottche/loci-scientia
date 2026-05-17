@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia';
 import type { User } from '~/types/User';
-import type {
-  LoginResponse,
-  MessageResponse,
-} from '~/types/ApiResponse';
+import type { LoginResponse } from '~/types/ApiResponse';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null);
@@ -48,31 +45,6 @@ export const useAuthStore = defineStore('auth', () => {
     return response.user;
   }
 
-  async function forgotPassword(email: string) {
-    const api = useApi();
-    return await api.post<MessageResponse>('/forgot-password', { email });
-  }
-
-  async function resetPassword(
-    resetToken: string,
-    email: string,
-    password: string,
-    password_confirmation: string
-  ) {
-    const api = useApi();
-    return await api.post<MessageResponse>('/reset-password', {
-      token: resetToken,
-      email,
-      password,
-      password_confirmation,
-    });
-  }
-
-  async function resendVerification() {
-    const api = useApi();
-    return await api.post<MessageResponse>('/email/resend');
-  }
-
   return {
     token,
     user,
@@ -81,9 +53,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     restore,
     login,
-    forgotPassword,
-    resetPassword,
-    resendVerification,
     isPremium,
   };
 });

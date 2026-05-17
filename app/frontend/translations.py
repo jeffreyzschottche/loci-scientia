@@ -1556,6 +1556,14 @@ TRANSLATIONS = {
         "nl": "Zoek in documenten...",
         "en": "Search documents...",
     },
+    "kb_documents_refresh": {
+        "nl": "Vernieuwen",
+        "en": "Refresh",
+    },
+    "kb_documents_refresh_tooltip": {
+        "nl": "Documenten en sync-status opnieuw ophalen",
+        "en": "Reload documents and sync status",
+    },
     "kb_preview_title": {
         "nl": "Document Preview",
         "en": "Document Preview",

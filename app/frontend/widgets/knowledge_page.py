@@ -48,6 +48,7 @@ class KnowledgePage(QWidget):
         self._actions_documents_detail_label: QLabel | None = None
         self._documents_title_label: QLabel | None = None
         self._documents_search_input: QLineEdit | None = None
+        self._documents_refresh_button: QPushButton | None = None
         self._documents_table: QTableWidget | None = None
         self._preview_title_label: QLabel | None = None
         self._preview_meta_label: QLabel | None = None
@@ -113,6 +114,9 @@ class KnowledgePage(QWidget):
             self._documents_title_label.setText(t("kb_documents"))
         if self._documents_search_input:
             self._documents_search_input.setPlaceholderText(t("kb_documents_search_placeholder"))
+        if self._documents_refresh_button:
+            self._documents_refresh_button.setText(t("kb_documents_refresh"))
+            self._documents_refresh_button.setToolTip(t("kb_documents_refresh_tooltip"))
         if self._documents_table:
             self._documents_table.setHorizontalHeaderLabels(
                 [
@@ -335,7 +339,29 @@ class KnowledgePage(QWidget):
             "}"
         )
         self._documents_search_input.textChanged.connect(self._apply_documents_filter)
-        card_layout.addWidget(self._documents_search_input)
+
+        self._documents_refresh_button = QPushButton(t("kb_documents_refresh"))
+        self._documents_refresh_button.setToolTip(t("kb_documents_refresh_tooltip"))
+        self._documents_refresh_button.setCursor(Qt.PointingHandCursor)
+        self._documents_refresh_button.setStyleSheet(
+            "QPushButton {"
+            "  background:#fcfbf8;"
+            "  border:1px solid #ece7dc;"
+            "  border-radius:16px;"
+            "  padding:10px 18px;"
+            "  color:#111111;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#f4eeda; border-color:#d6cdb4; }"
+            "QPushButton:disabled { color:#9a9183; }"
+        )
+        self._documents_refresh_button.clicked.connect(self._handle_refresh_clicked)
+
+        search_row = QHBoxLayout()
+        search_row.setSpacing(8)
+        search_row.addWidget(self._documents_search_input, 1)
+        search_row.addWidget(self._documents_refresh_button)
+        card_layout.addLayout(search_row)
 
         self._documents_table = QTableWidget()
         self._documents_table.setColumnCount(5)
@@ -695,3 +721,15 @@ class KnowledgePage(QWidget):
         # zich up-to-date houdt zonder polling.
         self._refresh_sync_state()
         self._refresh_library()
+
+    def _handle_refresh_clicked(self) -> None:
+        # Disable de knop tijdens de blocking HTTP-calls zodat de user niet
+        # twee keer klikt; Qt verwerkt events pas weer als we hieruit terug zijn.
+        if self._documents_refresh_button:
+            self._documents_refresh_button.setEnabled(False)
+        try:
+            self._refresh_sync_state()
+            self._refresh_library()
+        finally:
+            if self._documents_refresh_button:
+                self._documents_refresh_button.setEnabled(True)

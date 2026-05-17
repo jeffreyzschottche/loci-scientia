@@ -1224,387 +1224,87 @@ if [ -d "$WEBCLIENT_DIR" ]; then
     fi
 fi
 
-# --- Embedder app (Laravel + Nuxt SPA) ---------------------------------------
-# Geïnternaliseerd onder /embedder. Laravel draait lokaal op
-# 127.0.0.1:${EMBEDDER_PORT} (alleen loopback) en wordt door FastAPI
-# ge-reverse-proxied. De Nuxt SPA wordt statisch gegenereerd en gemount op
-# /embedder/. Voor zowel build als runtime moet PHP 8.2+ aanwezig zijn.
+# --- Embedder app (Nuxt SPA, FastAPI backend in-process) ----------------------
+# De Aitje Embedding Application is volledig geport naar FastAPI
+# (zie app/backend/embedder/). Er draait geen los Laravel-proces meer; de API
+# wordt mee gestart door uvicorn onder /embedder/api/v1/*. Dit blok bouwt nog
+# alleen de Nuxt SPA, statisch gegenereerd naar
+# app/embedder/frontend/.output/public en gemount op /embedder/ door FastAPI.
 
-EMBEDDER_PORT="${EMBEDDER_PORT:-8001}"
-EMBEDDER_BACKEND_DIR="$PROJECT_ROOT/app/embedder/backend"
 EMBEDDER_FRONTEND_DIR="$PROJECT_ROOT/app/embedder/frontend"
 EMBEDDER_FRONTEND_DIST_INDEX="$EMBEDDER_FRONTEND_DIR/.output/public/index.html"
-EMBEDDER_DB_PATH="$EMBEDDER_BACKEND_DIR/database/database.sqlite"
-EMBEDDER_LOG="$PROJECT_ROOT/embedder.log"
-embedder_pid=""
 
-_php_version_ok() {
-    command -v php >/dev/null 2>&1 || return 1
-    php -r 'exit(PHP_VERSION_ID >= 80200 ? 0 : 1);' >/dev/null 2>&1
-}
-
-_purge_apache2_if_present() {
-    # Eerdere versies van dit script gebruikten het `php` meta-package, dat
-    # libapache2-mod-php* en daarmee apache2 als afhankelijkheid binnenhaalt.
-    # Aitje-devices draaien geen Apache; ruim die op zodat poort 80 vrij is
-    # en het pakket niet meer geupdate hoeft te worden.
-    case "$DEVICE_PLATFORM" in
-        linux|jetson) ;;
-        *) return 0 ;;
-    esac
-    if ! command -v dpkg >/dev/null 2>&1; then
-        return 0
+build_embedder_spa() {
+    if [ ! -d "$EMBEDDER_FRONTEND_DIR" ]; then
+        echo "ℹ️  Geen app/embedder/frontend gevonden, embedder-SPA overslaan."
+        return 1
+    fi
+    if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        echo "⚠️  Node.js/npm niet gevonden — embedder SPA wordt niet gebouwd."
+        return 1
     fi
 
-    local candidates=(php libapache2-mod-php8.5 libapache2-mod-php8.4 libapache2-mod-php8.3 libapache2-mod-php8.2 apache2 apache2-bin apache2-data apache2-utils)
-    local to_purge=()
-    local pkg=""
-    for pkg in "${candidates[@]}"; do
-        if dpkg -s "$pkg" >/dev/null 2>&1; then
-            to_purge+=("$pkg")
-        fi
-    done
-    if [ "${#to_purge[@]}" -eq 0 ]; then
-        return 0
-    fi
-
-    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
-        echo "ℹ️  Apache2 + php meta-package gedetecteerd; verwijder handmatig met:"
-        echo "    sudo apt-get purge -y ${to_purge[*]} && sudo apt-get autoremove -y --purge"
-        return 0
-    fi
-    if ! command -v apt-get >/dev/null 2>&1 || ! _wait_for_apt_lock 60; then
-        return 0
-    fi
-
-    echo "🧹 Apache2 + php meta-package opruimen (niet nodig voor aitje): ${to_purge[*]}"
-    if command -v systemctl >/dev/null 2>&1; then
-        if [ "$(id -u)" -eq 0 ]; then
-            systemctl disable --now apache2 >/dev/null 2>&1 || true
-        else
-            sudo systemctl disable --now apache2 >/dev/null 2>&1 || true
-        fi
-    fi
-    if [ "$(id -u)" -eq 0 ]; then
-        apt-get purge -y "${to_purge[@]}" >/dev/null 2>&1 || true
-        apt-get autoremove -y --purge >/dev/null 2>&1 || true
+    local stamp="$EMBEDDER_FRONTEND_DIR/.output/.build-stamp"
+    local inputs=(
+        "$EMBEDDER_FRONTEND_DIR/package.json"
+        "$EMBEDDER_FRONTEND_DIR/package-lock.json"
+        "$EMBEDDER_FRONTEND_DIR/nuxt.config.ts"
+        "$EMBEDDER_FRONTEND_DIR/tailwind.config.ts"
+        "$EMBEDDER_FRONTEND_DIR/tsconfig.json"
+    )
+    local needs_build=0
+    if [ ! -f "$EMBEDDER_FRONTEND_DIST_INDEX" ] || [ ! -f "$stamp" ]; then
+        needs_build=1
     else
-        sudo apt-get purge -y "${to_purge[@]}" >/dev/null 2>&1 || true
-        sudo apt-get autoremove -y --purge >/dev/null 2>&1 || true
-    fi
-}
-
-ensure_php_toolchain() {
-    # Installeert PHP 8.2+, vereiste extensions en composer automatisch op
-    # apt-gebaseerde systemen, in lijn met `ensure_remote_support_dependencies`.
-    # Op andere platforms (macOS/Windows) printen we alleen een hint.
-    case "$DEVICE_PLATFORM" in
-        linux|jetson)
-            ;;
-        *)
-            if ! _php_version_ok || ! command -v composer >/dev/null 2>&1; then
-                echo "⚠️  Installeer PHP 8.2+ en composer handmatig op ${DEVICE_PLATFORM} voor de embedder."
-            fi
-            return 0
-            ;;
-    esac
-
-    local need_install=0
-    if ! _php_version_ok; then
-        need_install=1
-    fi
-    if ! command -v composer >/dev/null 2>&1; then
-        need_install=1
-    fi
-
-    # Géén `php` meta-package: die installeert libapache2-mod-php* en
-    # daarmee apache2 dat we niet nodig hebben (de embedder draait via
-    # `php artisan serve`). `php-gd` is verplicht voor phpoffice/phpword
-    # (docx-parsing in DocumentController).
-    local required_packages=(php-cli php-sqlite3 php-mbstring php-xml php-curl php-zip php-gd composer)
-    if command -v dpkg >/dev/null 2>&1; then
-        local pkg=""
-        for pkg in "${required_packages[@]}"; do
-            if ! dpkg -s "$pkg" >/dev/null 2>&1; then
-                need_install=1
+        for input in "${inputs[@]}"; do
+            if [ -f "$input" ] && [ "$input" -nt "$stamp" ]; then
+                needs_build=1
                 break
             fi
         done
-    fi
-
-    if [ "$need_install" -eq 0 ]; then
-        echo "✅ PHP/composer toolchain is al geïnstalleerd"
-        _purge_apache2_if_present
-        return 0
-    fi
-
-    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
-        echo "⚠️  Geen sudo/root; kan PHP/composer niet automatisch installeren."
-        echo "    Installeer met: sudo apt install ${required_packages[*]}"
-        return 1
-    fi
-    if ! command -v apt-get >/dev/null 2>&1; then
-        echo "⚠️  apt-get niet beschikbaar; installeer PHP/composer handmatig."
-        return 1
-    fi
-    if ! _wait_for_apt_lock 180; then
-        echo "⚠️  apt blijft bezet; PHP-installatie overgeslagen."
-        return 1
-    fi
-
-    local missing_packages=()
-    for pkg in "${required_packages[@]}"; do
-        if ! dpkg -s "$pkg" >/dev/null 2>&1; then
-            missing_packages+=("$pkg")
-        fi
-    done
-    if [ "${#missing_packages[@]}" -eq 0 ]; then
-        return 0
-    fi
-
-    echo "📦 PHP toolchain installeren: ${missing_packages[*]}"
-    _disable_broken_apt_repos || true
-    local apt_rc=0
-    if [ "$(id -u)" -eq 0 ]; then
-        apt-get update -y >/dev/null 2>&1 || true
-        apt-get install -y "${missing_packages[@]}" || apt_rc=$?
-    else
-        sudo apt-get update -y >/dev/null 2>&1 || true
-        sudo apt-get install -y "${missing_packages[@]}" || apt_rc=$?
-    fi
-    _restore_disabled_apt_repos
-
-    if [ "$apt_rc" -ne 0 ]; then
-        echo "⚠️  PHP/composer installatie mislukt (apt rc=$apt_rc). Installeer handmatig:"
-        echo "    sudo apt install ${required_packages[*]}"
-        return 1
-    fi
-
-    if ! _php_version_ok; then
-        echo "⚠️  PHP is geïnstalleerd maar versie < 8.2 — embedder werkt niet."
-        return 1
-    fi
-    echo "✅ PHP/composer geïnstalleerd"
-    _purge_apache2_if_present
-    return 0
-}
-
-_seed_embedder_env() {
-    # APP_URL = scheme://host[:port] van de publieke FastAPI. Geen /embedder
-    # suffix: de routes zelf zijn met apiPrefix='embedder/api' geregistreerd,
-    # dus URL::forceRootUrl(APP_URL) + route-URI levert exact het pad op dat
-    # de browser via FastAPI ziet — kritisch voor signed-URL validatie.
-    local appurl="http://${DEVICE_MDNS}:${BACKEND_PORT}"
-    local fronturl="http://${DEVICE_MDNS}:${BACKEND_PORT}/embedder"
-    local env_file="$EMBEDDER_BACKEND_DIR/.env"
-    if [ ! -f "$env_file" ]; then
-        if [ -f "$EMBEDDER_BACKEND_DIR/.env.example" ]; then
-            cp "$EMBEDDER_BACKEND_DIR/.env.example" "$env_file"
-        else
-            touch "$env_file"
+        if [ "$needs_build" -eq 0 ]; then
+            if find \
+                "$EMBEDDER_FRONTEND_DIR/app.vue" \
+                "$EMBEDDER_FRONTEND_DIR/pages" \
+                "$EMBEDDER_FRONTEND_DIR/components" \
+                "$EMBEDDER_FRONTEND_DIR/composables" \
+                "$EMBEDDER_FRONTEND_DIR/layouts" \
+                "$EMBEDDER_FRONTEND_DIR/middleware" \
+                "$EMBEDDER_FRONTEND_DIR/plugins" \
+                "$EMBEDDER_FRONTEND_DIR/services" \
+                "$EMBEDDER_FRONTEND_DIR/stores" \
+                "$EMBEDDER_FRONTEND_DIR/types" \
+                "$EMBEDDER_FRONTEND_DIR/assets" \
+                "$EMBEDDER_FRONTEND_DIR/public" \
+                -type f -newer "$stamp" 2>/dev/null | grep -q .; then
+                needs_build=1
+            fi
         fi
     fi
-    _upsert_env_key() {
-        local key="$1" value="$2"
-        if grep -qE "^${key}=" "$env_file"; then
-            # Vervang via Python in plaats van sed: zo zijn waarden met /, &, |,
-            # newlines of regex-metakarakters gegarandeerd veilig.
-            python3 - "$env_file" "$key" "$value" <<'PY'
-import sys, pathlib
-path = pathlib.Path(sys.argv[1])
-key = sys.argv[2]
-value = sys.argv[3]
-lines = path.read_text().splitlines()
-for i, line in enumerate(lines):
-    if line.startswith(f"{key}="):
-        lines[i] = f"{key}={value}"
-        break
-path.write_text("\n".join(lines) + "\n")
-PY
-        else
-            printf '%s=%s\n' "$key" "$value" >> "$env_file"
-        fi
-    }
-    _upsert_env_key APP_URL "$appurl"
-    _upsert_env_key FRONTEND_URL "$fronturl"
-    _upsert_env_key DB_CONNECTION sqlite
-    _upsert_env_key SANCTUM_STATEFUL_DOMAINS ""
-    # LAN push (vervangt git-bridge): de embedder pusht naar dezelfde FastAPI
-    # die /embedder/api/* proxiet. Loopback omdat Laravel op dit device draait.
-    _upsert_env_key AITJE_DEVICE_BASE_URL "http://127.0.0.1:${BACKEND_PORT}"
-    _upsert_env_key AITJE_ADMIN_TOKEN_FILE "${PROJECT_ROOT}/devices_db/admin_token.json"
-    # Single-tenant embedder-gebruiker (vervangt het oude multi-tenant Admin
-    # CMS). `php artisan aitje:bootstrap-user` (verderop) leest deze waarden
-    # en seed't de gebruiker op de eerste boot.
-    if [ -n "${EMBEDDER_USER_EMAIL:-}" ]; then
-        _upsert_env_key EMBEDDER_USER_EMAIL "$EMBEDDER_USER_EMAIL"
-    fi
-    if [ -n "${EMBEDDER_USER_PASSWORD:-}" ]; then
-        _upsert_env_key EMBEDDER_USER_PASSWORD "$EMBEDDER_USER_PASSWORD"
-    fi
-    if [ -n "${EMBEDDER_USER_NAME:-}" ]; then
-        _upsert_env_key EMBEDDER_USER_NAME "$EMBEDDER_USER_NAME"
-    fi
-}
 
-_wait_for_embedder() {
-    local url="http://127.0.0.1:${EMBEDDER_PORT}/up"
-    for _ in {1..40}; do
-        if curl -fs -o /dev/null "$url"; then
+    if [ "$needs_build" -eq 1 ]; then
+        echo "📦 Embedder SPA build (Nuxt) — kan even duren…"
+        (
+            cd "$EMBEDDER_FRONTEND_DIR" || exit 1
+            if [ ! -d "node_modules" ]; then
+                npm install --no-audit --no-fund
+            fi
+            npm run generate
+        )
+        if [ -f "$EMBEDDER_FRONTEND_DIST_INDEX" ]; then
+            touch "$stamp"
+            echo "✅ Embedder SPA klaar"
             return 0
         fi
-        sleep 0.5
-    done
-    return 1
-}
-
-start_embedder() {
-    if [ ! -d "$EMBEDDER_BACKEND_DIR" ]; then
-        echo "ℹ️  Geen app/embedder/backend gevonden, embedder overslaan."
+        echo "⚠️  Embedder SPA build mislukt; /embedder wordt niet gemount."
         return 1
     fi
-    if ! _php_version_ok; then
-        echo "⚠️  PHP 8.2+ niet gevonden — sla embedder over. Installeer met:"
-        echo "    sudo apt install php php-cli php-sqlite3 php-mbstring php-xml php-curl php-zip composer"
-        return 1
-    fi
-    if ! command -v composer >/dev/null 2>&1; then
-        echo "⚠️  composer niet gevonden — sla embedder over (zie hint hierboven)."
-        return 1
-    fi
-
-    _seed_embedder_env
-
-    local composer_stamp="$EMBEDDER_BACKEND_DIR/vendor/.aitje-composer-stamp"
-    if [ ! -f "$EMBEDDER_BACKEND_DIR/vendor/autoload.php" ] \
-        || [ "$EMBEDDER_BACKEND_DIR/composer.lock" -nt "$composer_stamp" ] \
-        || [ "$EMBEDDER_BACKEND_DIR/composer.json" -nt "$composer_stamp" ]; then
-        echo "📦 Embedder composer install (Laravel deps) — kan even duren…"
-        (cd "$EMBEDDER_BACKEND_DIR" && composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader) || {
-            echo "⚠️  composer install mislukt; embedder wordt niet gestart."
-            return 1
-        }
-        touch "$composer_stamp"
-    else
-        echo "✅ Embedder Laravel deps zijn up-to-date"
-    fi
-
-    if ! grep -qE "^APP_KEY=base64:" "$EMBEDDER_BACKEND_DIR/.env" 2>/dev/null; then
-        (cd "$EMBEDDER_BACKEND_DIR" && php artisan key:generate --force >/dev/null) || true
-    fi
-
-    mkdir -p "$EMBEDDER_BACKEND_DIR/database"
-    [ -f "$EMBEDDER_DB_PATH" ] || : > "$EMBEDDER_DB_PATH"
-
-    echo "🗄  Embedder migraties uitvoeren…"
-    (cd "$EMBEDDER_BACKEND_DIR" && php artisan migrate --force) || {
-        echo "⚠️  php artisan migrate mislukt; embedder wordt niet gestart."
-        return 1
-    }
-
-    # Seed de single-tenant gebruiker uit EMBEDDER_USER_* env vars (idempotent;
-    # zonder env vars is dit een no-op). Vervangt het oude Admin CMS dat
-    # gebruikers per klant aanmaakte.
-    (cd "$EMBEDDER_BACKEND_DIR" && php artisan aitje:bootstrap-user) || true
-
-    # Nuxt SPA bouwen (incrementeel, zoals webclient).
-    if [ -d "$EMBEDDER_FRONTEND_DIR" ]; then
-        if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-            echo "⚠️  Node.js/npm niet gevonden — embedder SPA wordt niet gebouwd."
-        else
-            local stamp="$EMBEDDER_FRONTEND_DIR/.output/.build-stamp"
-            local inputs=(
-                "$EMBEDDER_FRONTEND_DIR/package.json"
-                "$EMBEDDER_FRONTEND_DIR/package-lock.json"
-                "$EMBEDDER_FRONTEND_DIR/nuxt.config.ts"
-                "$EMBEDDER_FRONTEND_DIR/tailwind.config.ts"
-                "$EMBEDDER_FRONTEND_DIR/tsconfig.json"
-            )
-            local needs_build=0
-            if [ ! -f "$EMBEDDER_FRONTEND_DIST_INDEX" ] || [ ! -f "$stamp" ]; then
-                needs_build=1
-            else
-                for input in "${inputs[@]}"; do
-                    if [ -f "$input" ] && [ "$input" -nt "$stamp" ]; then
-                        needs_build=1
-                        break
-                    fi
-                done
-                if [ "$needs_build" -eq 0 ]; then
-                    if find \
-                        "$EMBEDDER_FRONTEND_DIR/app.vue" \
-                        "$EMBEDDER_FRONTEND_DIR/pages" \
-                        "$EMBEDDER_FRONTEND_DIR/components" \
-                        "$EMBEDDER_FRONTEND_DIR/composables" \
-                        "$EMBEDDER_FRONTEND_DIR/layouts" \
-                        "$EMBEDDER_FRONTEND_DIR/middleware" \
-                        "$EMBEDDER_FRONTEND_DIR/plugins" \
-                        "$EMBEDDER_FRONTEND_DIR/services" \
-                        "$EMBEDDER_FRONTEND_DIR/stores" \
-                        "$EMBEDDER_FRONTEND_DIR/types" \
-                        "$EMBEDDER_FRONTEND_DIR/assets" \
-                        "$EMBEDDER_FRONTEND_DIR/public" \
-                        -type f -newer "$stamp" 2>/dev/null | grep -q .; then
-                        needs_build=1
-                    fi
-                fi
-            fi
-
-            if [ "$needs_build" -eq 1 ]; then
-                echo "📦 Embedder SPA build (Nuxt) — kan even duren…"
-                (
-                    cd "$EMBEDDER_FRONTEND_DIR" || exit 1
-                    if [ ! -d "node_modules" ]; then
-                        npm install --no-audit --no-fund
-                    fi
-                    npm run generate
-                )
-                if [ -f "$EMBEDDER_FRONTEND_DIST_INDEX" ]; then
-                    touch "$stamp"
-                    echo "✅ Embedder SPA klaar"
-                else
-                    echo "⚠️  Embedder SPA build mislukt; /embedder wordt niet gemount."
-                fi
-            else
-                echo "✅ Embedder SPA up-to-date"
-            fi
-        fi
-    fi
-
-    # Bestaand proces op de poort opruimen (developer-restart scenario).
-    if pgrep -f "php artisan serve.*--port=${EMBEDDER_PORT}" >/dev/null 2>&1; then
-        echo "⚠️  bestaand embedder-proces gevonden, stoppen…"
-        pkill -f "php artisan serve.*--port=${EMBEDDER_PORT}" >/dev/null 2>&1 || true
-        sleep 1
-    fi
-    if lsof -ti:"$EMBEDDER_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-        local pids
-        pids="$(lsof -ti:"$EMBEDDER_PORT" -sTCP:LISTEN)"
-        for pid in $pids; do
-            echo "⚠️  poort $EMBEDDER_PORT bezet (pid $pid), stoppen…"
-            kill "$pid" >/dev/null 2>&1 || true
-        done
-        sleep 1
-    fi
-
-    echo "⏳ Embedder backend starten op 127.0.0.1:${EMBEDDER_PORT} (log: $EMBEDDER_LOG)…"
-    (
-        cd "$EMBEDDER_BACKEND_DIR" || exit 1
-        exec php artisan serve --host=127.0.0.1 --port="$EMBEDDER_PORT"
-    ) >"$EMBEDDER_LOG" 2>&1 &
-    embedder_pid=$!
-    echo "$embedder_pid" > "$PROJECT_ROOT/embedder.pid" 2>/dev/null || true
-    if ! _wait_for_embedder; then
-        echo "⚠️  Embedder reageert niet op /up; check $EMBEDDER_LOG."
-        return 1
-    fi
-    echo "✅ Embedder online → http://${DEVICE_MDNS}:${BACKEND_PORT}/embedder/"
+    echo "✅ Embedder SPA up-to-date"
     return 0
 }
 
 echo "=== Embedder Setup ==="
-ensure_php_toolchain || true
-if ! start_embedder; then
+if ! build_embedder_spa; then
     echo "⚠️  /embedder is niet beschikbaar in deze sessie."
 fi
 echo "======================"
@@ -1641,17 +1341,6 @@ cleanup() {
     echo
     echo "🛑 Backend stoppen..."
     kill "$backend_pid" >/dev/null 2>&1 || true
-
-    if [ -n "${embedder_pid:-}" ] || pgrep -f "php artisan serve.*--port=${EMBEDDER_PORT:-8001}" >/dev/null 2>&1; then
-        echo "🛑 Embedder stoppen..."
-        # `php artisan serve` is een wrapper rond een interne `php -S` dev-server;
-        # beide processen apart afsluiten.
-        if [ -n "${embedder_pid:-}" ]; then
-            kill "$embedder_pid" >/dev/null 2>&1 || true
-        fi
-        pkill -f "php artisan serve.*--port=${EMBEDDER_PORT:-8001}" >/dev/null 2>&1 || true
-        pkill -f "php -S.*:${EMBEDDER_PORT:-8001}" >/dev/null 2>&1 || true
-    fi
 
     if [ -n "${ollama_pid:-}" ]; then
         echo "🛑 Ollama stoppen..."
