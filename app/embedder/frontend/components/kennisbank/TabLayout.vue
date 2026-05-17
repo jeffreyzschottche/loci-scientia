@@ -3,11 +3,14 @@
     <!-- Tab Navigation -->
     <div class="bg-loci-white border-b border-loci-gray-100">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav class="flex items-center justify-between py-4" aria-label="Tabs">
-          <div class="flex items-center space-x-2">
+        <nav
+          class="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-0"
+          aria-label="Tabs"
+        >
+          <div class="-mx-4 flex items-center space-x-2 overflow-x-auto px-4 md:mx-0 md:px-0">
             <NuxtLink
               to="/kennisbank/upload"
-              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              class="flex-shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
               :class="isActive('/kennisbank/upload')
                 ? 'bg-loci-yellow text-loci-black-deep'
                 : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
@@ -16,7 +19,7 @@
             </NuxtLink>
             <NuxtLink
               to="/kennisbank/library"
-              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              class="flex-shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
               :class="isActive('/kennisbank/library')
                 ? 'bg-loci-yellow text-loci-black-deep'
                 : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
@@ -25,7 +28,7 @@
             </NuxtLink>
             <NuxtLink
               to="/kennisbank/priorities"
-              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              class="flex-shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
               :class="isActive('/kennisbank/priorities')
                 ? 'bg-loci-yellow text-loci-black-deep'
                 : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
@@ -34,7 +37,7 @@
             </NuxtLink>
             <NuxtLink
               to="/kennisbank/insights"
-              class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
+              class="flex-shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
               :class="isActive('/kennisbank/insights')
                 ? 'bg-loci-yellow text-loci-black-deep'
                 : 'bg-loci-gray-50 text-loci-gray-500 hover:bg-loci-gray-200 hover:text-loci-black'"
@@ -46,7 +49,7 @@
           <button
             @click="syncToDevice"
             :disabled="syncing"
-            class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all bg-loci-yellow text-loci-black-deep hover:bg-loci-black hover:text-loci-white disabled:opacity-50"
+            class="w-full whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all bg-loci-yellow text-loci-black-deep hover:bg-loci-black hover:text-loci-white disabled:opacity-50 md:w-auto"
           >
             {{ syncing ? translate('Synchroniseren...', 'Syncing...') : translate('Sync naar device', 'Sync to device') }}
           </button>

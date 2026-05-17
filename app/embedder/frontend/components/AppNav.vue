@@ -8,30 +8,33 @@
         </NuxtLink>
       </div>
 
-      <!-- Navigation - centered -->
+      <!-- Navigation - centered (desktop only when logged in) -->
       <div class="flex min-w-0 flex-1 items-center justify-center space-x-2">
         <template v-if="authStore.isLoggedIn">
-          <NuxtLink
-            v-for="link in primaryLinks"
-            :key="link.to"
-            :to="link.to"
-            class="rounded-full px-4 py-2 text-sm font-semibold transition-all"
-            :class="isActiveRoute(link.to)
-              ? 'bg-loci-yellow text-loci-black-deep'
-              : 'text-loci-black hover:bg-loci-yellow/10'"
-          >
-            {{ link.label }}
-          </NuxtLink>
+          <div class="hidden md:flex items-center space-x-2">
+            <NuxtLink
+              v-for="link in primaryLinks"
+              :key="link.to"
+              :to="link.to"
+              class="rounded-full px-4 py-2 text-sm font-semibold transition-all"
+              :class="isActiveRoute(link.to)
+                ? 'bg-loci-yellow text-loci-black-deep'
+                : 'text-loci-black hover:bg-loci-yellow/10'"
+            >
+              {{ link.label }}
+            </NuxtLink>
+          </div>
         </template>
         <p v-else class="truncate px-2 text-center text-sm font-bold text-loci-black sm:text-xl">
           Kennisbank Management
         </p>
       </div>
 
-      <!-- User info - right aligned -->
+      <!-- Right side -->
       <div class="flex items-center justify-end space-x-4">
         <template v-if="authStore.isLoggedIn">
-          <div class="flex items-center space-x-4">
+          <!-- Desktop user controls -->
+          <div class="hidden md:flex items-center space-x-4">
             <div class="relative" ref="languageMenuRef">
               <button
                 type="button"
@@ -58,7 +61,7 @@
               <transition name="fade-scale">
                 <div
                   v-if="isLanguageMenuOpen"
-                  class="absolute left-0 z-50 mt-2 w-44 rounded-loci-lg border border-loci-gray-100 bg-loci-white p-2 shadow-xl"
+                  class="absolute right-0 z-50 mt-2 w-44 rounded-loci-lg border border-loci-gray-100 bg-loci-white p-2 shadow-xl"
                   role="listbox"
                 >
                   <button
@@ -101,6 +104,23 @@
               {{ translate('Uitloggen', 'Logout') }}
             </button>
           </div>
+
+          <!-- Mobile hamburger -->
+          <button
+            type="button"
+            class="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-loci-gray-200 bg-loci-white text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow/20"
+            :aria-expanded="isMobileMenuOpen ? 'true' : 'false'"
+            :aria-label="translate('Menu', 'Menu')"
+            aria-controls="mobile-nav-panel"
+            @click.stop="toggleMobileMenu"
+          >
+            <svg v-if="!isMobileMenuOpen" class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
         </template>
         <template v-else>
           <div class="flex items-center space-x-4">
@@ -114,6 +134,79 @@
         </template>
       </div>
     </div>
+
+    <!-- Mobile drawer -->
+    <transition name="slide-down">
+      <div
+        v-if="authStore.isLoggedIn && isMobileMenuOpen"
+        id="mobile-nav-panel"
+        ref="mobileMenuRef"
+        class="md:hidden border-t border-loci-gray-100 bg-loci-white px-4 py-4 space-y-4"
+      >
+        <!-- User info -->
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-loci-gray-500">
+            <i>{{ translate('ingelogd als:', 'logged in as:') }}</i>
+            <b class="ml-1 text-loci-black">{{ authStore.user?.name || translate('onbekend', 'unknown') }}</b>
+          </span>
+        </div>
+
+        <!-- Primary links -->
+        <div class="flex flex-col space-y-1">
+          <NuxtLink
+            v-for="link in primaryLinks"
+            :key="link.to"
+            :to="link.to"
+            class="rounded-loci px-4 py-3 text-sm font-semibold transition-all"
+            :class="isActiveRoute(link.to)
+              ? 'bg-loci-yellow text-loci-black-deep'
+              : 'text-loci-black hover:bg-loci-yellow/10'"
+            @click="closeMobileMenu"
+          >
+            {{ link.label }}
+          </NuxtLink>
+        </div>
+
+        <!-- Language switcher -->
+        <div class="border-t border-loci-gray-100 pt-3">
+          <p class="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-loci-gray-400">
+            {{ translate('Taal', 'Language') }}
+          </p>
+          <div class="flex flex-col space-y-1">
+            <button
+              v-for="option in languageOptions"
+              :key="option.code"
+              type="button"
+              class="flex w-full items-center gap-3 rounded-loci px-3 py-2 text-sm transition hover:bg-loci-yellow/10"
+              :class="option.code === currentLanguage ? 'text-loci-black font-semibold bg-loci-yellow/10' : 'text-loci-gray-600'"
+              @click="selectLanguage(option.code)"
+            >
+              <span class="text-lg leading-none" aria-hidden="true">{{ option.emoji }}</span>
+              <span class="flex-1 text-left">{{ option.label }}</span>
+              <svg
+                v-if="option.code === currentLanguage"
+                class="h-4 w-4 text-loci-yellow"
+                viewBox="0 0 20 20"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path d="M16 6l-7 7-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Logout -->
+        <div class="border-t border-loci-gray-100 pt-3">
+          <button
+            @click="handleLogout"
+            class="w-full rounded-full border border-loci-gray-200 bg-loci-white px-4 py-3 text-sm font-semibold text-loci-black transition-all hover:border-loci-yellow hover:bg-loci-yellow hover:text-loci-black-deep"
+          >
+            {{ translate('Uitloggen', 'Logout') }}
+          </button>
+        </div>
+      </div>
+    </transition>
   </nav>
 </template>
 
@@ -146,7 +239,9 @@ const currentLanguageOption = computed(() => {
 });
 
 const isLanguageMenuOpen = ref(false);
+const isMobileMenuOpen = ref(false);
 const languageMenuRef = ref<HTMLElement | null>(null);
+const mobileMenuRef = ref<HTMLElement | null>(null);
 
 function isActiveRoute(path: string) {
   if (path === '/kennisbank') {
@@ -159,6 +254,14 @@ function toggleLanguageMenu() {
   isLanguageMenuOpen.value = !isLanguageMenuOpen.value;
 }
 
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false;
+}
+
 function selectLanguage(lang: LanguageCode) {
   if (currentLanguage.value !== lang) {
     setLanguage(lang);
@@ -167,9 +270,7 @@ function selectLanguage(lang: LanguageCode) {
 }
 
 function handleOutsideClick(event: MouseEvent) {
-  if (!isLanguageMenuOpen.value) return;
-  if (!languageMenuRef.value) return;
-  if (!languageMenuRef.value.contains(event.target as Node)) {
+  if (isLanguageMenuOpen.value && languageMenuRef.value && !languageMenuRef.value.contains(event.target as Node)) {
     isLanguageMenuOpen.value = false;
   }
 }
@@ -195,7 +296,15 @@ watch(
   },
 );
 
+watch(
+  () => route.path,
+  () => {
+    isMobileMenuOpen.value = false;
+  },
+);
+
 async function handleLogout() {
+  closeMobileMenu();
   try {
     const api = useApi();
     await api.post('/logout');
@@ -219,5 +328,17 @@ async function handleLogout() {
 .fade-scale-leave-to {
   opacity: 0;
   transform: translateY(-4px) scale(0.98);
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform-origin: top;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

@@ -13,6 +13,7 @@ export default defineNuxtConfig({
     head: {
       meta: [
         { name: 'robots', content: 'noindex, nofollow' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
       ],
     },
   },

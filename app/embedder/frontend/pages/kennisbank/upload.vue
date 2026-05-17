@@ -61,8 +61,8 @@
         </div>
 
         <!-- Metadata -->
-        <div class="grid grid-cols-2 gap-4">
-          <div class="col-span-2">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="md:col-span-2">
             <label class="block text-sm font-medium text-loci-black">
               {{ translate('Titel', 'Title') }}
             </label>
@@ -190,7 +190,7 @@
             </select>
           </div>
 
-          <div class="col-span-2">
+          <div class="md:col-span-2">
             <label class="block text-sm font-medium text-loci-black">
               {{ translate('Beschrijving', 'Description') }}
             </label>

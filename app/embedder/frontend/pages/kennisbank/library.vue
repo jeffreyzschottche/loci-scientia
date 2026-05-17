@@ -1,9 +1,12 @@
 <template>
   <KennisbankTabLayout>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="flex gap-4" style="height: calc(100vh - 200px);">
+      <div class="flex flex-col gap-4 min-h-[70vh] md:flex-row md:h-[calc(100vh-200px)] md:min-h-0">
         <!-- Left Panel: Categories & Documents -->
-        <div class="w-80 bg-loci-white rounded-loci-lg border border-loci-gray-100 flex flex-col">
+        <div
+          class="w-full bg-loci-white rounded-loci-lg border border-loci-gray-100 flex-col md:w-80 md:flex"
+          :class="mobileView === 'preview' ? 'hidden' : 'flex'"
+        >
           <div class="p-4 border-b border-loci-gray-100">
             <input
               v-model="searchQuery"
@@ -106,7 +109,24 @@
         </div>
 
         <!-- Right Panel: Preview -->
-        <div class="flex-1 bg-loci-white rounded-loci-lg border border-loci-gray-100 flex flex-col">
+        <div
+          class="flex-1 bg-loci-white rounded-loci-lg border border-loci-gray-100 flex-col md:flex"
+          :class="mobileView === 'preview' ? 'flex' : 'hidden'"
+        >
+          <!-- Mobile back button -->
+          <div class="md:hidden p-2 border-b border-loci-gray-100">
+            <button
+              type="button"
+              class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-loci-black hover:bg-loci-yellow/10"
+              @click="backToList"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              {{ translate('Terug', 'Back') }}
+            </button>
+          </div>
+
           <div v-if="!selectedDocument" class="flex-1 flex items-center justify-center text-loci-gray-500">
             <p>{{ translate('Selecteer een document', 'Select a document') }}</p>
           </div>
@@ -278,6 +298,7 @@ const deletingId = ref<number | null>(null);
 const expandedCategories = ref<Set<string>>(new Set());
 const deleteError = ref<{ title: string; message: string } | null>(null);
 const deleteCandidate = ref<any | null>(null);
+const mobileView = ref<'list' | 'preview'>('list');
 
 type CategoryGroup = {
   name: string;
@@ -353,6 +374,7 @@ async function loadTree() {
 
 async function selectDocument(node: any) {
   selectedId.value = node.id;
+  mobileView.value = 'preview';
 
   try {
     const response = await api.get<{ document: any }>(`/library/documents/${node.id}`);
@@ -360,6 +382,10 @@ async function selectDocument(node: any) {
   } catch (e: any) {
     console.error('Failed to load document:', e);
   }
+}
+
+function backToList() {
+  mobileView.value = 'list';
 }
 
 function requestDelete(node: any) {
@@ -386,6 +412,7 @@ async function deleteFromLibrary() {
     if (selectedId.value === node.id) {
       selectedId.value = null;
       selectedDocument.value = null;
+      mobileView.value = 'list';
     }
 
     await loadTree();
