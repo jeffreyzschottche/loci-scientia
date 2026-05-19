@@ -1187,7 +1187,6 @@ ensure_caddy() {
 {
     auto_https disable_redirects
     admin off
-    persist_config off
 }
 
 (bootstrap_paths) {
