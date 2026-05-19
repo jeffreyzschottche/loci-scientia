@@ -195,8 +195,16 @@ def _render_connect_page(host: str, platform: str, app: str) -> str:
     https_base = _https_base(host)
     chat_url = f"{https_base}/"
     embedder_url = f"{https_base}/embedder/"
-    target_url = embedder_url if app == "embedder" else chat_url
-    target_label = "AITJE Embedder" if app == "embedder" else "AITJE Chat"
+    if app == "embedder":
+        target_url = embedder_url
+        target_label = "AITJE Embedder"
+        other_url = chat_url
+        other_label = "AITJE Chat"
+    else:
+        target_url = chat_url
+        target_label = "AITJE Chat"
+        other_url = embedder_url
+        other_label = "AITJE Embedder"
 
     if platform in ("ios", "macos"):
         install_label = "Profiel installeren"
@@ -354,8 +362,7 @@ def _render_connect_page(host: str, platform: str, app: str) -> str:
 
       <div class="open-row">
         <a class="btn btn-primary" id="open-target" href="{target_url}">Open {target_label}</a>
-        <a class="btn btn-secondary" href="{chat_url}">Open AITJE Chat</a>
-        <a class="btn btn-secondary" href="{embedder_url}">Open AITJE Embedder</a>
+        <a class="btn btn-secondary" href="{other_url}">Open {other_label}</a>
       </div>
 
       <div class="live-status" id="live-status">Controleert verbinding…</div>
@@ -370,27 +377,72 @@ def _render_connect_page(host: str, platform: str, app: str) -> str:
   <script>
     (function () {{
       var target = {target_url!r};
+      var healthUrl = {https_base!r} + '/health';
       var status = document.getElementById('live-status');
       var attempts = 0;
+      var maxAttempts = 120;
+      var settled = false;
+      var inFlight = false;
+      var nextDelay = 500;
+      var nextTimer = null;
+
+      function redirect() {{
+        if (settled) return;
+        settled = true;
+        status.textContent = '✓ Verbonden — doorgaan…';
+        status.classList.add('ok');
+        window.location.replace(target);
+      }}
+
+      function schedule(delay) {{
+        if (settled) return;
+        if (nextTimer) clearTimeout(nextTimer);
+        nextTimer = setTimeout(poll, delay);
+      }}
+
       function poll() {{
+        nextTimer = null;
+        if (settled || inFlight) return;
+        inFlight = true;
         attempts += 1;
-        fetch({https_base!r} + '/health', {{ mode: 'cors', cache: 'no-store' }})
+        fetch(healthUrl, {{ mode: 'cors', cache: 'no-store' }})
           .then(function (r) {{
+            inFlight = false;
             if (!r.ok) throw new Error('not ok');
-            status.textContent = '✓ Verbonden — doorgaan…';
-            status.classList.add('ok');
-            setTimeout(function () {{ window.location = target; }}, 600);
+            redirect();
           }})
           .catch(function () {{
-            if (attempts < 60) {{
-              status.textContent = 'Wachten op vertrouwd certificaat…';
-              setTimeout(poll, 2000);
-            }} else {{
-              status.textContent = 'Nog niet vertrouwd. Tik handmatig op "Open" hierboven zodra het profiel geïnstalleerd is.';
+            inFlight = false;
+            if (settled) return;
+            if (attempts >= maxAttempts) {{
+              status.textContent = 'Nog niet vertrouwd. Tik handmatig op "Open" hierboven zodra het certificaat geïnstalleerd is.';
+              return;
             }}
+            status.textContent = 'Wachten op vertrouwd certificaat…';
+            // Gentle backoff: 500ms → cap at 2s. Visibilitychange resets it,
+            // so a returning user always gets a fast first poll.
+            nextDelay = Math.min(nextDelay + 250, 2000);
+            schedule(nextDelay);
           }});
       }}
-      setTimeout(poll, 1500);
+
+      function nudge() {{
+        // Fired when the user comes back to the page (e.g. after installing
+        // the profile in Settings on iOS). Reset the cadence and poll now.
+        if (settled) return;
+        nextDelay = 500;
+        if (nextTimer) {{ clearTimeout(nextTimer); nextTimer = null; }}
+        poll();
+      }}
+
+      document.addEventListener('visibilitychange', function () {{
+        if (document.visibilityState === 'visible') nudge();
+      }});
+      window.addEventListener('pageshow', nudge);
+      window.addEventListener('focus', nudge);
+
+      // First poll: immediate, no initial delay.
+      poll();
     }})();
   </script>
 </body>
@@ -429,10 +481,21 @@ def _instructions_html(kind: str) -> str:
     )
 
 
-@router.get("/connect", response_class=HTMLResponse)
-def connect_page(request: Request, app: str = "chat") -> HTMLResponse:
+def _connect_response(request: Request, app: str) -> HTMLResponse:
     host = _device_hostname()
     platform = _detect_platform(request.headers.get("user-agent", ""))
     app_kind = "embedder" if app == "embedder" else "chat"
     html = _render_connect_page(host=host, platform=platform, app=app_kind)
     return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/connect", response_class=HTMLResponse)
+def connect_page_default(request: Request) -> HTMLResponse:
+    # Bare /connect — default to chat. Kept so a hand-typed bare URL still works.
+    return _connect_response(request, "chat")
+
+
+@router.get("/connect/{app}", response_class=HTMLResponse)
+def connect_page_app(request: Request, app: str) -> HTMLResponse:
+    # /connect/chat or /connect/embedder — the QR codes encode these.
+    return _connect_response(request, app)

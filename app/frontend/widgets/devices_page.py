@@ -270,14 +270,16 @@ class DevicesPage(QWidget):
 
     @staticmethod
     def _public_client_url() -> str:
+        # Same string the QR encodes — the bootstrap URL that installs the
+        # device CA on first scan and forwards to the chat app afterwards.
+        base = (SETUP_URL or "").rstrip("/")
+        if base:
+            return f"{base}/chat"
         return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
 
     @staticmethod
     def _qr_payload() -> str:
-        base = (SETUP_URL or "").rstrip("/")
-        if not base:
-            return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
-        return f"{base}?app=chat"
+        return DevicesPage._public_client_url()
 
     def _open_client_url_dialog(self) -> None:
         display_url = self._public_client_url()
@@ -305,6 +307,7 @@ class DevicesPage(QWidget):
             dialog.card_layout.addWidget(qr_label, 0, Qt.AlignCenter)
             hint = QLabel(t("devices_client_url_qr_hint"))
             hint.setAlignment(Qt.AlignCenter)
+            hint.setWordWrap(True)
             hint.setStyleSheet("color:#6b7280; font-size:12px;")
             dialog.card_layout.addWidget(hint)
         else:
