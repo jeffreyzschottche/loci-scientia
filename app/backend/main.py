@@ -12,16 +12,23 @@ import httpx
 from fastapi import (
     Depends,
     FastAPI,
+    File,
     Header,
     HTTPException,
     Request,
+    UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import (
+    http_exception_handler as _default_http_exception_handler,
+    request_validation_exception_handler as _default_validation_handler,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -57,7 +64,7 @@ from .web_search import (
 from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
-from .kennisbank_sync import read_sync_state, sync_kennisbank
+from .kennisbank_sync import read_sync_state
 from .knowledge_library import get_library_overview, load_document_detail
 from .schemas import (
     BearerTokenResponse,
@@ -458,7 +465,7 @@ def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRe
 def _empty_sync_state() -> dict:
     return {
         "synced": False,
-        "git": None,
+        "source": None,
         "qdrant": None,
         "sqlite": None,
         "stats": None,
@@ -758,74 +765,11 @@ def kennisbank_sync_state(_: TokenRecord = Depends(require_admin_token)):
     return {**state, "synced": True}
 
 
-@app.post("/api/v1/kennisbank/sync")
-async def kennisbank_sync_endpoint(_: TokenRecord = Depends(require_admin_token)):
-    try:
-        result = await run_in_threadpool(sync_kennisbank)
-    except Exception as exc:  # pragma: no cover - onverwachte git/qdrant fouten
-        logger.exception("Kennisbank sync faalde: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Kennisbank sync mislukt: {exc}") from exc
-    return {**result, "synced": True}
-
-
-@app.post("/api/v1/kennisbank/sync/stream")
-async def kennisbank_sync_stream(_: TokenRecord = Depends(require_admin_token)):
-    """Stream SSE progress updates tijdens kennisbank sync."""
-    import queue
-    import threading
-
-    progress_queue: queue.Queue = queue.Queue()
-    result_holder: dict = {}
-    error_holder: list = []
-
-    def progress_callback(current: int, total: int, message: str):
-        progress_queue.put({"progress": current, "total": total, "status": message})
-
-    def run_sync():
-        try:
-            result = sync_kennisbank(progress_callback=progress_callback)
-            result_holder["result"] = result
-        except Exception as exc:
-            error_holder.append(str(exc))
-            logger.exception("Kennisbank sync faalde: %s", exc)
-
-    async def event_stream():
-        # Start sync in background thread
-        thread = threading.Thread(target=run_sync, daemon=True)
-        thread.start()
-
-        # Stream progress updates
-        while thread.is_alive() or not progress_queue.empty():
-            try:
-                update = progress_queue.get(timeout=0.5)
-                payload = json.dumps(update)
-                yield f"data: {payload}\n\n"
-            except queue.Empty:
-                continue
-
-        # Check for errors
-        if error_holder:
-            payload = json.dumps({"error": error_holder[0], "done": True})
-            yield f"data: {payload}\n\n"
-            return
-
-        # Send final result
-        if "result" in result_holder:
-            final = {**result_holder["result"], "synced": True, "done": True}
-            payload = json.dumps(final)
-            yield f"data: {payload}\n\n"
-        else:
-            payload = json.dumps({"error": "Onbekende fout", "done": True})
-            yield f"data: {payload}\n\n"
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+# NB: /api/v1/kennisbank/import en /import/stream zijn verwijderd. Voorheen ontvingen
+# die endpoints een ZIP-bundle van de Laravel-embedder. Sinds de embedder
+# in-process onder /embedder/api/v1/kennisbank/push draait, gaat de sync via
+# een directe Python-functie (app/backend/embedder/sync.py) — er is geen ZIP
+# tussenstap meer.
 
 
 @app.get("/api/v1/kennisbank/library")
@@ -1382,6 +1326,49 @@ async def ws_endpoint(ws: WebSocket):
         return
 
 
+# ---- LAN embedder app (FastAPI router + Nuxt SPA) ---------------------------
+#
+# De Aitje Embedding Application draait in-process binnen FastAPI (zie
+# app/backend/embedder/). De Nuxt SPA blijft statisch gegenereerd onder
+# app/embedder/frontend/.output/public en wordt verderop op /embedder/ gemount.
+
+from app.backend.embedder import router as embedder_router  # noqa: E402
+
+app.include_router(embedder_router, prefix="/embedder/api/v1")
+
+
+_EMBEDDER_API_PREFIX = "/embedder/api/"
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _embedder_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # De Nuxt-SPA leest ``data.message`` voor errors; FastAPI's default ``{"detail": ...}``
+    # mismatcht dat. Wrap embedder-errors zodat de SPA-onveranderd blijft werken.
+    if request.url.path.startswith(_EMBEDDER_API_PREFIX):
+        detail = exc.detail
+        if isinstance(detail, dict):
+            body = dict(detail)
+            body.setdefault("message", "")
+        else:
+            body = {"message": str(detail) if detail is not None else ""}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=body,
+            headers=getattr(exc, "headers", None),
+        )
+    return await _default_http_exception_handler(request, exc)
+
+
+@app.exception_handler(RequestValidationError)
+async def _embedder_validation_handler(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith(_EMBEDDER_API_PREFIX):
+        return JSONResponse(
+            status_code=422,
+            content={"message": "Validatie mislukt", "errors": exc.errors()},
+        )
+    return await _default_validation_handler(request, exc)
+
+
 # ---- LAN web client (Nuxt SPA) -----------------------------------------------
 #
 # The Nuxt 3 client is generated to app/webclient/.output/public during
@@ -1392,7 +1379,7 @@ async def ws_endpoint(ws: WebSocket):
 # This block must remain at the bottom of the file: the catch-all mount on "/"
 # would shadow any later-registered API route.
 
-_SPA_RESERVED_PREFIXES = ("api", "api/", "devices", "devices/", "health", "ws", "fonts/", "sprites/")
+_SPA_RESERVED_PREFIXES = ("api", "api/", "devices", "devices/", "health", "ws", "fonts/", "sprites/", "embedder", "embedder/")
 
 
 class _SPAStaticFiles(StaticFiles):
@@ -1417,6 +1404,23 @@ class _SPAStaticFiles(StaticFiles):
                 return FileResponse(index_path)
             raise
 
+
+_EMBEDDER_DIST = Path(__file__).resolve().parents[1] / "embedder" / "frontend" / ".output" / "public"
+if _EMBEDDER_DIST.is_dir() and (_EMBEDDER_DIST / "index.html").is_file():
+    # Reserve geen extra prefixes: alle requests die hier landen zitten al
+    # onder /embedder/, en de api-proxy hierboven vangt /embedder/api/* af
+    # voordat deze mount aan de beurt is.
+    app.mount(
+        "/embedder",
+        _SPAStaticFiles(directory=str(_EMBEDDER_DIST), html=True),
+        name="embedder",
+    )
+else:
+    logger.warning(
+        "Embedder build niet gevonden op %s; /embedder SPA niet gemount. "
+        "Run `cd app/embedder/frontend && npm install && npm run generate` of start lociscientia.sh.",
+        _EMBEDDER_DIST,
+    )
 
 _WEBCLIENT_DIST = Path(__file__).resolve().parents[1] / "webclient" / ".output" / "public"
 if _WEBCLIENT_DIST.is_dir() and (_WEBCLIENT_DIST / "index.html").is_file():

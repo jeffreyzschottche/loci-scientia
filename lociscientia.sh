@@ -1224,6 +1224,92 @@ if [ -d "$WEBCLIENT_DIR" ]; then
     fi
 fi
 
+# --- Embedder app (Nuxt SPA, FastAPI backend in-process) ----------------------
+# De Aitje Embedding Application is volledig geport naar FastAPI
+# (zie app/backend/embedder/). Er draait geen los Laravel-proces meer; de API
+# wordt mee gestart door uvicorn onder /embedder/api/v1/*. Dit blok bouwt nog
+# alleen de Nuxt SPA, statisch gegenereerd naar
+# app/embedder/frontend/.output/public en gemount op /embedder/ door FastAPI.
+
+EMBEDDER_FRONTEND_DIR="$PROJECT_ROOT/app/embedder/frontend"
+EMBEDDER_FRONTEND_DIST_INDEX="$EMBEDDER_FRONTEND_DIR/.output/public/index.html"
+
+build_embedder_spa() {
+    if [ ! -d "$EMBEDDER_FRONTEND_DIR" ]; then
+        echo "ℹ️  Geen app/embedder/frontend gevonden, embedder-SPA overslaan."
+        return 1
+    fi
+    if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        echo "⚠️  Node.js/npm niet gevonden — embedder SPA wordt niet gebouwd."
+        return 1
+    fi
+
+    local stamp="$EMBEDDER_FRONTEND_DIR/.output/.build-stamp"
+    local inputs=(
+        "$EMBEDDER_FRONTEND_DIR/package.json"
+        "$EMBEDDER_FRONTEND_DIR/package-lock.json"
+        "$EMBEDDER_FRONTEND_DIR/nuxt.config.ts"
+        "$EMBEDDER_FRONTEND_DIR/tailwind.config.ts"
+        "$EMBEDDER_FRONTEND_DIR/tsconfig.json"
+    )
+    local needs_build=0
+    if [ ! -f "$EMBEDDER_FRONTEND_DIST_INDEX" ] || [ ! -f "$stamp" ]; then
+        needs_build=1
+    else
+        for input in "${inputs[@]}"; do
+            if [ -f "$input" ] && [ "$input" -nt "$stamp" ]; then
+                needs_build=1
+                break
+            fi
+        done
+        if [ "$needs_build" -eq 0 ]; then
+            if find \
+                "$EMBEDDER_FRONTEND_DIR/app.vue" \
+                "$EMBEDDER_FRONTEND_DIR/pages" \
+                "$EMBEDDER_FRONTEND_DIR/components" \
+                "$EMBEDDER_FRONTEND_DIR/composables" \
+                "$EMBEDDER_FRONTEND_DIR/layouts" \
+                "$EMBEDDER_FRONTEND_DIR/middleware" \
+                "$EMBEDDER_FRONTEND_DIR/plugins" \
+                "$EMBEDDER_FRONTEND_DIR/services" \
+                "$EMBEDDER_FRONTEND_DIR/stores" \
+                "$EMBEDDER_FRONTEND_DIR/types" \
+                "$EMBEDDER_FRONTEND_DIR/assets" \
+                "$EMBEDDER_FRONTEND_DIR/public" \
+                -type f -newer "$stamp" 2>/dev/null | grep -q .; then
+                needs_build=1
+            fi
+        fi
+    fi
+
+    if [ "$needs_build" -eq 1 ]; then
+        echo "📦 Embedder SPA build (Nuxt) — kan even duren…"
+        (
+            cd "$EMBEDDER_FRONTEND_DIR" || exit 1
+            if [ ! -d "node_modules" ]; then
+                npm install --no-audit --no-fund
+            fi
+            npm run generate
+        )
+        if [ -f "$EMBEDDER_FRONTEND_DIST_INDEX" ]; then
+            touch "$stamp"
+            echo "✅ Embedder SPA klaar"
+            return 0
+        fi
+        echo "⚠️  Embedder SPA build mislukt; /embedder wordt niet gemount."
+        return 1
+    fi
+    echo "✅ Embedder SPA up-to-date"
+    return 0
+}
+
+echo "=== Embedder Setup ==="
+if ! build_embedder_spa; then
+    echo "⚠️  /embedder is niet beschikbaar in deze sessie."
+fi
+echo "======================"
+echo
+
 BACKEND_CMD=(python -m uvicorn app.backend.main:app --reload --host "$BACKEND_BIND_HOST" --port "$BACKEND_PORT")
 backend_log="$PROJECT_ROOT/backend.log"
 

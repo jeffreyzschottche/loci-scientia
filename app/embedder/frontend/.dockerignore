@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.nuxt
+.output
+.data
+.cache
+dist
+logs
+*.log
+node_modules

@@ -1,148 +1,32 @@
 from __future__ import annotations
 
-import json
 import os
 import shutil
-import threading
 from datetime import datetime
 from pathlib import Path
-from queue import Queue, Empty
 
 import requests
-from PySide6.QtCore import Qt, QTimer, Signal, QObject
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QProgressBar,
-    QProgressDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QHeaderView,
-    QProgressBar,
 )
 
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, BACKEND_TIMEOUT
 from ..translations import t, register_language_change_callback
 from ...backend.kennisbank_sync import _knowledge_embedded_path
-from .dialog_style import OverlayDialog, show_error_dialog
-
-
-class SyncProgressDialog(QDialog):
-    """Progress dialog voor kennisbank sync met SSE streaming."""
-
-    progress_updated = Signal(int, str)
-    sync_finished = Signal(dict)
-    sync_error = Signal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t("kb_syncing"))
-        self.setModal(True)
-        self.setFixedSize(400, 150)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        self._status_label = QLabel(t("kb_sync_starting"))
-        self._status_label.setStyleSheet("font-size: 14px; font-weight: 600;")
-        layout.addWidget(self._status_label)
-
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setRange(0, 100)
-        self._progress_bar.setValue(0)
-        self._progress_bar.setTextVisible(True)
-        self._progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #e5e7eb;
-                border-radius: 8px;
-                background: #f3f4f6;
-                height: 24px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background: #facc15;
-                border-radius: 7px;
-            }
-        """)
-        layout.addWidget(self._progress_bar)
-
-        self._detail_label = QLabel("")
-        self._detail_label.setStyleSheet("color: #6b7280; font-size: 12px;")
-        layout.addWidget(self._detail_label)
-
-        # Connect signals
-        self.progress_updated.connect(self._on_progress)
-        self.sync_finished.connect(self._on_finished)
-        self.sync_error.connect(self._on_error)
-
-        self._result = None
-        self._error = None
-
-    def _on_progress(self, progress: int, status: str):
-        self._progress_bar.setValue(progress)
-        self._status_label.setText(status)
-
-    def _on_finished(self, result: dict):
-        self._result = result
-        self.accept()
-
-    def _on_error(self, error: str):
-        self._error = error
-        self.reject()
-
-    def start_sync(self):
-        """Start de sync in een background thread."""
-        thread = threading.Thread(target=self._run_sync, daemon=True)
-        thread.start()
-
-    def _run_sync(self):
-        """Voer de sync uit en stream progress updates."""
-        headers = {"Accept": "text/event-stream"}
-        if BACKEND_BEARER_TOKEN:
-            headers["Authorization"] = f"Bearer {BACKEND_BEARER_TOKEN}"
-
-        try:
-            with requests.post(
-                f"{BACKEND_HTTP}/api/v1/kennisbank/sync/stream",
-                headers=headers,
-                stream=True,
-                timeout=600,  # 10 minuten timeout
-            ) as resp:
-                resp.raise_for_status()
-                for line in resp.iter_lines(decode_unicode=True):
-                    if not line or not line.startswith("data: "):
-                        continue
-                    try:
-                        data = json.loads(line[6:])  # Strip "data: " prefix
-                    except json.JSONDecodeError:
-                        continue
-
-                    if "error" in data:
-                        self.sync_error.emit(data["error"])
-                        return
-
-                    if data.get("done"):
-                        self.sync_finished.emit(data)
-                        return
-
-                    progress = data.get("progress", 0)
-                    status = data.get("status", "")
-                    self.progress_updated.emit(progress, status)
-
-        except requests.RequestException as exc:
-            self.sync_error.emit(str(exc))
+from .dialog_style import show_error_dialog
 
 
 class KnowledgePage(QWidget):
@@ -164,11 +48,11 @@ class KnowledgePage(QWidget):
         self._actions_documents_detail_label: QLabel | None = None
         self._documents_title_label: QLabel | None = None
         self._documents_search_input: QLineEdit | None = None
+        self._documents_refresh_button: QPushButton | None = None
         self._documents_table: QTableWidget | None = None
         self._preview_title_label: QLabel | None = None
         self._preview_meta_label: QLabel | None = None
         self._preview_text: QTextEdit | None = None
-        self._sync_button: QPushButton | None = None
         self._sync_status_label: QLabel | None = None
         self._sync_details_label: QLabel | None = None
         self._sync_meta_label: QLabel | None = None
@@ -198,9 +82,6 @@ class KnowledgePage(QWidget):
         register_language_change_callback(self._update_translations)
 
     def _update_translations(self) -> None:
-        self._upload_btn.setText(t("kb_upload_document"))
-        if self._sync_button:
-            self._sync_button.setText(f"🔄 {t('kb_sync_button')}")
         if self._sync_status_label and self._sync_state:
             self._update_sync_labels(self._sync_state)
 
@@ -233,6 +114,9 @@ class KnowledgePage(QWidget):
             self._documents_title_label.setText(t("kb_documents"))
         if self._documents_search_input:
             self._documents_search_input.setPlaceholderText(t("kb_documents_search_placeholder"))
+        if self._documents_refresh_button:
+            self._documents_refresh_button.setText(t("kb_documents_refresh"))
+            self._documents_refresh_button.setToolTip(t("kb_documents_refresh_tooltip"))
         if self._documents_table:
             self._documents_table.setHorizontalHeaderLabels(
                 [
@@ -281,20 +165,14 @@ class KnowledgePage(QWidget):
         return btn
 
     def _actions_card(self) -> QFrame:
+        # Geen sync- of upload-knoppen meer: documenten worden door de
+        # embedder-app (zie Embedder-tab) over LAN gepusht. Deze kaart is
+        # nu enkel een statistiek-tegel met het aantal aanwezige documenten.
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
-
-        self._sync_button = self._pill_button(t("kb_sync_button"), primary=True)
-        self._sync_button.setText(f"🔄 {t('kb_sync_button')}")
-        self._sync_button.clicked.connect(self._trigger_sync)
-        layout.addWidget(self._sync_button)
-
-        self._upload_btn = self._pill_button(t("kb_upload_document"))
-        self._upload_btn.clicked.connect(self._show_upload_instructions)
-        layout.addWidget(self._upload_btn)
 
         documents_block = QFrame()
         documents_block.setStyleSheet(
@@ -323,63 +201,8 @@ class KnowledgePage(QWidget):
         documents_layout.addWidget(self._actions_documents_detail_label)
 
         layout.addWidget(documents_block)
+        layout.addStretch(1)
         return card
-
-    def _show_upload_instructions(self) -> None:
-        dialog = OverlayDialog(self)
-        dialog.setWindowTitle(t("kb_upload_popup_title"))
-
-        badge = QLabel(t("kb_upload_popup_badge"))
-        badge.setStyleSheet(
-            "font-size:11px; font-weight:700; letter-spacing:0.18em; color:#6b7280;"
-        )
-        dialog.card_layout.addWidget(badge)
-
-        title = QLabel(t("kb_upload_popup_title"))
-        title.setWordWrap(True)
-        title.setStyleSheet("font-size:24px; font-weight:800; color:#111111;")
-        dialog.card_layout.addWidget(title)
-
-        body = QLabel(t("kb_upload_popup_body"))
-        body.setWordWrap(True)
-        body.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        body.setStyleSheet("font-size:15px; font-weight:500; line-height:1.55; color:#374151;")
-        dialog.card_layout.addWidget(body)
-
-        url_label = QLabel("kennisbank.aitje.com")
-        url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        url_label.setStyleSheet(
-            "background:#f9fafb; border:1px solid #e5e7eb; border-radius:18px; "
-            "padding:14px 16px; font-size:16px; font-weight:700; color:#111111;"
-        )
-        dialog.card_layout.addWidget(url_label)
-
-        dialog.card_layout.addStretch(1)
-
-        actions = QHBoxLayout()
-        actions.setSpacing(12)
-
-        close_btn = QPushButton(t("close"))
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#ffffff;"
-            "  color:#111111;"
-            "  border:1px solid #e5e7eb;"
-            "  border-radius:18px;"
-            "  padding:8px 18px;"
-            "  font-weight:600;"
-            "  min-height:36px;"
-            "  text-align:center;"
-            "}"
-            "QPushButton:hover { background:#f9fafb; border-color:#d1d5db; }"
-        )
-        close_btn.clicked.connect(dialog.reject)
-
-        actions.addStretch(1)
-        actions.addWidget(close_btn)
-        dialog.card_layout.addLayout(actions)
-        dialog.exec()
 
     def _sync_status_card(self) -> QFrame:
         card = QFrame()
@@ -516,7 +339,29 @@ class KnowledgePage(QWidget):
             "}"
         )
         self._documents_search_input.textChanged.connect(self._apply_documents_filter)
-        card_layout.addWidget(self._documents_search_input)
+
+        self._documents_refresh_button = QPushButton(t("kb_documents_refresh"))
+        self._documents_refresh_button.setToolTip(t("kb_documents_refresh_tooltip"))
+        self._documents_refresh_button.setCursor(Qt.PointingHandCursor)
+        self._documents_refresh_button.setStyleSheet(
+            "QPushButton {"
+            "  background:#fcfbf8;"
+            "  border:1px solid #ece7dc;"
+            "  border-radius:16px;"
+            "  padding:10px 18px;"
+            "  color:#111111;"
+            "  font-weight:600;"
+            "}"
+            "QPushButton:hover { background:#f4eeda; border-color:#d6cdb4; }"
+            "QPushButton:disabled { color:#9a9183; }"
+        )
+        self._documents_refresh_button.clicked.connect(self._handle_refresh_clicked)
+
+        search_row = QHBoxLayout()
+        search_row.setSpacing(8)
+        search_row.addWidget(self._documents_search_input, 1)
+        search_row.addWidget(self._documents_refresh_button)
+        card_layout.addLayout(search_row)
 
         self._documents_table = QTableWidget()
         self._documents_table.setColumnCount(5)
@@ -593,8 +438,6 @@ class KnowledgePage(QWidget):
         if not BACKEND_BEARER_TOKEN:
             if self._sync_status_label:
                 self._set_sync_status_badge("Failed", "#dc2626")
-            if self._sync_button:
-                self._sync_button.setEnabled(False)
             return
         try:
             resp = requests.get(
@@ -872,33 +715,21 @@ class KnowledgePage(QWidget):
         local_dt = dt.astimezone()
         return local_dt.strftime("%d %b %Y %H:%M")
 
-    def _friendly_sync_error(self, message: str | None) -> str:
-        raw = (message or "").strip()
-        if "KENNISBANK_GIT_REPO" in raw:
-            return t("kb_sync_repo_missing")
-        if not raw:
-            return t("kb_sync_support_suffix")
-        return f"{raw}\n\n{t('kb_sync_support_suffix')}"
+    def on_page_shown(self) -> None:
+        # main.py roept dit aan wanneer de tab opent. We hebben geen handmatige
+        # sync-knop meer (de embedder pusht over LAN); deze hook is hoe de UI
+        # zich up-to-date houdt zonder polling.
+        self._refresh_sync_state()
+        self._refresh_library()
 
-    def _trigger_sync(self) -> None:
-        if not BACKEND_BEARER_TOKEN:
-            show_error_dialog(self, t("kb_sync_error"), self._friendly_sync_error(t("kb_sync_need_token")), compact=True)
-            return
-        if not self._sync_button:
-            return
-
-        # Open progress dialog
-        dialog = SyncProgressDialog(self)
-        dialog.start_sync()
-        result = dialog.exec()
-
-        if result == QDialog.Accepted and dialog._result:
-            data = dialog._result
-            self._sync_state = data
-            self._update_sync_labels(data)
-            stats = data.get("stats") or {}
-            self._update_stats_view(stats, data.get("qdrant"))
-            self._update_vector_view(stats, data.get("qdrant"))
+    def _handle_refresh_clicked(self) -> None:
+        # Disable de knop tijdens de blocking HTTP-calls zodat de user niet
+        # twee keer klikt; Qt verwerkt events pas weer als we hieruit terug zijn.
+        if self._documents_refresh_button:
+            self._documents_refresh_button.setEnabled(False)
+        try:
+            self._refresh_sync_state()
             self._refresh_library()
-        elif dialog._error:
-            show_error_dialog(self, t("kb_sync_error"), self._friendly_sync_error(dialog._error), compact=True)
+        finally:
+            if self._documents_refresh_button:
+                self._documents_refresh_button.setEnabled(True)

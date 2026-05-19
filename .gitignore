@@ -27,6 +27,23 @@ promptlog.log
 
 ollama.pid
 
-kennisbank_repo/
-kennisbank_cache.db
-kennis_chunk_hashes.json
+devices_db/kennisbank_sync_state.json
+devices_db/embedder.db
+devices_db/embedder.db-journal
+devices_db/embedder_tokens.json
+devices_db/embedder_uploads/
+app/embedder/backend/bootstrap/cache/*.php
+app/embedder/backend/storage/logs/*.log
+app/embedder/backend/storage/framework/cache/data/*
+app/embedder/backend/storage/framework/sessions/*
+app/embedder/backend/storage/framework/views/*
+app/embedder/backend/storage/framework/testing/*
+app/embedder/backend/storage/app/private/*
+app/embedder/backend/storage/app/public/*
+app/embedder/backend/database/database.sqlite
+app/embedder/backend/.env
+app/embedder/backend/composer.phar
+app/embedder/frontend/node_modules/
+app/embedder/frontend/.nuxt/
+app/embedder/frontend/.output/
+app/embedder/frontend/.env
