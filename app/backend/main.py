@@ -1333,8 +1333,10 @@ async def ws_endpoint(ws: WebSocket):
 # app/embedder/frontend/.output/public en wordt verderop op /embedder/ gemount.
 
 from app.backend.embedder import router as embedder_router  # noqa: E402
+from app.backend.setup_routes import router as setup_router  # noqa: E402
 
 app.include_router(embedder_router, prefix="/embedder/api/v1")
+app.include_router(setup_router)
 
 
 _EMBEDDER_API_PREFIX = "/embedder/api/"
@@ -1379,7 +1381,11 @@ async def _embedder_validation_handler(request: Request, exc: RequestValidationE
 # This block must remain at the bottom of the file: the catch-all mount on "/"
 # would shadow any later-registered API route.
 
-_SPA_RESERVED_PREFIXES = ("api", "api/", "devices", "devices/", "health", "ws", "fonts/", "sprites/", "embedder", "embedder/")
+_SPA_RESERVED_PREFIXES = (
+    "api", "api/", "devices", "devices/", "health", "ws",
+    "fonts/", "sprites/", "embedder", "embedder/",
+    "connect", "connect/", "ca.crt", "aitje-ca.mobileconfig",
+)
 
 
 class _SPAStaticFiles(StaticFiles):

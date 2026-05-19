@@ -1033,8 +1033,8 @@ TRANSLATIONS = {
         "en": "URL copied",
     },
     "devices_client_url_qr_hint": {
-        "nl": "Scan de QR-code met je telefoon.",
-        "en": "Scan the QR code with your phone.",
+        "nl": "Scan met je telefoon. Bij eerste keer installeer je het apparaatcertificaat — daarna werkt alles over HTTPS.",
+        "en": "Scan with your phone. First-time clients install the device certificate, then everything runs over HTTPS.",
     },
 
     # ============================================
@@ -1045,8 +1045,8 @@ TRANSLATIONS = {
         "en": "The Embedding Application runs on this device and is reachable from other computers on the same network. Scan the QR code from a laptop or tablet to sign in and manage knowledge-base documents — no Git, no cloud.",
     },
     "embedder_qr_hint": {
-        "nl": "Scan met de camera-app of een QR-scanner.",
-        "en": "Scan with your camera app or a QR scanner.",
+        "nl": "Scan met de camera-app. Eerste keer vraagt het apparaatcertificaat te installeren — daarna werkt de embedder over HTTPS.",
+        "en": "Scan with your camera app. First-time visitors install the device certificate, then the embedder runs over HTTPS.",
     },
     "embedder_qr_missing": {
         "nl": "QR-module ontbreekt — herstart AITJE om dependencies bij te werken.",

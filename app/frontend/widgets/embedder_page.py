@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_HTTP, PUBLIC_BASE_URL
+from ..config import BACKEND_HTTP, PUBLIC_BASE_URL, SETUP_URL
 from ..translations import register_language_change_callback, t
 
 
@@ -40,6 +40,13 @@ def _render_qr_pixmap(text: str, size: int = 280) -> Optional[QPixmap]:
 
 def _embedder_url() -> str:
     return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/embedder/"
+
+
+def _embedder_qr_payload() -> str:
+    base = (SETUP_URL or "").rstrip("/")
+    if not base:
+        return _embedder_url()
+    return f"{base}?app=embedder"
 
 
 class EmbedderPage(QWidget):
@@ -149,7 +156,7 @@ class EmbedderPage(QWidget):
     def _refresh_url_and_qr(self) -> None:
         url = _embedder_url()
         self._url_label.setText(url)
-        pixmap = _render_qr_pixmap(url, size=280)
+        pixmap = _render_qr_pixmap(_embedder_qr_payload(), size=280)
         if pixmap is not None:
             self._qr_label.setPixmap(pixmap)
         else:

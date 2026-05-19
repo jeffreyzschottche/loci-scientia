@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 import requests
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL, SETUP_URL
 from ..translations import t, register_language_change_callback
 from .dialog_style import (
     OverlayDialog,
@@ -272,9 +272,17 @@ class DevicesPage(QWidget):
     def _public_client_url() -> str:
         return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
 
+    @staticmethod
+    def _qr_payload() -> str:
+        base = (SETUP_URL or "").rstrip("/")
+        if not base:
+            return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
+        return f"{base}?app=chat"
+
     def _open_client_url_dialog(self) -> None:
-        url = self._public_client_url()
-        dialog = OverlayDialog(self, width=430, height=500)
+        display_url = self._public_client_url()
+        qr_payload = self._qr_payload()
+        dialog = OverlayDialog(self, width=430, height=540)
         dialog.setWindowTitle(t("devices_client_url_title"))
 
         title = QLabel(t("devices_client_url_title"))
@@ -282,14 +290,14 @@ class DevicesPage(QWidget):
         title.setStyleSheet("font-size:18px; font-weight:800; color:#0f172a;")
         dialog.card_layout.addWidget(title)
 
-        url_label = QLabel(url)
+        url_label = QLabel(display_url)
         url_label.setAlignment(Qt.AlignCenter)
         url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         url_label.setStyleSheet("font-size:15px; font-weight:600; color:#0f172a;")
         url_label.setWordWrap(True)
         dialog.card_layout.addWidget(url_label)
 
-        qr_pixmap = _render_qr_pixmap(url, size=240)
+        qr_pixmap = _render_qr_pixmap(qr_payload, size=240)
         if qr_pixmap is not None:
             qr_label = QLabel()
             qr_label.setAlignment(Qt.AlignCenter)
