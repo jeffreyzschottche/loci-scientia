@@ -35,16 +35,27 @@ export const useAuthStore = defineStore('auth', {
       return expiryDate > now
     },
     baseUrl: (state) => {
-      if (state.deviceNumber) {
-        if (state.deviceNumber.startsWith('http://') || state.deviceNumber.startsWith('https://')) {
-          return state.deviceNumber.replace(/\/$/, '')
+      const configuredDevice = state.deviceNumber?.trim()
+
+      if (configuredDevice) {
+        if (configuredDevice.startsWith('http://') || configuredDevice.startsWith('https://')) {
+          return configuredDevice.replace(/\/$/, '')
         }
-        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(state.deviceNumber)) {
-          return `http://${state.deviceNumber}:8000`
-        }
-        return `http://aitje-${state.deviceNumber}.local:8000`
       }
-      return null
+
+      const origin = sameOriginBase()
+      if (origin) {
+        return origin
+      }
+
+      if (configuredDevice) {
+        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(configuredDevice)) {
+          return `https://${configuredDevice}`
+        }
+        return `https://aitje-${configuredDevice}.local`
+      }
+
+      return origin
     },
   },
 

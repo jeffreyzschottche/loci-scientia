@@ -11,9 +11,14 @@ export default defineNuxtConfig({
     baseURL: '/embedder/',
     buildAssetsDir: '_nuxt/',
     head: {
+      title: 'AITJE',
       meta: [
         { name: 'robots', content: 'noindex, nofollow' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
+      ],
+      link: [
+        { rel: 'icon', type: 'image/x-icon', href: '/embedder/favicon.ico' },
+        { rel: 'apple-touch-icon', href: '/embedder/aitje.png' },
       ],
     },
   },

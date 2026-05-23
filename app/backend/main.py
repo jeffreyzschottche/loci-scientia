@@ -81,6 +81,7 @@ from .schemas import (
 )
 from .settings import settings
 from .support_tunnel import SupportTunnelError, SupportTunnelManager
+from .user_roles import ROLE_CHAT, has_role
 
 logger = logging.getLogger(__name__)
 ENV_FILE_PATH = Path(
@@ -462,6 +463,12 @@ def require_admin_token(record: TokenRecord = Depends(require_token)) -> TokenRe
     return record
 
 
+def require_chat_role(record: TokenRecord = Depends(require_token)) -> TokenRecord:
+    if not has_role(record.roles, ROLE_CHAT):
+        raise HTTPException(status_code=403, detail="Chat-rol vereist")
+    return record
+
+
 def _empty_sync_state() -> dict:
     return {
         "synced": False,
@@ -794,13 +801,15 @@ def api_signon(req: SignOnRequest):
         raise HTTPException(status_code=401, detail="Account niet gevonden of geblokkeerd")
     if device.password != req.password:
         raise HTTPException(status_code=401, detail="Onjuiste gebruikersnaam of wachtwoord")
-    issued = token_store.issue_token(device.id, device.user_name)
+    if not has_role(device.roles, ROLE_CHAT):
+        raise HTTPException(status_code=403, detail="Dit account heeft geen chattoegang")
+    issued = token_store.issue_token(device.id, device.user_name, roles=device.roles)
     device_presence.mark(device.id)
     return {"token": issued.token, "expires_at": issued.expires_at}
 
 
 @app.post("/api/v1/ask")
-async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)):
+async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_chat_role)):
     _mark_prompt_activity()
     started = time.perf_counter()
     api_stats.begin_interaction(record.token)
@@ -911,7 +920,7 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_token)
 @app.post("/api/v1/ask/reset")
 def api_ask_reset(
     req: Optional[ChatResetRequest] = None,
-    record: TokenRecord = Depends(require_token),
+    record: TokenRecord = Depends(require_chat_role),
 ):
     conversation_id = req.conversation_id if req else None
     chat_history.clear(_history_key(record, conversation_id))
@@ -1086,6 +1095,13 @@ async def sse_stream_generator(
 
                         # Check if done
                         if data.get("done", False):
+                            if pending_assistant_chunks:
+                                assistant_stream_started = True
+                                for pending_token in pending_assistant_chunks:
+                                    assistant_chunks.append(pending_token)
+                                    event_data = json.dumps({"token": pending_token, "done": False})
+                                    yield f"data: {event_data}\n\n"
+                                pending_assistant_chunks = []
                             if isinstance(data.get("eval_count"), (int, float)):
                                 eval_count = float(data["eval_count"])
                             if isinstance(data.get("eval_duration"), (int, float)) and data.get("eval_duration"):
@@ -1187,7 +1203,7 @@ async def sse_stream_generator(
 
 
 @app.post("/api/v1/ask/stream")
-async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require_token)):
+async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require_chat_role)):
     """Stream SSE response with queue position and token-by-token LLM output."""
     _mark_prompt_activity()
     api_stats.begin_interaction(record.token)
@@ -1245,7 +1261,7 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
 
 
 @app.post("/api/v1/ask/cancel")
-async def api_ask_cancel(req: ChatCancelRequest, record: TokenRecord = Depends(require_token)):
+async def api_ask_cancel(req: ChatCancelRequest, record: TokenRecord = Depends(require_chat_role)):
     request_id = req.request_id.strip()
     generation = active_generations.get(request_id)
     if generation is None:
@@ -1375,8 +1391,8 @@ async def _embedder_validation_handler(request: Request, exc: RequestValidationE
 #
 # The Nuxt 3 client is generated to app/webclient/.output/public during
 # `lociscientia.sh` startup (or manually with `npm run generate`). FastAPI
-# serves it on the same port so phones/laptops on the LAN can just open
-# http://aitje-<n>.local:8000/ and log in via /api/v1/signon.
+# serves it behind Caddy so phones/laptops on the LAN can open
+# https://aitje-<n>.local/ and log in via /api/v1/signon.
 #
 # This block must remain at the bottom of the file: the catch-all mount on "/"
 # would shadow any later-registered API route.
@@ -1393,9 +1409,17 @@ class _SPAStaticFiles(StaticFiles):
     but never for paths that look like API routes (so a POST-only endpoint
     queried with GET still returns 405/404 instead of an HTML page)."""
 
+    @staticmethod
+    def _disable_html_cache(response):
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type:
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
     async def get_response(self, path: str, scope):
         try:
-            return await super().get_response(path, scope)
+            return self._disable_html_cache(await super().get_response(path, scope))
         except StarletteHTTPException as exc:
             if exc.status_code != 404:
                 raise
@@ -1407,7 +1431,7 @@ class _SPAStaticFiles(StaticFiles):
                 raise
             index_path = Path(self.directory) / "index.html"
             if index_path.is_file():
-                return FileResponse(index_path)
+                return self._disable_html_cache(FileResponse(index_path))
             raise
 
 

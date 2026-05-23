@@ -51,7 +51,6 @@ from .theme import AITJE_QSS
 from .translations import t, register_language_change_callback
 from .widgets.chat_page import ChatPage
 from .widgets.devices_page import DevicesPage
-from .widgets.embedder_page import EmbedderPage
 from .widgets.headerbar import HeaderBar
 from .widgets.knowledge_page import KnowledgePage
 from .widgets.network_page import NetworkStatusPage
@@ -379,7 +378,6 @@ class MainWindow(QMainWindow):
             "kb": KnowledgePage(),
             "net": NetworkStatusPage(),
             "devices": DevicesPage(),
-            "embedder": EmbedderPage(),
             "settings": SettingsPage(),
         }
         self.pages["chat"].open_settings_tab_requested.connect(self._open_settings_tab)
@@ -466,7 +464,6 @@ class MainWindow(QMainWindow):
             "kb": "page_title_kb",
             "net": "page_title_net",
             "devices": "page_title_devices",
-            "embedder": "page_title_embedder",
             "settings": "page_title_settings",
         }
         subtitle_keys = {
@@ -474,7 +471,6 @@ class MainWindow(QMainWindow):
             "kb": "page_subtitle_kb",
             "net": "page_subtitle_net",
             "devices": "page_subtitle_devices",
-            "embedder": "page_subtitle_embedder",
             "settings": "page_subtitle_settings",
         }
         self.page_title.setText(t(title_keys.get(key, "page_title_chat")))

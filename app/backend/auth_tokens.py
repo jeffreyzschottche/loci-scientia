@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
+from .user_roles import DEFAULT_ROLES, normalize_roles
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -24,6 +26,7 @@ class TokenRecord:
     device_id: str
     user_name: str
     expires_at: datetime
+    roles: list[str]
 
     def to_json(self) -> dict:
         return {
@@ -31,6 +34,7 @@ class TokenRecord:
             "device_id": self.device_id,
             "user_name": self.user_name,
             "expires_at": self.expires_at.isoformat(),
+            "roles": normalize_roles(self.roles),
         }
 
 
@@ -70,6 +74,7 @@ class BearerTokenStore:
             device_id = entry.get("device_id")
             user_name = entry.get("user_name")
             expires_at = entry.get("expires_at")
+            roles = entry.get("roles")
             if not (token and device_id and user_name and expires_at):
                 continue
             try:
@@ -81,6 +86,7 @@ class BearerTokenStore:
                 device_id=str(device_id),
                 user_name=str(user_name),
                 expires_at=_coerce_utc(parsed_expiry),
+                roles=normalize_roles(roles),
             )
             tokens.append(record)
         return tokens
@@ -92,7 +98,12 @@ class BearerTokenStore:
         tmp_path.replace(self.tokens_path)
 
     # -- public API -------------------------------------------------------
-    def issue_token(self, device_id: str, user_name: str) -> TokenRecord:
+    def issue_token(
+        self,
+        device_id: str,
+        user_name: str,
+        roles: Optional[Iterable[str]] = None,
+    ) -> TokenRecord:
         valid = self._purge_expired()
         # Replace any existing token for this device to avoid duplicates.
         valid = [record for record in valid if record.device_id != device_id]
@@ -103,6 +114,7 @@ class BearerTokenStore:
             device_id=device_id,
             user_name=user_name,
             expires_at=expires_at,
+            roles=normalize_roles(roles or DEFAULT_ROLES),
         )
         valid.append(record)
         self._persist_tokens(valid)
