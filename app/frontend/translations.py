@@ -984,6 +984,30 @@ TRANSLATIONS = {
         "nl": "Device naam",
         "en": "Device name",
     },
+    "devices_roles": {
+        "nl": "Rollen",
+        "en": "Roles",
+    },
+    "devices_role_chat": {
+        "nl": "Mag chatten",
+        "en": "Can chat",
+    },
+    "devices_role_chat_short": {
+        "nl": "Chat",
+        "en": "Chat",
+    },
+    "devices_role_knowledge_management": {
+        "nl": "Kennisbank management",
+        "en": "Knowledge base management",
+    },
+    "devices_role_knowledge_management_short": {
+        "nl": "Kennisbank",
+        "en": "Knowledge base",
+    },
+    "devices_roles_required": {
+        "nl": "Kies minimaal één rol voor deze gebruiker.",
+        "en": "Choose at least one role for this user.",
+    },
     "devices_username_device_required": {
         "nl": "Naam gebruiker en device naam zijn verplicht.",
         "en": "Username and device name are required.",
@@ -1033,8 +1057,8 @@ TRANSLATIONS = {
         "en": "URL copied",
     },
     "devices_client_url_qr_hint": {
-        "nl": "Scan de QR-code met je telefoon.",
-        "en": "Scan the QR code with your phone.",
+        "nl": "Scan met je telefoon. Eerste keer? Installeer kort het apparaat­certificaat — daarna gaat alles via HTTPS.",
+        "en": "Scan with your phone. First time? Install the device certificate once — after that everything runs over HTTPS.",
     },
 
     # ============================================
@@ -1045,8 +1069,8 @@ TRANSLATIONS = {
         "en": "The Embedding Application runs on this device and is reachable from other computers on the same network. Scan the QR code from a laptop or tablet to sign in and manage knowledge-base documents — no Git, no cloud.",
     },
     "embedder_qr_hint": {
-        "nl": "Scan met de camera-app of een QR-scanner.",
-        "en": "Scan with your camera app or a QR scanner.",
+        "nl": "Scan de QR-code of ga naar de URL en volg de instructies.",
+        "en": "Scan the QR code or go to the URL and follow the instructions.",
     },
     "embedder_qr_missing": {
         "nl": "QR-module ontbreekt — herstart AITJE om dependencies bij te werken.",

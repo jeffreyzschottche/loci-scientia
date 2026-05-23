@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -27,6 +27,7 @@ from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, BACKEND_TIMEOUT
 from ..translations import t, register_language_change_callback
 from ...backend.kennisbank_sync import _knowledge_embedded_path
 from .dialog_style import show_error_dialog
+from .embedder_page import _embedder_qr_payload, _embedder_url, _render_qr_pixmap
 
 
 class KnowledgePage(QWidget):
@@ -46,6 +47,10 @@ class KnowledgePage(QWidget):
         self._actions_documents_title_label: QLabel | None = None
         self._actions_documents_value_label: QLabel | None = None
         self._actions_documents_detail_label: QLabel | None = None
+        self._embedder_status_badge: QLabel | None = None
+        self._embedder_qr_label: QLabel | None = None
+        self._embedder_qr_hint: QLabel | None = None
+        self._embedder_url_label: QLabel | None = None
         self._documents_title_label: QLabel | None = None
         self._documents_search_input: QLineEdit | None = None
         self._documents_refresh_button: QPushButton | None = None
@@ -70,7 +75,7 @@ class KnowledgePage(QWidget):
         top_grid.setColumnStretch(0, 3)
         top_grid.setColumnStretch(1, 1)
         top_grid.addWidget(self._sync_status_card(), 0, 0)
-        top_grid.addWidget(self._actions_card(), 0, 1)
+        top_grid.addWidget(self._embedder_access_card(), 0, 1)
         self._main_layout.addLayout(top_grid)
 
         self._main_layout.addLayout(self._stats_grid())
@@ -79,6 +84,12 @@ class KnowledgePage(QWidget):
 
         self._refresh_sync_state()
         self._refresh_library()
+        self._refresh_embedder_access()
+        self._embedder_status_timer = QTimer(self)
+        self._embedder_status_timer.setInterval(5000)
+        self._embedder_status_timer.timeout.connect(self._check_embedder_status)
+        self._embedder_status_timer.start()
+        QTimer.singleShot(0, self._check_embedder_status)
         register_language_change_callback(self._update_translations)
 
     def _update_translations(self) -> None:
@@ -94,6 +105,9 @@ class KnowledgePage(QWidget):
 
         if self._actions_documents_title_label:
             self._actions_documents_title_label.setText(t("kb_stat_documents").upper())
+        if self._embedder_qr_hint:
+            self._embedder_qr_hint.setText(t("embedder_qr_hint"))
+        self._refresh_embedder_access()
 
         if self._vector_title_label:
             self._vector_title_label.setText(t("kb_vector_db_title"))
@@ -164,44 +178,50 @@ class KnowledgePage(QWidget):
         btn.setFixedHeight(40)
         return btn
 
-    def _actions_card(self) -> QFrame:
-        # Geen sync- of upload-knoppen meer: documenten worden door de
-        # embedder-app (zie Embedder-tab) over LAN gepusht. Deze kaart is
-        # nu enkel een statistiek-tegel met het aantal aanwezige documenten.
+    def _embedder_access_card(self) -> QFrame:
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(18, 16, 18, 18)
+        layout.setSpacing(8)
 
-        documents_block = QFrame()
-        documents_block.setStyleSheet(
-            "QFrame { background:#ffffff; border:1px solid #ece7dc; border-radius:18px; }"
+        self._embedder_status_badge = QLabel()
+        self._embedder_status_badge.setAlignment(Qt.AlignCenter)
+        self._embedder_status_badge.setFixedHeight(26)
+        layout.addWidget(self._embedder_status_badge, 0, Qt.AlignHCenter)
+
+        self._embedder_qr_label = QLabel()
+        self._embedder_qr_label.setAlignment(Qt.AlignCenter)
+        self._embedder_qr_label.setFixedSize(178, 178)
+        self._embedder_qr_label.setStyleSheet(
+            "QLabel {"
+            "  background:#ffffff;"
+            "  border:1px solid #e7dcc0;"
+            "  border-radius:18px;"
+            "  padding:10px;"
+            "}"
         )
-        documents_layout = QVBoxLayout(documents_block)
-        documents_layout.setContentsMargins(14, 14, 14, 14)
-        documents_layout.setSpacing(6)
+        layout.addWidget(self._embedder_qr_label, 0, Qt.AlignHCenter)
 
-        self._actions_documents_title_label = QLabel(t("kb_stat_documents").upper())
-        self._actions_documents_title_label.setStyleSheet(
-            "color:#6b7280; letter-spacing:0.35em; font-size:11px; border:none; background:transparent;"
+        self._embedder_qr_hint = QLabel(t("embedder_qr_hint"))
+        self._embedder_qr_hint.setAlignment(Qt.AlignCenter)
+        self._embedder_qr_hint.setWordWrap(True)
+        self._embedder_qr_hint.setStyleSheet("color:#6b7280; font-size:11px;")
+        layout.addWidget(self._embedder_qr_hint)
+
+        self._embedder_url_label = QLabel()
+        self._embedder_url_label.setAlignment(Qt.AlignCenter)
+        self._embedder_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._embedder_url_label.setWordWrap(True)
+        self._embedder_url_label.setStyleSheet(
+            "QLabel {"
+            "  font-size:12px; font-weight:700; color:#0f172a;"
+            "  background:#f8f6ef; border:1px solid #e7dcc0;"
+            "  border-radius:12px;"
+            "  padding:8px 12px;"
+            "}"
         )
-        documents_layout.addWidget(self._actions_documents_title_label)
-
-        self._actions_documents_value_label = QLabel("0")
-        self._actions_documents_value_label.setStyleSheet(
-            "font-size:28px; font-weight:700; color:#111111; border:none; background:transparent;"
-        )
-        documents_layout.addWidget(self._actions_documents_value_label)
-
-        self._actions_documents_detail_label = QLabel(t("kb_stat_documents_detail", count="0"))
-        self._actions_documents_detail_label.setStyleSheet(
-            "color:#4b5563; border:none; background:transparent;"
-        )
-        documents_layout.addWidget(self._actions_documents_detail_label)
-
-        layout.addWidget(documents_block)
-        layout.addStretch(1)
+        layout.addWidget(self._embedder_url_label)
         return card
 
     def _sync_status_card(self) -> QFrame:
@@ -433,6 +453,54 @@ class KnowledgePage(QWidget):
         if BACKEND_BEARER_TOKEN:
             headers["Authorization"] = f"Bearer {BACKEND_BEARER_TOKEN}"
         return headers
+
+    def _refresh_embedder_access(self) -> None:
+        if self._embedder_url_label:
+            self._embedder_url_label.setText(_embedder_url())
+        if self._embedder_qr_label:
+            pixmap = _render_qr_pixmap(_embedder_qr_payload(), size=150)
+            if pixmap is not None:
+                self._embedder_qr_label.setPixmap(pixmap)
+                self._embedder_qr_label.setText("")
+            else:
+                self._embedder_qr_label.setPixmap(QPixmap())
+                self._embedder_qr_label.setText(t("embedder_qr_missing"))
+        self._check_embedder_status()
+
+    def _set_embedder_status(self, online: bool) -> None:
+        if not self._embedder_status_badge:
+            return
+        if online:
+            self._embedder_status_badge.setText(f"●  {t('embedder_status_online')}")
+            self._embedder_status_badge.setStyleSheet(
+                "QLabel {"
+                "  color:#15803d; background:#ecfdf5;"
+                "  border:1px solid #bbf7d0; border-radius:13px;"
+                "  padding:4px 14px; font-size:10px; font-weight:700;"
+                "  letter-spacing:0.18em;"
+                "}"
+            )
+        else:
+            self._embedder_status_badge.setText(f"○  {t('embedder_status_offline')}")
+            self._embedder_status_badge.setStyleSheet(
+                "QLabel {"
+                "  color:#6b7280; background:#f3f4f6;"
+                "  border:1px solid #e5e7eb; border-radius:13px;"
+                "  padding:4px 14px; font-size:10px; font-weight:700;"
+                "  letter-spacing:0.18em;"
+                "}"
+            )
+
+    def _check_embedder_status(self) -> None:
+        try:
+            resp = requests.head(
+                f"{BACKEND_HTTP.rstrip('/')}/embedder/",
+                timeout=1.5,
+                allow_redirects=True,
+            )
+            self._set_embedder_status(resp.status_code < 400)
+        except requests.RequestException:
+            self._set_embedder_status(False)
 
     def _refresh_sync_state(self) -> None:
         if not BACKEND_BEARER_TOKEN:
@@ -721,6 +789,7 @@ class KnowledgePage(QWidget):
         # zich up-to-date houdt zonder polling.
         self._refresh_sync_state()
         self._refresh_library()
+        self._refresh_embedder_access()
 
     def _handle_refresh_clicked(self) -> None:
         # Disable de knop tijdens de blocking HTTP-calls zodat de user niet

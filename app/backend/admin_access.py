@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from .auth_tokens import BearerTokenStore, TokenRecord
+from .user_roles import ALL_ROLES
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class AdminTokenManager:
             user_name=user_name,
         )
         if record is None:
-            record = self._issuer.issue_token(self.admin_device_id, user_name)
+            record = self._issuer.issue_token(self.admin_device_id, user_name, roles=ALL_ROLES)
         try:
             self._persist_local_token(record)
         except OSError:

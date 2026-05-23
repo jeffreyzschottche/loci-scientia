@@ -34,6 +34,16 @@ DOCKER_CMD=()
 searxng_started_by_us=0
 DISABLED_APT_FILES=()
 
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+
+CADDY_AUTOSTART="${CADDY_AUTOSTART:-1}"
+CADDY_HTTP_PORT="${CADDY_HTTP_PORT:-80}"
+CADDY_HTTPS_PORT="${CADDY_HTTPS_PORT:-443}"
+CADDY_DATA_HOME="${CADDY_DATA_HOME:-$PROJECT_ROOT/devices_db}"
+CADDY_TLS_DIR="$PROJECT_ROOT/devices_db/tls"
+caddy_pid=""
+caddy_started=0
+
 ensure_sudo_session() {
     if ! command -v sudo >/dev/null 2>&1; then
         return 1
@@ -1069,6 +1079,184 @@ start_searxng() {
     return 0
 }
 
+ensure_caddy() {
+    # Returns 0 if a foreground Caddy was started successfully (CA cert ready);
+    # nonzero otherwise. On success: $caddy_pid is set, $caddy_started=1,
+    # CA cert lives at $CADDY_TLS_DIR/ca.crt.
+    if [ "$(_normalize_bool "$CADDY_AUTOSTART")" = "0" ]; then
+        echo "ℹ️  CADDY_AUTOSTART=0; HTTPS reverse proxy uitgeschakeld."
+        return 1
+    fi
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *)
+            echo "ℹ️  Caddy autostart wordt alleen op Linux ondersteund; HTTPS overgeslagen."
+            return 1
+            ;;
+    esac
+
+    if ! command -v caddy >/dev/null 2>&1; then
+        if [ "$HAVE_SUDO" -ne 1 ] || ! command -v apt-get >/dev/null 2>&1; then
+            echo "⚠️  Caddy niet gevonden en kan niet via apt geïnstalleerd worden."
+            return 1
+        fi
+        echo "📦 Caddy installeren via apt..."
+        if ! _wait_for_apt_lock 180; then
+            echo "⚠️  apt blijft bezet; Caddy installatie overgeslagen."
+            return 1
+        fi
+        _disable_broken_apt_repos || true
+        local apt_rc=0
+        if ! sudo apt-get install -y caddy 2>/dev/null; then
+            apt_rc=1
+            echo "📦 Caddy zit niet in de default repos, voeg cloudsmith toe..."
+            if ! command -v gpg >/dev/null 2>&1; then
+                sudo apt-get install -y gnupg >/dev/null 2>&1 || true
+            fi
+            if ! command -v curl >/dev/null 2>&1; then
+                sudo apt-get install -y curl >/dev/null 2>&1 || true
+            fi
+            sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https >/dev/null 2>&1 || true
+            local key_path=/usr/share/keyrings/caddy-stable-archive-keyring.gpg
+            local list_path=/etc/apt/sources.list.d/caddy-stable.list
+            if [ ! -f "$key_path" ]; then
+                curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+                    | sudo gpg --dearmor -o "$key_path" >/dev/null 2>&1 || true
+            fi
+            if [ ! -f "$list_path" ]; then
+                curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+                    | sudo tee "$list_path" >/dev/null 2>&1 || true
+            fi
+            sudo apt-get update -y >/dev/null 2>&1 || true
+            if sudo apt-get install -y caddy; then
+                apt_rc=0
+            fi
+        fi
+        _restore_disabled_apt_repos
+        if [ "$apt_rc" -ne 0 ]; then
+            echo "⚠️  Caddy installatie mislukt."
+            return 1
+        fi
+    fi
+
+    local caddy_bin
+    caddy_bin="$(command -v caddy)"
+
+    # setcap so a non-root Caddy can bind privileged ports (80/443).
+    if [ "$CADDY_HTTP_PORT" -lt 1024 ] || [ "$CADDY_HTTPS_PORT" -lt 1024 ]; then
+        if command -v setcap >/dev/null 2>&1 && [ "$HAVE_SUDO" -eq 1 ]; then
+            local current_caps
+            current_caps="$(sudo getcap "$caddy_bin" 2>/dev/null || true)"
+            if [[ "$current_caps" != *"cap_net_bind_service"* ]]; then
+                if sudo setcap cap_net_bind_service=+ep "$caddy_bin" 2>/dev/null; then
+                    echo "🔒 setcap cap_net_bind_service op ${caddy_bin}."
+                else
+                    echo "⚠️  setcap mislukt; Caddy kan poort <1024 mogelijk niet binden."
+                fi
+            fi
+        fi
+    fi
+
+    # The apt package enables caddy.service by default; stop it so we own
+    # the listening sockets ourselves (and write data under our project tree).
+    if [ "$HAVE_SUDO" -eq 1 ] && command -v systemctl >/dev/null 2>&1; then
+        if systemctl is-active --quiet caddy 2>/dev/null; then
+            echo "🛑 Bestaande caddy.service stoppen (we runnen onze eigen instance)..."
+            sudo systemctl stop caddy >/dev/null 2>&1 || true
+            sudo systemctl disable caddy >/dev/null 2>&1 || true
+        fi
+    fi
+
+    # Kill a foreground caddy left behind by a previous run (otherwise it
+    # would already hold :80/:443 and our new instance would fail to bind).
+    if [ -f "$PROJECT_ROOT/caddy.pid" ]; then
+        local prev_pid
+        prev_pid="$(cat "$PROJECT_ROOT/caddy.pid" 2>/dev/null || true)"
+        if [ -n "$prev_pid" ] && kill -0 "$prev_pid" 2>/dev/null; then
+            echo "🛑 Eerder gestarte Caddy (pid $prev_pid) stoppen..."
+            kill "$prev_pid" 2>/dev/null || true
+            sleep 1
+        fi
+        rm -f "$PROJECT_ROOT/caddy.pid" >/dev/null 2>&1 || true
+    fi
+
+    mkdir -p "$CADDY_DATA_HOME" "$CADDY_TLS_DIR"
+
+    local caddyfile="$CADDY_TLS_DIR/Caddyfile"
+    cat > "$caddyfile" <<EOF
+{
+    auto_https disable_redirects
+    admin off
+}
+
+(bootstrap_paths) {
+    @bootstrap path /connect /connect/* /ca.crt /aitje-ca.mobileconfig
+    handle @bootstrap {
+        reverse_proxy 127.0.0.1:${BACKEND_PORT:-8000}
+    }
+}
+
+http://${DEVICE_MDNS}:${CADDY_HTTP_PORT} {
+    import bootstrap_paths
+    handle {
+        redir https://${DEVICE_MDNS}{uri} permanent
+    }
+}
+
+http://:${CADDY_HTTP_PORT} {
+    import bootstrap_paths
+    handle {
+        redir https://${DEVICE_MDNS}{uri} permanent
+    }
+}
+
+https://${DEVICE_MDNS}:${CADDY_HTTPS_PORT} {
+    tls internal
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:${BACKEND_PORT:-8000} {
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Host {host}
+    }
+}
+EOF
+
+    if ! XDG_DATA_HOME="$CADDY_DATA_HOME" "$caddy_bin" validate \
+            --config "$caddyfile" --adapter caddyfile >/dev/null 2>&1; then
+        echo "⚠️  Caddyfile validatie mislukt:"
+        XDG_DATA_HOME="$CADDY_DATA_HOME" "$caddy_bin" validate \
+            --config "$caddyfile" --adapter caddyfile 2>&1 | sed 's/^/    /'
+        return 1
+    fi
+
+    echo "⏳ Caddy starten op :${CADDY_HTTP_PORT}/:${CADDY_HTTPS_PORT}..."
+    XDG_DATA_HOME="$CADDY_DATA_HOME" \
+        "$caddy_bin" run --config "$caddyfile" --adapter caddyfile \
+        > "$PROJECT_ROOT/caddy.log" 2>&1 &
+    caddy_pid=$!
+    echo "$caddy_pid" > "$PROJECT_ROOT/caddy.pid" 2>/dev/null || true
+
+    local ca_src="$CADDY_DATA_HOME/caddy/pki/authorities/local/root.crt"
+    local i
+    for i in {1..30}; do
+        if ! kill -0 "$caddy_pid" 2>/dev/null; then
+            echo "⚠️  Caddy crashte tijdens start — check caddy.log."
+            return 1
+        fi
+        if [ -f "$ca_src" ]; then
+            cp -f "$ca_src" "$CADDY_TLS_DIR/ca.crt" 2>/dev/null || true
+            chmod 0644 "$CADDY_TLS_DIR/ca.crt" 2>/dev/null || true
+            echo "✅ Caddy actief; root CA → http://${DEVICE_MDNS}/ca.crt"
+            export AITJE_CA_CERT_PATH="$CADDY_TLS_DIR/ca.crt"
+            export CADDY_HTTP_PORT CADDY_HTTPS_PORT
+            caddy_started=1
+            return 0
+        fi
+        sleep 0.5
+    done
+    echo "⚠️  Caddy startte maar het interne CA-cert kwam niet op tijd."
+    return 1
+}
+
 echo "=== Netwerk & mDNS setup ==="
 ensure_mdns_support
 ensure_active_wifi_profile_persistence
@@ -1097,16 +1285,44 @@ fi
 echo "====================="
 echo
 
-BACKEND_HOST="${BACKEND_HOST:-}"
-auto_backend_host=0
-if [ -z "$BACKEND_HOST" ] || [ "$BACKEND_HOST" = "127.0.0.1" ] || [ "$BACKEND_HOST" = "localhost" ]; then
-    BACKEND_HOST="$DEVICE_MDNS"
-    auto_backend_host=1
-fi
-if [ "$auto_backend_host" -eq 1 ]; then
-    host_check_failed=0
-    if command -v python3 >/dev/null 2>&1; then
-        if ! CHECK_HOST="$BACKEND_HOST" python3 - <<'PY' >/dev/null 2>&1; then
+# Caddy must be probed *before* uvicorn so we know whether to bind loopback
+# (HTTPS via reverse proxy) or 0.0.0.0 (fallback, plain HTTP on $BACKEND_PORT).
+echo "=== Caddy HTTPS reverse proxy ==="
+ensure_caddy || true
+echo "================================="
+echo
+
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+
+if [ "$caddy_started" -eq 1 ]; then
+    # LAN clients reach the device via Caddy on :80/:443 only. Uvicorn binds
+    # loopback so plain HTTP on :8000 isn't exposed beyond the device itself.
+    BACKEND_BIND_HOST="${BACKEND_BIND_HOST:-127.0.0.1}"
+    BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
+    BACKEND_HTTP="${BACKEND_HTTP:-http://127.0.0.1:$BACKEND_PORT}"
+    BACKEND_WS="${BACKEND_WS:-ws://127.0.0.1:$BACKEND_PORT/ws}"
+    if [ "$CADDY_HTTPS_PORT" = "443" ]; then
+        PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://$DEVICE_MDNS}"
+    else
+        PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://$DEVICE_MDNS:$CADDY_HTTPS_PORT}"
+    fi
+    if [ "$CADDY_HTTP_PORT" = "80" ]; then
+        SETUP_URL="${SETUP_URL:-http://$DEVICE_MDNS/connect}"
+    else
+        SETUP_URL="${SETUP_URL:-http://$DEVICE_MDNS:$CADDY_HTTP_PORT/connect}"
+    fi
+else
+    # Fallback: no TLS, bind uvicorn publicly on $BACKEND_PORT (legacy path).
+    BACKEND_HOST="${BACKEND_HOST:-}"
+    auto_backend_host=0
+    if [ -z "$BACKEND_HOST" ] || [ "$BACKEND_HOST" = "127.0.0.1" ] || [ "$BACKEND_HOST" = "localhost" ]; then
+        BACKEND_HOST="$DEVICE_MDNS"
+        auto_backend_host=1
+    fi
+    if [ "$auto_backend_host" -eq 1 ]; then
+        host_check_failed=0
+        if command -v python3 >/dev/null 2>&1; then
+            if ! CHECK_HOST="$BACKEND_HOST" python3 - <<'PY' >/dev/null 2>&1; then
 import os, socket, sys
 host = os.environ.get("CHECK_HOST", "")
 try:
@@ -1114,34 +1330,30 @@ try:
 except OSError:
     sys.exit(1)
 PY
+                host_check_failed=1
+            fi
+        elif ! getent hosts "$BACKEND_HOST" >/dev/null 2>&1; then
             host_check_failed=1
         fi
-    elif ! getent hosts "$BACKEND_HOST" >/dev/null 2>&1; then
-        host_check_failed=1
+        if [ "$host_check_failed" -eq 1 ]; then
+            echo "⚠️  Hostname ${BACKEND_HOST} niet bereikbaar, val terug op 127.0.0.1"
+            BACKEND_HOST="127.0.0.1"
+        fi
     fi
-    if [ "$host_check_failed" -eq 1 ]; then
-        echo "⚠️  Hostname ${BACKEND_HOST} niet bereikbaar, val terug op 127.0.0.1"
-        BACKEND_HOST="127.0.0.1"
+    BACKEND_BIND_HOST="${BACKEND_BIND_HOST:-0.0.0.0}"
+    if [ -z "${BACKEND_HTTP:-}" ] || [[ "$BACKEND_HTTP" == http://127.0.0.1* ]] || [[ "$BACKEND_HTTP" == http://localhost* ]]; then
+        BACKEND_HTTP="http://$BACKEND_HOST:$BACKEND_PORT"
     fi
-fi
-BACKEND_BIND_HOST="${BACKEND_BIND_HOST:-0.0.0.0}"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
-if [ -z "${BACKEND_HTTP:-}" ] || [[ "$BACKEND_HTTP" == http://127.0.0.1* ]] || [[ "$BACKEND_HTTP" == http://localhost* ]]; then
-    BACKEND_HTTP="http://$BACKEND_HOST:$BACKEND_PORT"
-fi
-if [ -z "${BACKEND_WS:-}" ]; then
-    if [[ "$BACKEND_HTTP" == https://* ]]; then
-        BACKEND_WS="wss://${BACKEND_HTTP#https://}"
-    elif [[ "$BACKEND_HTTP" == http://* ]]; then
-        BACKEND_WS="ws://${BACKEND_HTTP#http://}"
-    else
+    if [ -z "${BACKEND_WS:-}" ]; then
         BACKEND_WS="ws://$BACKEND_HOST:$BACKEND_PORT/ws"
     fi
+    if [ -z "${PUBLIC_BASE_URL:-}" ] || [[ "$PUBLIC_BASE_URL" == http://127.0.0.1* ]] || [[ "$PUBLIC_BASE_URL" == http://localhost* ]]; then
+        PUBLIC_BASE_URL="http://$DEVICE_MDNS:$BACKEND_PORT"
+    fi
+    SETUP_URL="${SETUP_URL:-http://$DEVICE_MDNS:$BACKEND_PORT/connect}"
 fi
-if [ -z "${PUBLIC_BASE_URL:-}" ] || [[ "$PUBLIC_BASE_URL" == http://127.0.0.1* ]] || [[ "$PUBLIC_BASE_URL" == http://localhost* ]]; then
-    PUBLIC_BASE_URL="http://$DEVICE_MDNS:$BACKEND_PORT"
-fi
-export BACKEND_HOST BACKEND_BIND_HOST BACKEND_PORT BACKEND_HTTP BACKEND_WS PUBLIC_BASE_URL
+export BACKEND_HOST BACKEND_BIND_HOST BACKEND_PORT BACKEND_HTTP BACKEND_WS PUBLIC_BASE_URL SETUP_URL
+export CADDY_HTTP_PORT CADDY_HTTPS_PORT
 
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
@@ -1176,7 +1388,7 @@ WEBCLIENT_DIR="$PROJECT_ROOT/app/webclient"
 WEBCLIENT_DIST_INDEX="$WEBCLIENT_DIR/.output/public/index.html"
 if [ -d "$WEBCLIENT_DIR" ]; then
     if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-        echo "⚠️  Node.js/npm niet gevonden — sla webclient-build over. Installeer Node 20+ om de browserclient op http://${DEVICE_MDNS}:${BACKEND_PORT}/ te hosten."
+        echo "⚠️  Node.js/npm niet gevonden — sla webclient-build over. Installeer Node 20+ om de browserclient op ${PUBLIC_BASE_URL}/ te hosten."
     else
         webclient_stamp="$WEBCLIENT_DIR/.output/.build-stamp"
         webclient_inputs=(
@@ -1214,12 +1426,12 @@ if [ -d "$WEBCLIENT_DIR" ]; then
             )
             if [ -f "$WEBCLIENT_DIST_INDEX" ]; then
                 touch "$webclient_stamp"
-                echo "✅ Webclient klaar — bereikbaar op http://${DEVICE_MDNS}:${BACKEND_PORT}/"
+                echo "✅ Webclient klaar — bereikbaar op ${PUBLIC_BASE_URL}/"
             else
                 echo "⚠️  Webclient build mislukt; FastAPI start zonder SPA."
             fi
         else
-            echo "✅ Webclient up-to-date — bereikbaar op http://${DEVICE_MDNS}:${BACKEND_PORT}/"
+            echo "✅ Webclient up-to-date — bereikbaar op ${PUBLIC_BASE_URL}/"
         fi
     fi
 fi
@@ -1339,8 +1551,16 @@ backend_pid=$!
 
 cleanup() {
     echo
-    echo "🛑 Backend stoppen..."
-    kill "$backend_pid" >/dev/null 2>&1 || true
+    if [ -n "${backend_pid:-}" ]; then
+        echo "🛑 Backend stoppen..."
+        kill "$backend_pid" >/dev/null 2>&1 || true
+    fi
+
+    if [ -n "${caddy_pid:-}" ]; then
+        echo "🛑 Caddy stoppen..."
+        kill "$caddy_pid" >/dev/null 2>&1 || true
+        rm -f "$PROJECT_ROOT/caddy.pid" >/dev/null 2>&1 || true
+    fi
 
     if [ -n "${ollama_pid:-}" ]; then
         echo "🛑 Ollama stoppen..."
@@ -1388,7 +1608,11 @@ cleanup() {
 
 trap cleanup EXIT
 
-health_url="http://$BACKEND_HOST:$BACKEND_PORT/health"
+health_host="$BACKEND_HOST"
+if [ "$BACKEND_BIND_HOST" = "127.0.0.1" ] || [ "$BACKEND_BIND_HOST" = "localhost" ]; then
+    health_host="127.0.0.1"
+fi
+health_url="http://$health_host:$BACKEND_PORT/health"
 for i in {1..40}; do
     if curl -fs "$health_url" >/dev/null 2>&1; then
         echo "✅ Backend reagerend, start frontend."

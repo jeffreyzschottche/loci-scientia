@@ -2,7 +2,7 @@
   <NuxtLayout name="default">
     <div class="relative h-full w-full overflow-hidden flex flex-col">
       <!-- Header -->
-      <header class="bg-white border-b border-gray-200 py-2 pt-safe">
+      <header class="bg-white border-b border-gray-200 py-1 pt-safe">
         <div
           class="mx-auto flex items-center justify-between gap-2"
           :class="isNativeMobileApp ? 'w-[94%]' : ''"
@@ -12,7 +12,7 @@
             <img
               src="/aitje-logox.png"
               alt="AITJE"
-              :class="isNativeMobileApp ? 'h-[45px] w-auto' : 'h-[60px] w-auto'"
+              :class="isNativeMobileApp ? 'h-[40px] w-auto' : 'h-[54px] w-auto'"
             />
           </div>
           <div class="flex items-center gap-1.5 sm:gap-2">
@@ -468,7 +468,7 @@ const { t } = useI18n()
 const error = ref('')
 const showNewChatModal = ref(false)
 const inputText = ref('')
-const thinkingEnabled = ref(true)
+const thinkingEnabled = ref(false)
 const webSearchEnabled = ref(false)
 const webSearchStatus = ref<WebSearchStatus | null>(null)
 const shouldResetServerChat = ref(false)

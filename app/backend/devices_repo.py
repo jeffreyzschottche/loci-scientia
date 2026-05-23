@@ -10,6 +10,7 @@ from qdrant_client.models import CollectionInfo, Distance, PointStruct, VectorPa
 from .qdrant_utils import QDRANT_LOCAL_DIR, get_qdrant_client
 from .rag.embedder import embed_text
 from .schemas import Device, DeviceCreate, DevicePatch
+from .user_roles import normalize_roles
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,7 @@ class DevicesRepository:
             password=payload.get("password", ""),
             phone=payload.get("phone", ""),
             device_name=payload.get("device_name", ""),
+            roles=normalize_roles(payload.get("roles")),
         )
 
     def list_devices(self) -> List[Device]:
@@ -167,6 +169,7 @@ class DevicesRepository:
             "email": data.email,
             "password": data.password,
             "device_name": data.device_name,
+            "roles": normalize_roles(data.roles),
         }
 
         text = self._embedding_text(payload)

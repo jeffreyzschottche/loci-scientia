@@ -26,6 +26,13 @@ promptlog.log
 *.pmtiles
 
 ollama.pid
+caddy.pid
+
+# Per-device Caddy state — includes the internal CA *private key*, must never
+# be committed.
+devices_db/caddy/
+# Mirrored CA public cert + generated Caddyfile (regenerated each boot).
+devices_db/tls/
 
 devices_db/kennisbank_sync_state.json
 devices_db/embedder.db

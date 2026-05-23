@@ -7,6 +7,29 @@ def _default_backend_http(host: str, port: int) -> str:
     return f"http://{host}:{port}"
 
 
+def _default_public_base(host: str) -> str:
+    """LAN-facing URL served by Caddy.
+
+    Defaults to https on the implicit port 443; override via PUBLIC_BASE_URL
+    if Caddy isn't running or is on a non-standard port (then it falls back
+    to plain http://host:BACKEND_PORT)."""
+    port = (os.environ.get("CADDY_HTTPS_PORT") or "443").strip() or "443"
+    if port == "443":
+        return f"https://{host}"
+    return f"https://{host}:{port}"
+
+
+def _default_setup_url(host: str) -> str:
+    """First-time onboarding URL served over plain HTTP by Caddy on port 80.
+
+    This is what the QR codes encode — the page installs the local CA and
+    then forwards the client to the HTTPS app."""
+    port = (os.environ.get("CADDY_HTTP_PORT") or "80").strip() or "80"
+    if port == "80":
+        return f"http://{host}/connect"
+    return f"http://{host}:{port}/connect"
+
+
 def _http_to_ws(url: str) -> str:
     if url.startswith("https://"):
         return "wss://" + url[len("https://") :]
@@ -39,15 +62,21 @@ if not DEVICE_HOSTNAME:
 DEVICE_MDNS = os.environ.get("DEVICE_MDNS") or f"{DEVICE_HOSTNAME}.local"
 
 _ENV_BACKEND_HOST = os.environ.get("BACKEND_HOST")
-if _ENV_BACKEND_HOST and _ENV_BACKEND_HOST not in {"0.0.0.0", "127.0.0.1"}:
+if _ENV_BACKEND_HOST and _ENV_BACKEND_HOST not in {"0.0.0.0"}:
+    # 127.0.0.1 is a legitimate value now (uvicorn binds loopback when Caddy
+    # terminates TLS); preserve it. 0.0.0.0 only makes sense as a *bind* host,
+    # never as a connect target.
     BACKEND_HOST = _ENV_BACKEND_HOST
 else:
-    BACKEND_HOST = DEVICE_MDNS
+    # Default: talk to uvicorn over loopback. The Qt UI runs on the device
+    # itself, so there's never a reason to go through Caddy or the LAN name.
+    BACKEND_HOST = "127.0.0.1"
 BACKEND_PORT = int(os.environ.get("BACKEND_PORT", "8000"))
 BACKEND_HTTP = os.environ.get("BACKEND_HTTP", _default_backend_http(BACKEND_HOST, BACKEND_PORT)).rstrip("/")
 BACKEND_WS = os.environ.get("BACKEND_WS") or _http_to_ws(BACKEND_HTTP)
 BACKEND_TIMEOUT = int(os.environ.get("BACKEND_TIMEOUT", "6"))
-PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", _default_backend_http(DEVICE_MDNS, BACKEND_PORT)).rstrip("/")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", _default_public_base(DEVICE_MDNS)).rstrip("/")
+SETUP_URL = os.environ.get("SETUP_URL", _default_setup_url(DEVICE_MDNS)).rstrip("/")
 _ENV_BEARER_TOKEN = (
     os.environ.get("AITJE_BEARER_TOKEN")
     or os.environ.get("BACKEND_BEARER_TOKEN")

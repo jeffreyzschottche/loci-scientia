@@ -29,11 +29,10 @@ from app.backend.settings import settings
 
 from . import jsonld, models, processing
 from .auth import (
-    admin_user_payload,
     issue_token,
     require_embedder_user,
     revoke_token,
-    verify_credentials,
+    user_payload_for_record,
 )
 from .parsing.parsed import slugify
 
@@ -175,10 +174,11 @@ def _section_or_404(section_id: int) -> dict:
 
 @router.post("/login")
 def login(body: LoginRequest) -> dict:
-    if not verify_credentials(body.email, body.password):
+    try:
+        record, user = issue_token(body.email, body.password)
+    except ValueError:
         raise HTTPException(status_code=422, detail="Deze inloggegevens kloppen niet.")
-    record = issue_token()
-    return {"token": record.token, "user": admin_user_payload()}
+    return {"token": record.token, "user": user}
 
 
 @router.post("/logout", response_model=MessageResponse)
@@ -188,8 +188,8 @@ def logout(record: TokenRecord = Depends(require_embedder_user)) -> dict:
 
 
 @router.get("/me")
-def me(_: TokenRecord = Depends(require_embedder_user)) -> dict:
-    return admin_user_payload()
+def me(record: TokenRecord = Depends(require_embedder_user)) -> dict:
+    return user_payload_for_record(record)
 
 
 # ---- documents --------------------------------------------------------------
@@ -341,9 +341,24 @@ def process_document_route(
             detail={"message": "Verwerking mislukt", "error": str(exc)},
         )
 
+    try:
+        from . import sync as embedder_sync
+
+        sync_result = embedder_sync.sync_changed_chunks_to_qdrant()
+    except Exception as exc:
+        logger.exception("Automatische sync naar device faalde voor document %s", document_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Document verwerkt, maar synchronisatie naar de kennisbank mislukt.",
+                "error": str(exc),
+            },
+        ) from exc
+
     return {
-        "message": "Document succesvol verwerkt",
+        "message": "Document succesvol verwerkt en gesynchroniseerd",
         "document": _hydrate_document(updated),
+        "sync": sync_result,
     }
 
 

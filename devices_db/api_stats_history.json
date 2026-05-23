@@ -2,168 +2,6 @@
   "mode": "interactive_v1",
   "samples": [
     {
-      "timestamp": "2026-05-03T18:27:46.106705+00:00",
-      "requests_today": 1,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 11334,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-03T19:14:06.774483+00:00",
-      "requests_today": 2,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 11609,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-03T22:55:20.306668+00:00",
-      "requests_today": 3,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 11719,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-03T22:56:06.903185+00:00",
-      "requests_today": 4,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 11708,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-03T22:57:01.985787+00:00",
-      "requests_today": 5,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 12002,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-03T22:57:38.089110+00:00",
-      "requests_today": 6,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 11309,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T17:54:40.683928+00:00",
-      "requests_today": 1,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 27549,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T17:58:07.159414+00:00",
-      "requests_today": 2,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 31245,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T17:58:32.231774+00:00",
-      "requests_today": 3,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 25181,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T17:59:22.265013+00:00",
-      "requests_today": 4,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 24508,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T18:03:37.292903+00:00",
-      "requests_today": 5,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 25464,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T18:05:03.004353+00:00",
-      "requests_today": 6,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 22906,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T18:05:46.584232+00:00",
-      "requests_today": 7,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 24911,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T18:44:22.024412+00:00",
-      "requests_today": 8,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 2,
-      "avg_response_ms": 23206,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T18:45:00.300939+00:00",
-      "requests_today": 9,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 2,
-      "avg_response_ms": 23574,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-04T18:46:42.343621+00:00",
-      "requests_today": 10,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 3,
-      "avg_response_ms": 24305,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-06T12:42:11.093416+00:00",
-      "requests_today": 1,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 25482,
-      "tokens_per_second": 0.0
-    },
-    {
-      "timestamp": "2026-05-06T12:47:26.500007+00:00",
-      "requests_today": 2,
-      "errors_today": 0,
-      "error_rate": 0.0,
-      "active_users_today": 1,
-      "avg_response_ms": 39171,
-      "tokens_per_second": 0.0
-    },
-    {
       "timestamp": "2026-05-06T16:13:01.314298+00:00",
       "requests_today": 1,
       "errors_today": 0,
@@ -396,6 +234,222 @@
       "active_users_today": 1,
       "avg_response_ms": 58308,
       "tokens_per_second": 73.4
+    },
+    {
+      "timestamp": "2026-05-23T09:46:25.676582+00:00",
+      "requests_today": 1,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 1,
+      "avg_response_ms": 8691,
+      "tokens_per_second": 27.2
+    },
+    {
+      "timestamp": "2026-05-23T09:46:45.277675+00:00",
+      "requests_today": 2,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 1,
+      "avg_response_ms": 6625,
+      "tokens_per_second": 27.2
+    },
+    {
+      "timestamp": "2026-05-23T09:47:00.190967+00:00",
+      "requests_today": 3,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 2,
+      "avg_response_ms": 6118,
+      "tokens_per_second": 26.7
+    },
+    {
+      "timestamp": "2026-05-23T09:52:20.803749+00:00",
+      "requests_today": 4,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 2,
+      "avg_response_ms": 13005,
+      "tokens_per_second": 24.8
+    },
+    {
+      "timestamp": "2026-05-23T11:28:33.772859+00:00",
+      "requests_today": 5,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 12542,
+      "tokens_per_second": 25.0
+    },
+    {
+      "timestamp": "2026-05-23T11:28:53.535723+00:00",
+      "requests_today": 6,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 11371,
+      "tokens_per_second": 25.0
+    },
+    {
+      "timestamp": "2026-05-23T11:29:10.360066+00:00",
+      "requests_today": 7,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 10479,
+      "tokens_per_second": 25.1
+    },
+    {
+      "timestamp": "2026-05-23T11:29:59.802160+00:00",
+      "requests_today": 8,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 10253,
+      "tokens_per_second": 25.1
+    },
+    {
+      "timestamp": "2026-05-23T11:30:15.413973+00:00",
+      "requests_today": 9,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 9901,
+      "tokens_per_second": 25.1
+    },
+    {
+      "timestamp": "2026-05-23T11:30:56.443187+00:00",
+      "requests_today": 10,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 10018,
+      "tokens_per_second": 25.0
+    },
+    {
+      "timestamp": "2026-05-23T11:31:21.924026+00:00",
+      "requests_today": 11,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 10344,
+      "tokens_per_second": 24.9
+    },
+    {
+      "timestamp": "2026-05-23T11:32:08.101143+00:00",
+      "requests_today": 12,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 3,
+      "avg_response_ms": 10358,
+      "tokens_per_second": 24.9
+    },
+    {
+      "timestamp": "2026-05-23T11:37:34.159370+00:00",
+      "requests_today": 16,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 10876,
+      "tokens_per_second": 23.0
+    },
+    {
+      "timestamp": "2026-05-23T11:39:54.056087+00:00",
+      "requests_today": 20,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 11161,
+      "tokens_per_second": 21.8
+    },
+    {
+      "timestamp": "2026-05-23T11:46:00.926110+00:00",
+      "requests_today": 22,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 12161,
+      "tokens_per_second": 21.1
+    },
+    {
+      "timestamp": "2026-05-23T11:46:45.676373+00:00",
+      "requests_today": 23,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 12768,
+      "tokens_per_second": 20.7
+    },
+    {
+      "timestamp": "2026-05-23T11:47:28.805240+00:00",
+      "requests_today": 24,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 13461,
+      "tokens_per_second": 19.9
+    },
+    {
+      "timestamp": "2026-05-23T11:48:07.509729+00:00",
+      "requests_today": 25,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 13946,
+      "tokens_per_second": 19.4
+    },
+    {
+      "timestamp": "2026-05-23T11:48:40.098144+00:00",
+      "requests_today": 26,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 14139,
+      "tokens_per_second": 19.2
+    },
+    {
+      "timestamp": "2026-05-23T11:49:33.804957+00:00",
+      "requests_today": 27,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 14786,
+      "tokens_per_second": 18.8
+    },
+    {
+      "timestamp": "2026-05-23T11:52:58.470765+00:00",
+      "requests_today": 29,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 15302,
+      "tokens_per_second": 18.2
+    },
+    {
+      "timestamp": "2026-05-23T11:54:04.919087+00:00",
+      "requests_today": 30,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 16166,
+      "tokens_per_second": 17.5
+    },
+    {
+      "timestamp": "2026-05-23T11:54:45.705678+00:00",
+      "requests_today": 31,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 16665,
+      "tokens_per_second": 17.0
+    },
+    {
+      "timestamp": "2026-05-23T11:55:34.585078+00:00",
+      "requests_today": 32,
+      "errors_today": 0,
+      "error_rate": 0.0,
+      "active_users_today": 4,
+      "avg_response_ms": 17667,
+      "tokens_per_second": 16.4
     }
   ]
 }

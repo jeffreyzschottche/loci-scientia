@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKEND_HTTP, PUBLIC_BASE_URL
+from ..config import BACKEND_HTTP, PUBLIC_BASE_URL, SETUP_URL
 from ..translations import register_language_change_callback, t
 
 
@@ -39,7 +39,16 @@ def _render_qr_pixmap(text: str, size: int = 280) -> Optional[QPixmap]:
 
 
 def _embedder_url() -> str:
+    # Same string the QR encodes — the bootstrap URL that installs the device
+    # CA on first scan and forwards to the embedder afterwards.
+    base = (SETUP_URL or "").rstrip("/")
+    if base:
+        return f"{base}/embedder"
     return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/embedder/"
+
+
+def _embedder_qr_payload() -> str:
+    return _embedder_url()
 
 
 class EmbedderPage(QWidget):
@@ -109,9 +118,10 @@ class EmbedderPage(QWidget):
         )
         card_layout.addWidget(self._qr_label, 0, Qt.AlignHCenter)
 
-        # QR hint — single short line; no wordWrap → no clipping risk.
+        # QR hint — multi-line, wraps to the card width.
         self._qr_hint = QLabel(t("embedder_qr_hint"))
         self._qr_hint.setAlignment(Qt.AlignCenter)
+        self._qr_hint.setWordWrap(True)
         self._qr_hint.setStyleSheet("color:#6b7280; font-size:12px;")
         card_layout.addWidget(self._qr_hint)
 
@@ -149,7 +159,7 @@ class EmbedderPage(QWidget):
     def _refresh_url_and_qr(self) -> None:
         url = _embedder_url()
         self._url_label.setText(url)
-        pixmap = _render_qr_pixmap(url, size=280)
+        pixmap = _render_qr_pixmap(_embedder_qr_payload(), size=280)
         if pixmap is not None:
             self._qr_label.setPixmap(pixmap)
         else:

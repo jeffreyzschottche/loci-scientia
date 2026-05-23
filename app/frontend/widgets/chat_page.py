@@ -905,7 +905,7 @@ class ChatPage(QWidget):
         self.available_modes = PROMPT_MODES or ["Developer", "Finance", "Law", "Child"]
         self.selected_mode = self._load_focus_mode()
         self.current_model_name = self._fallback_current_model()
-        self.thinking_enabled = True
+        self.thinking_enabled = False
         self._is_generating = False
         self._stop_requested = False
         self._request_seq = 0

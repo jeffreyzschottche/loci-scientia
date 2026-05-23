@@ -5,6 +5,7 @@ from typing import Optional
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFormLayout,
     QFrame,
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import (
 
 import requests
 
-from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL
+from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, PUBLIC_BASE_URL, SETUP_URL
 from ..translations import t, register_language_change_callback
 from .dialog_style import (
     OverlayDialog,
@@ -77,6 +78,7 @@ class DeviceCard(QFrame):
         info.addWidget(self._build_status_badge())
 
         info.addWidget(self._line_with_icon("👤", device.get("user_name", "")))
+        info.addWidget(self._roles_widget(device.get("roles") or ["chat"]))
         info.addWidget(self._line_with_icon("✉️", device.get("email", "")))
 
         actions = QHBoxLayout()
@@ -106,12 +108,51 @@ class DeviceCard(QFrame):
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
+        row.setAlignment(Qt.AlignVCenter)
         icon_label = QLabel(icon)
-        icon_label.setFixedWidth(18)
+        icon_label.setFixedSize(22, 24)
+        icon_label.setAlignment(Qt.AlignCenter)
         label = QLabel(text or "-")
         label.setStyleSheet("color:#4b5563;")
-        row.addWidget(icon_label, 0, Qt.AlignTop)
+        label.setMinimumHeight(24)
+        label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        row.addWidget(icon_label)
         row.addWidget(label, 1)
+        container = QWidget()
+        container.setLayout(row)
+        return container
+
+    def _roles_widget(self, roles: list[str]) -> QWidget:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        row.setAlignment(Qt.AlignVCenter)
+        icon_label = QLabel("🔐")
+        icon_label.setFixedSize(22, 24)
+        icon_label.setAlignment(Qt.AlignCenter)
+        row.addWidget(icon_label)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(2)
+
+        role_items = []
+        if "chat" in roles:
+            role_items.append(t("devices_role_chat_short"))
+        if "knowledge_management" in roles:
+            role_items.append(t("devices_role_knowledge_management_short"))
+        if not role_items:
+            role_items.append("-")
+
+        label = QLabel(f"{t('devices_roles')}: {', '.join(role_items)}")
+        label.setWordWrap(True)
+        label.setMinimumHeight(24)
+        label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        label.setStyleSheet("color:#374151; font-size:13px; font-weight:600;")
+        content_layout.addWidget(label)
+
+        row.addWidget(content, 1)
         container = QWidget()
         container.setLayout(row)
         return container
@@ -270,11 +311,21 @@ class DevicesPage(QWidget):
 
     @staticmethod
     def _public_client_url() -> str:
+        # Same string the QR encodes — the bootstrap URL that installs the
+        # device CA on first scan and forwards to the chat app afterwards.
+        base = (SETUP_URL or "").rstrip("/")
+        if base:
+            return f"{base}/chat"
         return (PUBLIC_BASE_URL or BACKEND_HTTP).rstrip("/") + "/"
 
+    @staticmethod
+    def _qr_payload() -> str:
+        return DevicesPage._public_client_url()
+
     def _open_client_url_dialog(self) -> None:
-        url = self._public_client_url()
-        dialog = OverlayDialog(self, width=430, height=500)
+        display_url = self._public_client_url()
+        qr_payload = self._qr_payload()
+        dialog = OverlayDialog(self, width=430, height=540)
         dialog.setWindowTitle(t("devices_client_url_title"))
 
         title = QLabel(t("devices_client_url_title"))
@@ -282,14 +333,14 @@ class DevicesPage(QWidget):
         title.setStyleSheet("font-size:18px; font-weight:800; color:#0f172a;")
         dialog.card_layout.addWidget(title)
 
-        url_label = QLabel(url)
+        url_label = QLabel(display_url)
         url_label.setAlignment(Qt.AlignCenter)
         url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         url_label.setStyleSheet("font-size:15px; font-weight:600; color:#0f172a;")
         url_label.setWordWrap(True)
         dialog.card_layout.addWidget(url_label)
 
-        qr_pixmap = _render_qr_pixmap(url, size=240)
+        qr_pixmap = _render_qr_pixmap(qr_payload, size=240)
         if qr_pixmap is not None:
             qr_label = QLabel()
             qr_label.setAlignment(Qt.AlignCenter)
@@ -297,6 +348,7 @@ class DevicesPage(QWidget):
             dialog.card_layout.addWidget(qr_label, 0, Qt.AlignCenter)
             hint = QLabel(t("devices_client_url_qr_hint"))
             hint.setAlignment(Qt.AlignCenter)
+            hint.setWordWrap(True)
             hint.setStyleSheet("color:#6b7280; font-size:12px;")
             dialog.card_layout.addWidget(hint)
         else:
@@ -453,6 +505,17 @@ class DevicesPage(QWidget):
         confirm_edit = QLineEdit()
         confirm_edit.setEchoMode(QLineEdit.Password)
         device_name_edit = QLineEdit()
+        chat_role_check = QCheckBox(t("devices_role_chat"))
+        knowledge_role_check = QCheckBox(t("devices_role_knowledge_management"))
+        chat_role_check.setChecked(True)
+
+        for checkbox in [chat_role_check, knowledge_role_check]:
+            checkbox.setStyleSheet(
+                "QCheckBox { color:#0f172a; spacing:8px; min-height:28px; }"
+                "QCheckBox::indicator { width:18px; height:18px; }"
+                "QCheckBox::indicator:unchecked { border:1px solid #d4d4d8; background:#ffffff; border-radius:4px; }"
+                "QCheckBox::indicator:checked { border:1px solid #facc15; background:#facc15; border-radius:4px; }"
+            )
 
         for widget in [
             user_name_edit,
@@ -503,12 +566,22 @@ class DevicesPage(QWidget):
             password_edit.setText(device.get("password", ""))
             confirm_edit.setText(device.get("password", ""))
             device_name_edit.setText(device.get("device_name", ""))
+            roles = device.get("roles") or ["chat"]
+            chat_role_check.setChecked("chat" in roles)
+            knowledge_role_check.setChecked("knowledge_management" in roles)
 
         form.addRow(t("devices_username"), user_name_edit)
         form.addRow(t("devices_email"), email_edit)
         form.addRow(t("devices_password"), password_container)
         form.addRow(t("devices_repeat_password"), confirm_edit)
         form.addRow(t("devices_device_name"), device_name_edit)
+        roles_container = QWidget()
+        roles_layout = QVBoxLayout(roles_container)
+        roles_layout.setContentsMargins(0, 0, 0, 0)
+        roles_layout.setSpacing(6)
+        roles_layout.addWidget(chat_role_check)
+        roles_layout.addWidget(knowledge_role_check)
+        form.addRow(t("devices_roles"), roles_container)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(16)
@@ -571,11 +644,25 @@ class DevicesPage(QWidget):
             )
             return
 
+        roles = []
+        if chat_role_check.isChecked():
+            roles.append("chat")
+        if knowledge_role_check.isChecked():
+            roles.append("knowledge_management")
+        if not roles:
+            show_warning_dialog(
+                self,
+                t("invalid"),
+                t("devices_roles_required"),
+            )
+            return
+
         payload = {
             "user_name": user_name,
             "email": email_edit.text().strip(),
             "password": password,
             "device_name": device_name,
+            "roles": roles,
         }
 
         try:

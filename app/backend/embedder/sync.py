@@ -50,7 +50,9 @@ def sync_changed_chunks_to_qdrant() -> dict:
     failed = 0
     for chunk in pending:
         try:
-            vector = list(embed_text(chunk["text"]).vector)
+            vector = list(
+                embed_text(_embedding_text(chunk, documents_by_id, sections_by_id)).vector
+            )
         except Exception as exc:  # pragma: no cover
             logger.exception("Embedding faalde voor chunk %s: %s", chunk.get("chunk_id"), exc)
             failed += 1
@@ -107,6 +109,24 @@ def sync_changed_chunks_to_qdrant() -> dict:
 
 
 # ---- helpers ----------------------------------------------------------------
+
+
+def _embedding_text(
+    chunk: dict,
+    documents_by_id: dict[int, dict],
+    sections_by_id: dict[int, dict],
+) -> str:
+    """Embed met documentcontext, maar bewaar alleen de zuivere chunktekst als payload."""
+
+    document = documents_by_id.get(chunk["document_id"]) or {}
+    section = sections_by_id.get(chunk.get("section_id")) if chunk.get("section_id") else None
+    parts = [
+        str(document.get("title") or document.get("doc_id") or "").strip(),
+        str(document.get("category") or "").strip(),
+        str(section.get("title") if section else "").strip(),
+        str(chunk.get("text") or "").strip(),
+    ]
+    return "\n".join(part for part in parts if part)
 
 
 def _load_sections_by_id(document_ids: Iterable[int]) -> dict[int, dict]:

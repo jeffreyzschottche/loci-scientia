@@ -3,6 +3,8 @@ from typing import Literal, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
+from .user_roles import DEFAULT_ROLES, normalize_roles
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"] = "user"
@@ -35,7 +37,7 @@ class ChatRequest(BaseModel):
     request_id: Optional[str] = None
     conversation_id: Optional[str] = None
     mode: Optional[str] = None
-    thinking: bool = True
+    thinking: bool = False
     max_new_tokens: int = 128
     history: list[ChatMessage] = Field(default_factory=list)
     images: list[str] = Field(default_factory=list)
@@ -51,6 +53,7 @@ class Device(BaseModel):
     password: str
     phone: str = ""
     device_name: str
+    roles: list[str] = Field(default_factory=lambda: list(DEFAULT_ROLES))
     is_connected: bool = False
     last_seen_at: Optional[datetime] = None
 
@@ -60,6 +63,12 @@ class DeviceCreate(BaseModel):
     email: str
     password: str
     device_name: str
+    roles: list[str] = Field(default_factory=lambda: list(DEFAULT_ROLES))
+
+    @model_validator(mode="after")
+    def validate_roles(self) -> "DeviceCreate":
+        self.roles = normalize_roles(self.roles)
+        return self
 
 
 class DevicePatch(BaseModel):
@@ -67,6 +76,13 @@ class DevicePatch(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     device_name: Optional[str] = None
+    roles: Optional[list[str]] = None
+
+    @model_validator(mode="after")
+    def validate_roles(self) -> "DevicePatch":
+        if self.roles is not None:
+            self.roles = normalize_roles(self.roles)
+        return self
 
 
 class SignOnRequest(BaseModel):
