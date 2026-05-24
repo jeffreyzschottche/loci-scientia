@@ -234,7 +234,7 @@ class KnowledgePage(QWidget):
 
         sync_panel = QWidget()
         sync_layout = QVBoxLayout(sync_panel)
-        sync_layout.setContentsMargins(0, 0, 0, 0)
+        sync_layout.setContentsMargins(0, 12, 0, 14)
         sync_layout.setSpacing(6)
 
         title = QLabel(t("kb_sync_last").upper())
@@ -275,7 +275,7 @@ class KnowledgePage(QWidget):
         card = QFrame()
         card.setStyleSheet("QFrame { background:transparent; border:none; }")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(0, 12, 0, 0)
+        layout.setContentsMargins(0, 12, 0, 14)
         layout.setSpacing(18)
         self._vector_title_label = QLabel(t("kb_vector_db_title"))
         self._vector_title_label.setStyleSheet("font-size:20px; font-weight:700; letter-spacing:0.02em;")
@@ -518,10 +518,11 @@ class KnowledgePage(QWidget):
             self._sync_state = data
             self._update_sync_labels(data)
             stats = data.get("stats") or {}
+            qdrant = data.get("qdrant") if isinstance(data.get("qdrant"), dict) else data
             self._latest_stats = stats
-            self._latest_qdrant = data.get("qdrant") or {}
-            self._update_stats_view(stats, data.get("qdrant"))
-            self._update_vector_view(stats, data.get("qdrant"))
+            self._latest_qdrant = qdrant or {}
+            self._update_stats_view(stats, qdrant)
+            self._update_vector_view(stats, qdrant)
         except requests.RequestException as exc:
             if self._sync_status_label:
                 self._set_sync_status_badge("Failed", "#dc2626")
@@ -689,11 +690,17 @@ class KnowledgePage(QWidget):
         total_docs = max(
             len(self._documents_data),
             int((stats or {}).get("document_count") or 0),
+            int((stats or {}).get("total_documents") or 0),
         )
-        total_chunks = int((stats or {}).get("chunk_count") or 0)
+        total_chunks = max(
+            int((stats or {}).get("chunk_count") or 0),
+            int((stats or {}).get("total_chunks") or 0),
+            sum(int(doc.get("chunk_count") or 0) for doc in self._documents_data),
+        )
         qdrant_size_bytes = self._directory_size(_knowledge_embedded_path())
         disk_total, disk_used, disk_free = self._disk_usage(_knowledge_embedded_path())
         model = (stats or {}).get("model", {}).get("model") if stats else None
+        total_vectors = int((qdrant or {}).get("points") or 0)
 
         if len(self._vector_progress_bars) >= 2:
             storage_pct = int((disk_used / disk_total) * 100) if disk_total else 0
@@ -714,13 +721,13 @@ class KnowledgePage(QWidget):
                 "".join(
                     [
                         '<div style="margin:8px 0;">• <b>'
-                        f'{t("kb_total_vectors")}</b>: {(qdrant or {}).get("points") or 0}</div>',
+                        f'{t("kb_total_vectors")}</b>: {total_vectors}</div>',
                         '<div style="margin:8px 0;">• <b>'
                         f'{t("kb_embedding_model")}</b>: {model or "-"}</div>',
                         '<div style="margin:8px 0;">• <b>'
                         f'{t("kb_database_engine")}</b>: {"Qdrant (embedded)" if not os.getenv("QDRANT_HOST") else "Qdrant (remote)"}</div>',
                         '<div style="margin:8px 0 16px 0;">• <b>'
-                        f'{t("kb_index_status")}</b>: {t("kb_optimal") if (qdrant or {}).get("points") else t("kb_sync_pending")}</div>',
+                        f'{t("kb_index_status")}</b>: {t("kb_optimal") if total_vectors else t("kb_sync_pending")}</div>',
                     ]
                 )
             )

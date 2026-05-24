@@ -402,6 +402,7 @@ class MainWindow(QMainWindow):
         title_col = QVBoxLayout()
         title_col.setContentsMargins(0, 0, 0, 0)
         title_col.setSpacing(2)
+        title_col.setAlignment(Qt.AlignTop)
 
         self.page_title = QLabel()
         self.page_title.setObjectName("PageTitle")
