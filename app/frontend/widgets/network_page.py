@@ -66,10 +66,16 @@ class SparklineWidget(QWidget):
         line_color = QColor("#facc15")
         point_color = QColor("#eab308")
 
-        left_pad = 42
         right_pad = 10
         top_pad = 8
         bottom_pad = 22
+        font = painter.font()
+        font.setPointSize(8)
+        painter.setFont(font)
+        metrics = painter.fontMetrics()
+        y_label_width = max(metrics.horizontalAdvance(label) for label in self._y_labels) if self._y_labels else 0
+        y_label_width = max(34, y_label_width)
+        left_pad = y_label_width + 14
         rect = self.rect().adjusted(left_pad, top_pad, -right_pad, -bottom_pad)
         min_value = min(self._points)
         max_value = max(self._points)
@@ -83,12 +89,9 @@ class SparklineWidget(QWidget):
             painter.drawLine(rect.left(), int(y), rect.right(), int(y))
 
         painter.setPen(label_color)
-        font = painter.font()
-        font.setPointSize(8)
-        painter.setFont(font)
-        painter.drawText(4, rect.top() + 6, 34, 12, Qt.AlignRight | Qt.AlignVCenter, self._y_labels[0])
-        painter.drawText(4, rect.center().y() - 6, 34, 12, Qt.AlignRight | Qt.AlignVCenter, self._y_labels[1])
-        painter.drawText(4, rect.bottom() - 6, 34, 12, Qt.AlignRight | Qt.AlignVCenter, self._y_labels[2])
+        painter.drawText(4, rect.top() + 6, y_label_width, 12, Qt.AlignRight | Qt.AlignVCenter, self._y_labels[0])
+        painter.drawText(4, rect.center().y() - 6, y_label_width, 12, Qt.AlignRight | Qt.AlignVCenter, self._y_labels[1])
+        painter.drawText(4, rect.bottom() - 6, y_label_width, 12, Qt.AlignRight | Qt.AlignVCenter, self._y_labels[2])
         painter.drawText(rect.left(), rect.bottom() + 6, 40, 14, Qt.AlignLeft | Qt.AlignVCenter, self._x_labels[0])
         painter.drawText(rect.right() - 28, rect.bottom() + 6, 28, 14, Qt.AlignRight | Qt.AlignVCenter, self._x_labels[1])
 
@@ -384,11 +387,8 @@ class NetworkStatusPage(QWidget):
         if avg_response_ms is None:
             avg_label = t("network_na")
             avg_caption = t("network_no_measurements")
-        elif avg_response_ms >= 1000:
-            avg_label = f"{avg_response_ms / 1000:.1f}s".replace(".", ",")
-            avg_caption = t("network_avg_wait_time")
         else:
-            avg_label = f"{int(avg_response_ms)} ms"
+            avg_label = self._format_seconds(avg_response_ms)
             avg_caption = t("network_avg_wait_time")
 
         if total_requests is None:
@@ -446,8 +446,12 @@ class NetworkStatusPage(QWidget):
 
     def _format_chart_value(self, key: str, value: float) -> str:
         if key == "avg_response":
-            return f"{int(round(value))} ms"
+            return self._format_seconds(value)
         return str(int(round(value)))
+
+    @staticmethod
+    def _format_seconds(milliseconds: float) -> str:
+        return f"{milliseconds / 1000:.1f}s".replace(".", ",")
 
     def _reload(self):
         self._update_stats([])

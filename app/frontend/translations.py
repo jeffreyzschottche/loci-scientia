@@ -1037,12 +1037,12 @@ TRANSLATIONS = {
         "en": "Status: Not connected",
     },
     "devices_client_url_title": {
-        "nl": "Webclient URL",
-        "en": "Web client URL",
+        "nl": "Chat met AITJE via ander apparaat",
+        "en": "Chat with AITJE on another device",
     },
     "devices_client_url_subtitle": {
-        "nl": "Externe apparaten kunnen op hetzelfde netwerk deze URL openen in een browser of webbrowser om in te loggen.",
-        "en": "Devices on the same network can browse to this URL to sign in.",
+        "nl": "Scan de QR-code of ga naar de URL. Log in met de gegevens van je account.",
+        "en": "Scan the QR code or go to the URL. Sign in with your account details.",
     },
     "devices_client_url_show": {
         "nl": "Toon client URL",
@@ -1059,6 +1059,10 @@ TRANSLATIONS = {
     "devices_client_url_qr_hint": {
         "nl": "Scan met je telefoon. Eerste keer? Installeer kort het apparaat­certificaat — daarna gaat alles via HTTPS.",
         "en": "Scan with your phone. First time? Install the device certificate once — after that everything runs over HTTPS.",
+    },
+    "devices_client_url_qr_missing": {
+        "nl": "QR-module ontbreekt",
+        "en": "QR module missing",
     },
 
     # ============================================

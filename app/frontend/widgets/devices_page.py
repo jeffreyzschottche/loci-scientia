@@ -256,7 +256,7 @@ class DevicesPage(QWidget):
         self.count_label.setText(t("devices_total_devices", count=len(self.devices)))
         self._client_url_title.setText(t("devices_client_url_title"))
         self._client_url_subtitle.setText(t("devices_client_url_subtitle"))
-        self._client_url_show_btn.setText(t("devices_client_url_show"))
+        self._refresh_client_url_panel()
         self._render_devices()
 
     def header_widget(self) -> QWidget:
@@ -272,40 +272,50 @@ class DevicesPage(QWidget):
             "  border-radius:20px;"
             "}"
         )
-        panel.setMaximumWidth(720)
+        panel.setMaximumWidth(760)
         panel.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         layout = QHBoxLayout(panel)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(16)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(20)
 
         text_col = QVBoxLayout()
-        text_col.setSpacing(4)
+        text_col.setSpacing(5)
         self._client_url_title = QLabel(t("devices_client_url_title"))
-        self._client_url_title.setStyleSheet("font-size:15px; font-weight:700; color:#111111;")
+        self._client_url_title.setStyleSheet("font-size:16px; font-weight:800; color:#111111;")
         self._client_url_subtitle = QLabel(t("devices_client_url_subtitle"))
         self._client_url_subtitle.setWordWrap(True)
-        self._client_url_subtitle.setStyleSheet("color:#6b7280; font-size:12px;")
+        self._client_url_subtitle.setStyleSheet("color:#6b7280; font-size:13px; line-height:1.35;")
         self._client_url_value = QLabel(self._public_client_url())
+        self._client_url_value.setAlignment(Qt.AlignCenter)
         self._client_url_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self._client_url_value.setStyleSheet("font-size:14px; font-weight:600; color:#0f172a;")
+        self._client_url_value.setWordWrap(True)
+        self._client_url_value.setStyleSheet(
+            "QLabel {"
+            "  font-size:14px; font-weight:800; color:#0f172a;"
+            "  background:#f8f6ef; border:1px solid #e7dcc0;"
+            "  border-radius:14px;"
+            "  padding:8px 14px;"
+            "}"
+        )
         text_col.addWidget(self._client_url_title)
-        text_col.addWidget(self._client_url_value)
         text_col.addWidget(self._client_url_subtitle)
+        text_col.addWidget(self._client_url_value)
         layout.addLayout(text_col, 1)
 
-        self._client_url_show_btn = QPushButton(t("devices_client_url_show"))
-        self._client_url_show_btn.setCursor(Qt.PointingHandCursor)
-        self._client_url_show_btn.setFixedHeight(36)
-        self._client_url_show_btn.setStyleSheet(
-            "QPushButton {"
-            "  background:#facc15; color:#050505;"
-            "  border:none; border-radius:18px;"
-            "  padding:6px 18px; font-weight:600;"
+        self._client_url_qr_label = QLabel()
+        self._client_url_qr_label.setAlignment(Qt.AlignCenter)
+        self._client_url_qr_label.setFixedSize(142, 142)
+        self._client_url_qr_label.setStyleSheet(
+            "QLabel {"
+            "  background:#ffffff;"
+            "  border:1px solid #e7dcc0;"
+            "  border-radius:16px;"
+            "  padding:8px;"
             "}"
-            "QPushButton:hover { background:#050505; color:#facc15; }"
         )
-        self._client_url_show_btn.clicked.connect(self._open_client_url_dialog)
-        layout.addWidget(self._client_url_show_btn, 0, Qt.AlignVCenter)
+        layout.addWidget(self._client_url_qr_label, 0, Qt.AlignVCenter)
+
+        self._refresh_client_url_panel()
 
         return panel
 
@@ -322,44 +332,17 @@ class DevicesPage(QWidget):
     def _qr_payload() -> str:
         return DevicesPage._public_client_url()
 
-    def _open_client_url_dialog(self) -> None:
+    def _refresh_client_url_panel(self) -> None:
         display_url = self._public_client_url()
-        qr_payload = self._qr_payload()
-        dialog = OverlayDialog(self, width=430, height=540)
-        dialog.setWindowTitle(t("devices_client_url_title"))
-
-        title = QLabel(t("devices_client_url_title"))
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size:18px; font-weight:800; color:#0f172a;")
-        dialog.card_layout.addWidget(title)
-
-        url_label = QLabel(display_url)
-        url_label.setAlignment(Qt.AlignCenter)
-        url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        url_label.setStyleSheet("font-size:15px; font-weight:600; color:#0f172a;")
-        url_label.setWordWrap(True)
-        dialog.card_layout.addWidget(url_label)
-
-        qr_pixmap = _render_qr_pixmap(qr_payload, size=240)
+        self._client_url_value.setText(display_url)
+        qr_pixmap = _render_qr_pixmap(self._qr_payload(), size=120)
         if qr_pixmap is not None:
-            qr_label = QLabel()
-            qr_label.setAlignment(Qt.AlignCenter)
-            qr_label.setPixmap(qr_pixmap)
-            dialog.card_layout.addWidget(qr_label, 0, Qt.AlignCenter)
-            hint = QLabel(t("devices_client_url_qr_hint"))
-            hint.setAlignment(Qt.AlignCenter)
-            hint.setWordWrap(True)
-            hint.setStyleSheet("color:#6b7280; font-size:12px;")
-            dialog.card_layout.addWidget(hint)
+            self._client_url_qr_label.setPixmap(qr_pixmap)
+            self._client_url_qr_label.setText("")
         else:
-            error_label = QLabel("QR-code module ontbreekt. Herstart AITJE om dependencies bij te werken.")
-            error_label.setAlignment(Qt.AlignCenter)
-            error_label.setWordWrap(True)
-            error_label.setStyleSheet("color:#b45309; font-size:12px;")
-            dialog.card_layout.addWidget(error_label)
-        dialog.card_layout.addStretch(1)
-
-        dialog.exec()
+            self._client_url_qr_label.setPixmap(QPixmap())
+            self._client_url_qr_label.setText(t("devices_client_url_qr_missing"))
+            self._client_url_qr_label.setWordWrap(True)
 
     def _render_devices(self):
         while self.list_layout.count():

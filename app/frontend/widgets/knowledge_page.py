@@ -365,15 +365,16 @@ class KnowledgePage(QWidget):
         self._documents_refresh_button.setCursor(Qt.PointingHandCursor)
         self._documents_refresh_button.setStyleSheet(
             "QPushButton {"
-            "  background:#fcfbf8;"
-            "  border:1px solid #ece7dc;"
+            "  background:#facc15;"
+            "  border:1px solid #facc15;"
             "  border-radius:16px;"
-            "  padding:10px 18px;"
-            "  color:#111111;"
-            "  font-weight:600;"
+            "  padding:10px 22px;"
+            "  color:#050505;"
+            "  font-weight:800;"
             "}"
-            "QPushButton:hover { background:#f4eeda; border-color:#d6cdb4; }"
-            "QPushButton:disabled { color:#9a9183; }"
+            "QPushButton:hover { background:#050505; border-color:#050505; color:#facc15; }"
+            "QPushButton:pressed { background:#c99f05; border-color:#c99f05; color:#050505; }"
+            "QPushButton:disabled { background:#f4eeda; border-color:#e7dcc0; color:#9a9183; }"
         )
         self._documents_refresh_button.clicked.connect(self._handle_refresh_clicked)
 
