@@ -80,7 +80,7 @@ class KnowledgePage(QWidget):
 
         self._main_layout.addLayout(self._stats_grid())
 
-        self._main_layout.addLayout(self._documents_section())
+        self._main_layout.addLayout(self._documents_section(), 1)
 
         self._refresh_sync_state()
         self._refresh_library()
@@ -330,7 +330,7 @@ class KnowledgePage(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-        layout.addWidget(self._documents_table_widget(), 9, Qt.AlignTop)
+        layout.addWidget(self._documents_table_widget(), 9)
         layout.addWidget(self._preview_card(), 11)
         return layout
 

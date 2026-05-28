@@ -345,7 +345,10 @@ class BootScreen(QWidget):
             self._media_player.stop()
         if self.on_finished:
             self.on_finished()
-        self.close()
+        # Keep the boot screen alive for one short event-loop turn while the
+        # main window is mapped and painted behind it. Closing immediately can
+        # expose the desktop for a frame on some compositors.
+        QTimer.singleShot(120, self.close)
 
 
 class MainWindow(QMainWindow):
@@ -574,6 +577,9 @@ def main():
 
     def on_boot_finished():
         window.showFullScreen()
+        window.raise_()
+        window.activateWindow()
+        app.processEvents()
 
     boot_screen = BootScreen(
         logo_path=boot_logo_path,

@@ -278,12 +278,16 @@ class DevicesPage(QWidget):
         layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(20)
 
-        text_col = QVBoxLayout()
-        text_col.setSpacing(5)
+        text_panel = QWidget()
+        text_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        text_col = QVBoxLayout(text_panel)
+        text_col.setContentsMargins(0, 0, 0, 0)
+        text_col.setSpacing(7)
         self._client_url_title = QLabel(t("devices_client_url_title"))
         self._client_url_title.setStyleSheet("font-size:16px; font-weight:800; color:#111111;")
         self._client_url_subtitle = QLabel(t("devices_client_url_subtitle"))
         self._client_url_subtitle.setWordWrap(True)
+        self._client_url_subtitle.setContentsMargins(0, 2, 0, 2)
         self._client_url_subtitle.setStyleSheet("color:#6b7280; font-size:13px; line-height:1.35;")
         self._client_url_value = QLabel(self._public_client_url())
         self._client_url_value.setAlignment(Qt.AlignCenter)
@@ -297,10 +301,10 @@ class DevicesPage(QWidget):
             "  padding:8px 14px;"
             "}"
         )
-        text_col.addWidget(self._client_url_title)
-        text_col.addWidget(self._client_url_subtitle)
+        text_col.addWidget(self._client_url_title, 0, Qt.AlignTop)
+        text_col.addWidget(self._client_url_subtitle, 0, Qt.AlignTop)
         text_col.addWidget(self._client_url_value)
-        layout.addLayout(text_col, 1)
+        layout.addWidget(text_panel, 1, Qt.AlignVCenter)
 
         self._client_url_qr_label = QLabel()
         self._client_url_qr_label.setAlignment(Qt.AlignCenter)
@@ -469,11 +473,11 @@ class DevicesPage(QWidget):
         scroll_area.setFrameShape(QScrollArea.NoFrame)
         scroll_area.setStyleSheet(
             "QScrollArea { background: transparent; border: none; }"
-            "QScrollArea > QWidget > QWidget { background: transparent; }"
+            "QScrollArea QWidget { background: transparent; }"
         )
         dialog.card_layout.addWidget(scroll_area)
         form_host = QWidget()
-        form_host.setStyleSheet("background:#ffffff;")
+        form_host.setStyleSheet("background:transparent;")
         scroll_area.setWidget(form_host)
         form = QFormLayout(form_host)
         form.setRowWrapPolicy(QFormLayout.WrapAllRows)

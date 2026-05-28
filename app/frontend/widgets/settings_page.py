@@ -52,6 +52,10 @@ class SettingsPage(QWidget):
         "  font-size: 14px;"
         "  font-weight: 600;"
         "}"
+        "QComboBox[popupOpen='true'] {"
+        "  border-bottom-left-radius: 0px;"
+        "  border-bottom-right-radius: 0px;"
+        "}"
         "QComboBox:hover, QDateEdit:hover {"
         "  border-color: #f0c94c;"
         "  background: #ffffff;"
@@ -94,8 +98,11 @@ class SettingsPage(QWidget):
         "  background:#fffdf8;"
         "  color:#171717;"
         "  border:1px solid #e7e0d4;"
+        "  border-top:none;"
+        "  border-bottom-left-radius:16px;"
+        "  border-bottom-right-radius:16px;"
         "  outline:0;"
-        "  padding:4px;"
+        "  padding:4px 0;"
         "}"
         "QListView::item {"
         "  min-height:34px;"
@@ -2386,12 +2393,18 @@ class ChevronComboBox(QComboBox):
 
     def showPopup(self) -> None:
         self._popup_open = True
+        self.setProperty("popupOpen", True)
+        self.style().unpolish(self)
+        self.style().polish(self)
         self.update()
         super().showPopup()
 
     def hidePopup(self) -> None:
         super().hidePopup()
         self._popup_open = False
+        self.setProperty("popupOpen", False)
+        self.style().unpolish(self)
+        self.style().polish(self)
         self.update()
 
     def paintEvent(self, event) -> None:
