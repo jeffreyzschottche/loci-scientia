@@ -1,13 +1,14 @@
 {
   "mode": "interactive_v1",
   "date": "2026-05-28",
-  "requests_today": 1,
+  "requests_today": 7,
   "errors_today": 0,
-  "latency_total_ms": 7400.0,
-  "latency_count": 1,
-  "output_tokens_total": 222.0,
-  "generation_seconds_total": 18.849,
+  "latency_total_ms": 278333.269,
+  "latency_count": 5,
+  "output_tokens_total": 3262.0,
+  "generation_seconds_total": 223.991,
   "active_ids": [
+    "7e5076095f3a4352",
     "a433c4a1d2b16087"
   ]
 }

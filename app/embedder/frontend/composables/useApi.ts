@@ -23,6 +23,32 @@ export function useApi() {
     });
   }
 
+  async function download(endpoint: string): Promise<{ blob: Blob; filename: string }> {
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.apiBaseUrl as string;
+    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+    const headers: Record<string, string> = {
+      Accept: 'application/zip',
+    };
+
+    if (authStore.token) {
+      headers.Authorization = `Bearer ${authStore.token}`;
+    }
+
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || data?.detail?.message || 'Download mislukt');
+    }
+
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+    return {
+      blob: await response.blob(),
+      filename: filenameMatch?.[1] || 'aitje-kennisbank-backup.zip',
+    };
+  }
+
   return {
     get: <T>(endpoint: string) => request<T>(endpoint, { method: 'GET' }),
 
@@ -40,5 +66,7 @@ export function useApi() {
 
     delete: <T>(endpoint: string) =>
       request<T>(endpoint, { method: 'DELETE' }),
+
+    download,
   };
 }

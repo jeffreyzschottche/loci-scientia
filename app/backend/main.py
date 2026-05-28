@@ -664,6 +664,59 @@ def list_ollama_models(_: TokenRecord = Depends(require_admin_token)):
     return {"current": settings.ollama_model, "available": settings.ollama_models}
 
 
+def _model_name_suggests_vision(model: str) -> bool:
+    normalized = (model or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized.startswith("gemma3:1b") or normalized.startswith("gemma3n:"):
+        return False
+    vision_markers = (
+        "vision",
+        "llava",
+        "bakllava",
+        "moondream",
+        "minicpm-v",
+        "minicpmv",
+        "qwen2-vl",
+        "qwen2.5-vl",
+        "qwen2.5vl",
+        "qwen-vl",
+        "gemma3",
+        "gemma4",
+        "mistral-small3.1",
+        "mistral-small3.2",
+        "granite3.2-vision",
+    )
+    return any(marker in normalized for marker in vision_markers)
+
+
+async def _ollama_model_supports_images(model: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{settings.ollama_base_url}/api/show",
+                json={"model": model},
+            )
+            response.raise_for_status()
+            data = response.json()
+    except Exception as exc:
+        logger.warning("Kon Ollama model-capabilities niet ophalen voor %s: %s", model, exc)
+        return _model_name_suggests_vision(model)
+
+    capabilities = data.get("capabilities")
+    if isinstance(capabilities, list):
+        return any(str(capability).lower() == "vision" for capability in capabilities)
+    return _model_name_suggests_vision(model)
+
+
+@app.get("/api/v1/ollama/current")
+async def get_current_ollama_model(_: TokenRecord = Depends(require_chat_role)):
+    return {
+        "current": settings.ollama_model,
+        "supports_images": await _ollama_model_supports_images(settings.ollama_model),
+    }
+
+
 @app.post("/api/v1/ollama/model")
 async def set_ollama_model(req: OllamaModelRequest, _: TokenRecord = Depends(require_admin_token)):
     model = req.model.strip()
@@ -1021,15 +1074,6 @@ async def sse_stream_generator(
     assistant_stream_started = False
     eval_count: Optional[float] = None
     eval_duration_seconds: Optional[float] = None
-
-    # Short queue countdown: 2 to 0 with 1 second between each
-    for position in range(2, -1, -1):
-        if generation.cancelled:
-            active_generations.pop(request_id, None)
-            return
-        event_data = json.dumps({"status": "queued", "position": position})
-        yield f"data: {event_data}\n\n"
-        await asyncio.sleep(1)
 
     # Call Ollama API with streaming
     ollama_url = f"{settings.ollama_base_url}/api/generate"

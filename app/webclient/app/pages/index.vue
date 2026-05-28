@@ -344,7 +344,7 @@
                 @change="handleDocumentSelection"
               />
 
-              <div ref="attachmentMenuRef" class="relative flex items-center">
+              <div v-if="modelSupportsImages" ref="attachmentMenuRef" class="relative flex items-center">
                 <button
                   type="button"
                   :disabled="chatStore.isLoading"
@@ -460,7 +460,7 @@ const allowedImageMimeTypes = new Set(['image/png', 'image/jpeg'])
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
-const { ask } = useAitjeApi()
+const { ask, getCurrentModel } = useAitjeApi()
 const { clearLogs } = useChatLogger()
 const router = useRouter()
 const { t } = useI18n()
@@ -486,6 +486,7 @@ const settingsMenuRef = ref<HTMLElement | null>(null)
 const activeAskController = ref<AbortController | null>(null)
 const chatInputRef = ref<HTMLInputElement | null>(null)
 const stoppedGeneration = ref(false)
+const modelSupportsImages = ref(false)
 
 const connectedDeviceLabel = computed(() => {
   if (authStore.deviceNumber) {
@@ -701,8 +702,33 @@ const clearSelectedAttachments = () => {
 }
 
 const toggleAttachmentMenu = () => {
+  if (!modelSupportsImages.value) return
   showSettingsMenu.value = false
   showAttachmentMenu.value = !showAttachmentMenu.value
+}
+
+const refreshModelCapabilities = async () => {
+  if (!authStore.isAuthenticated) {
+    modelSupportsImages.value = false
+    clearSelectedAttachments()
+    return
+  }
+
+  try {
+    const model = await getCurrentModel()
+    modelSupportsImages.value = Boolean(model.supports_images)
+  } catch (_error) {
+    modelSupportsImages.value = false
+  }
+
+  if (!modelSupportsImages.value) {
+    showAttachmentMenu.value = false
+    clearSelectedAttachments()
+  }
+}
+
+const handleWindowFocus = () => {
+  void refreshModelCapabilities()
 }
 
 const toggleSettingsMenu = () => {
@@ -909,15 +935,21 @@ onMounted(() => {
     router.push('/setup')
   } else if (!authStore.isAuthenticated) {
     router.push('/login')
+  } else {
+    void refreshModelCapabilities()
   }
 
   document.addEventListener('click', handleDocumentClick)
+  window.addEventListener('focus', handleWindowFocus)
 })
 
 onBeforeUnmount(() => {
   abortActiveRequest()
   if (typeof document !== 'undefined') {
     document.removeEventListener('click', handleDocumentClick)
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', handleWindowFocus)
   }
 })
 </script>

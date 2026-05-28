@@ -8,6 +8,11 @@ interface SignonResponse {
   expires_at: string
 }
 
+interface CurrentModelResponse {
+  current: string
+  supports_images: boolean
+}
+
 export interface WebSource {
   title: string
   url: string
@@ -160,6 +165,48 @@ export const useAitjeApi = () => {
       return data
     } catch (error: any) {
       handleApiError(error, 'Sign-on', url)
+    }
+  }
+
+  const getCurrentModel = async (): Promise<CurrentModelResponse> => {
+    if (!authStore.baseUrl) {
+      throw createError(translate('errors.deviceNotConfigured'), 'DEVICE_NOT_CONFIGURED')
+    }
+
+    if (!authStore.bearerToken) {
+      throw createError(translate('errors.notLoggedIn'), 'NOT_AUTHENTICATED')
+    }
+
+    const url = `${authStore.baseUrl}/api/v1/ollama/current`
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authStore.bearerToken}`,
+        },
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          authStore.clearAuth()
+          throw createError(translate('errors.sessionExpired'), 'SESSION_EXPIRED')
+        }
+
+        const errorText = await response.text()
+        throw createError(
+          translate('errors.askFailed', {
+            status: response.status,
+            message: errorText || response.statusText,
+          }),
+          'MODEL_CAPABILITIES_FAILED',
+        )
+      }
+
+      return await response.json()
+    } catch (error: any) {
+      handleApiError(error, 'Current model', url)
     }
   }
 
@@ -387,6 +434,7 @@ export const useAitjeApi = () => {
 
   return {
     signon,
+    getCurrentModel,
     ask,
   }
 }

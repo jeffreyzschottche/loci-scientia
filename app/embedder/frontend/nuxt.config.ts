@@ -1,3 +1,6 @@
+const eggFavicon =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='48' text-anchor='middle' font-size='48'%3E%F0%9F%A5%9A%3C/text%3E%3C/svg%3E"
+
 export default defineNuxtConfig({
   srcDir: '.',
   compatibilityDate: '2024-01-09',
@@ -17,8 +20,7 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
       ],
       link: [
-        { rel: 'icon', type: 'image/x-icon', href: '/embedder/favicon.ico' },
-        { rel: 'apple-touch-icon', href: '/embedder/aitje.png' },
+        { rel: 'icon', href: eggFavicon },
       ],
     },
   },

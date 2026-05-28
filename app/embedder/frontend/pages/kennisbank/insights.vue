@@ -1,11 +1,23 @@
 <template>
   <KennisbankTabLayout>
     <div>
-      <div class="mb-6">
+      <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="text-2xl font-bold text-loci-black">
           {{ translate('Kennisbank Inzicht', 'Knowledge base insights') }}
         </h1>
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center justify-center rounded-loci px-5 py-2.5 text-sm font-semibold text-loci-black-deep transition-all disabled:cursor-not-allowed disabled:opacity-60"
+          :class="isExporting ? 'bg-loci-gray-200' : 'bg-loci-yellow hover:bg-loci-yellow-hover'"
+          :disabled="isExporting"
+          @click="downloadBackup"
+        >
+          {{ isExporting ? translate('Backup maken...', 'Creating backup...') : translate('Backup kennisbank', 'Back up knowledge base') }}
+        </button>
       </div>
+      <p v-if="exportError" class="mb-6 rounded-loci border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ exportError }}
+      </p>
 
       <!-- Stats -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -90,6 +102,8 @@ const stats = ref({
 });
 const categories = ref<Record<string, number>>({});
 const recentDocuments = ref<any[]>([]);
+const isExporting = ref(false);
+const exportError = ref('');
 
 onMounted(async () => {
   await loadStats();
@@ -120,5 +134,25 @@ function formatNumber(num: number) {
 function formatDate(dateStr: string) {
   const locale = currentLanguage.value === 'en' ? 'en-US' : 'nl-NL';
   return new Date(dateStr).toLocaleDateString(locale);
+}
+
+async function downloadBackup() {
+  isExporting.value = true;
+  exportError.value = '';
+  try {
+    const { blob, filename } = await api.download('/insights/export/backup');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (e: any) {
+    exportError.value = e?.message || translate('Backup downloaden mislukt.', 'Backup download failed.');
+  } finally {
+    isExporting.value = false;
+  }
 }
 </script>

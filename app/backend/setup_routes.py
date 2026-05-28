@@ -29,6 +29,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CA_PATH = _PROJECT_ROOT / "devices_db" / "tls" / "ca.crt"
 _CONNECT_LOGO_PATH = _PROJECT_ROOT / "app" / "embedder" / "frontend" / "public" / "aitje.png"
 _CONNECT_FAVICON_PATH = _PROJECT_ROOT / "app" / "webclient" / "public" / "favicon.ico"
+_EGG_FAVICON = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E"
+    "%3Ctext x='32' y='48' text-anchor='middle' font-size='48'%3E%F0%9F%A5%9A%3C/text%3E"
+    "%3C/svg%3E"
+)
 _PROFILE_NAMESPACE = uuid.UUID("8e1f3c5a-7d2b-4f60-9a3e-1c1a73aa17e5")
 
 
@@ -249,7 +255,7 @@ def _render_connect_page(host: str, platform: str, app: str) -> str:
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AITJE</title>
-  <link rel="icon" type="image/x-icon" href="/connect/favicon.ico">
+  <link rel="icon" href="{_EGG_FAVICON}">
   <style>
     * {{ box-sizing: border-box; }}
     html, body {{

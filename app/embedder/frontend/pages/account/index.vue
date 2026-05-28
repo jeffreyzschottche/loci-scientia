@@ -36,6 +36,31 @@
         </p>
       </section>
 
+      <section class="rounded-loci-lg border border-loci-gray-100 bg-loci-white p-8">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-xl font-semibold text-loci-black">
+              {{ translate('Kennisbank backup', 'Knowledge base backup') }}
+            </h2>
+            <p class="text-sm text-loci-gray-500">
+              {{ translate('Download een ZIP-bestand met alle kennis uit deze kennisbank.', 'Download a ZIP file with all knowledge from this knowledge base.') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center justify-center rounded-loci px-5 py-2.5 text-sm font-semibold text-loci-black-deep transition-all disabled:cursor-not-allowed disabled:opacity-60"
+            :class="isExporting ? 'bg-loci-gray-200' : 'bg-loci-yellow hover:bg-loci-yellow-hover'"
+            :disabled="isExporting"
+            @click="downloadBackup"
+          >
+            {{ isExporting ? translate('Backup maken...', 'Creating backup...') : translate('Backup kennisbank', 'Back up knowledge base') }}
+          </button>
+        </div>
+        <p v-if="exportError" class="mt-4 rounded-loci border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {{ exportError }}
+        </p>
+      </section>
+
     </div>
   </div>
 </template>
@@ -47,4 +72,27 @@ definePageMeta({
 
 const authStore = useAuthStore();
 const { translate } = useTranslations();
+const api = useApi();
+const isExporting = ref(false);
+const exportError = ref('');
+
+async function downloadBackup() {
+  isExporting.value = true;
+  exportError.value = '';
+  try {
+    const { blob, filename } = await api.download('/insights/export/backup');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (e: any) {
+    exportError.value = e?.message || translate('Backup downloaden mislukt.', 'Backup download failed.');
+  } finally {
+    isExporting.value = false;
+  }
+}
 </script>

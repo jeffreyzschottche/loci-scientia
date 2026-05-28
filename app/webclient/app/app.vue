@@ -1,8 +1,6 @@
 <template>
   <div class="h-full w-screen overflow-hidden" style="max-width: 100vw;">
     <Head>
-      <Link rel="icon" type="image/png" href="/aitje-logo.png" />
-      <Link rel="apple-touch-icon" href="/aitje-logo.png" />
       <Title>AITJE</Title>
       <Meta name="description" :content="t('app.metaDescription')" />
     </Head>

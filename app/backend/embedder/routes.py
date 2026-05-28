@@ -7,9 +7,12 @@ Nuxt-SPA ongewijzigd blijft werken.
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 import time
 import uuid
+import zipfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -22,6 +25,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.backend.auth_tokens import TokenRecord
@@ -160,6 +164,64 @@ def _document_or_404(document_id: int) -> dict:
     if document is None:
         raise HTTPException(status_code=404, detail="Document niet gevonden")
     return document
+
+
+def _build_kennisbank_backup() -> tuple[bytes, str, dict]:
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    documents = models.list_documents(only_status="formatted")
+
+    graph: list[dict] = []
+    section_count = 0
+    chunk_count = 0
+
+    for document in documents:
+        sections = models.list_sections(document["id"])
+        chunks = models.list_chunks(document["id"])
+        sections_by_id = {section["id"]: section for section in sections}
+
+        graph.append(
+            jsonld.serialize_document(
+                document,
+                sections=sections,
+                include_sections=True,
+                include_chunks=False,
+            )
+        )
+        graph.extend(jsonld.serialize_chunks(chunks, document, sections_by_id))
+
+        section_count += len(sections)
+        chunk_count += len(chunks)
+
+    manifest = {
+        "name": "AITJE kennisbank backup",
+        "generated_at": generated_at,
+        "format": "jsonld-zip",
+        "document_count": len(documents),
+        "section_count": section_count,
+        "chunk_count": chunk_count,
+    }
+    dataset = {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "AITJE kennisbank backup",
+        "dateCreated": generated_at,
+        "encodingFormat": "application/ld+json",
+        "@graph": graph,
+    }
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "manifest.json",
+            json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        archive.writestr(
+            "kennisbank.jsonld",
+            json.dumps(dataset, ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return buffer.getvalue(), f"aitje-kennisbank-backup-{timestamp}.zip", manifest
 
 
 def _section_or_404(section_id: int) -> dict:
@@ -620,6 +682,21 @@ def insights_stats(_: TokenRecord = Depends(require_embedder_user)) -> dict:
         "categories": categories,
         "recent_documents": recent,
     }
+
+
+@router.get("/insights/export/backup")
+def insights_export_backup(_: TokenRecord = Depends(require_embedder_user)) -> StreamingResponse:
+    content, filename, manifest = _build_kennisbank_backup()
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Aitje-Document-Count": str(manifest["document_count"]),
+        "X-Aitje-Chunk-Count": str(manifest["chunk_count"]),
+    }
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/zip",
+        headers=headers,
+    )
 
 
 @router.get("/insights/categories")
