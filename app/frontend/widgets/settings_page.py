@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS, PROMPT_MODES
 from ..translations import get_current_language, register_language_change_callback, set_language, t
 from .dialog_style import OverlayDialog, ask_yes_no_dialog, show_error_dialog
+from .ios_switch import IosSwitch
 
 class SettingsPage(QWidget):
     FIELD_STYLE = (
@@ -154,6 +155,9 @@ class SettingsPage(QWidget):
         self._date_loading = False
         self._system_save_button: QPushButton | None = None
         self._system_reset_button: QPushButton | None = None
+        self._kiosk_switch: IosSwitch | None = None
+        self._kiosk_status: QLabel | None = None
+        self._kiosk_busy = False
         self._saved_timezone: str = ""
         self._saved_language: str = ""
         self._saved_today: str = ""
@@ -313,8 +317,180 @@ class SettingsPage(QWidget):
 
         info_card.layout().addWidget(info_body)
         layout.addWidget(info_card)
+
+        if self._show_kiosk_toggle():
+            layout.addWidget(self._kiosk_card())
+            QTimer.singleShot(0, self._refresh_kiosk_state)
+
         layout.addStretch(1)
         return tab
+
+    # ------------------------------------------------------------------ kiosk
+    @staticmethod
+    def _truthy(value: object) -> bool:
+        return str(value or "").strip().lower() in {"1", "true", "yes", "on", "enable", "enabled"}
+
+    def _show_kiosk_toggle(self) -> bool:
+        raw = self._read_env_value("SHOW_KIOSK_TOGGLE")
+        if raw is None:
+            raw = os.environ.get("SHOW_KIOSK_TOGGLE", "")
+        return self._truthy(raw)
+
+    @staticmethod
+    def _kiosk_script_path() -> Path:
+        return Path(__file__).resolve().parents[3] / "scripts" / "aitje-kiosk-apply.sh"
+
+    def _kiosk_card(self) -> QFrame:
+        card = self._settings_card(t("settings_kiosk_title"))
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(10)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(16)
+
+        text_col = QVBoxLayout()
+        text_col.setContentsMargins(0, 0, 0, 0)
+        text_col.setSpacing(4)
+        label = QLabel(t("settings_kiosk_switch_label"))
+        label.setStyleSheet("font-weight:700; color:#171717; font-size:14px;")
+        text_col.addWidget(label)
+        description = QLabel(t("settings_kiosk_description"))
+        description.setWordWrap(True)
+        description.setStyleSheet("color:#6b7280; font-size:13px; line-height:1.45;")
+        text_col.addWidget(description)
+        row.addLayout(text_col, 1)
+
+        self._kiosk_switch = IosSwitch()
+        self._kiosk_switch.toggled.connect(self._on_kiosk_toggled)
+        row.addWidget(self._kiosk_switch, 0, Qt.AlignTop)
+        body_layout.addLayout(row)
+
+        self._kiosk_status = QLabel(t("settings_kiosk_status_loading"))
+        self._kiosk_status.setWordWrap(True)
+        self._kiosk_status.setStyleSheet("color:#6b7280; font-size:12px;")
+        body_layout.addWidget(self._kiosk_status)
+
+        card.layout().addWidget(body)
+        return card
+
+    def _set_kiosk_switch(self, state: bool) -> None:
+        if not self._kiosk_switch:
+            return
+        # blockSignals so a programmatic set doesn't fire _on_kiosk_toggled.
+        self._kiosk_switch.blockSignals(True)
+        self._kiosk_switch.setChecked(state)
+        self._kiosk_switch.blockSignals(False)
+
+    def _read_kiosk_state(self) -> bool:
+        if platform.system() != "Linux" or shutil.which("systemctl") is None:
+            return False
+        out = self._run_command(["systemctl", "is-enabled", "aitje-kiosk.service"], timeout=5).strip()
+        return out == "enabled"
+
+    def _refresh_kiosk_state(self) -> None:
+        if not self._kiosk_switch:
+            return
+        self._schedule_task(self._refresh_kiosk_state_async())
+
+    async def _refresh_kiosk_state_async(self) -> None:
+        state = await asyncio.to_thread(self._read_kiosk_state)
+        self._set_kiosk_switch(state)
+        if self._kiosk_status:
+            self._kiosk_status.setText(
+                t("settings_kiosk_active") if state else t("settings_kiosk_inactive")
+            )
+
+    def _on_kiosk_toggled(self, checked: bool) -> None:
+        if self._kiosk_busy:
+            return
+        self._schedule_task(self._apply_kiosk_async(bool(checked)))
+
+    def _run_kiosk_helper(self, action: str) -> tuple[str, str]:
+        """Run the privileged helper. Returns (status, output) where status is
+        one of: 'ok', 'need_sudo' (passwordless sudo not set up yet — one-time
+        bootstrap required), or 'error'. A status string avoids colliding with
+        the helper's own numeric exit codes."""
+        if platform.system() != "Linux":
+            return ("error", t("settings_kiosk_linux_only"))
+        script = self._kiosk_script_path()
+        if not script.exists():
+            return ("error", f"{script} ontbreekt")
+        try:
+            probe = subprocess.run(["sudo", "-n", "true"], capture_output=True, text=True, timeout=10)
+        except Exception as exc:
+            return ("error", str(exc))
+        if probe.returncode != 0:
+            return ("need_sudo", "")
+        try:
+            completed = subprocess.run(
+                ["sudo", "-n", str(script), action],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except subprocess.TimeoutExpired:
+            return ("error", "timeout")
+        output = ((completed.stdout or "") + (completed.stderr or "")).strip()
+        return ("ok" if completed.returncode == 0 else "error", output)
+
+    async def _apply_kiosk_async(self, enable: bool) -> None:
+        self._kiosk_busy = True
+        # Disable the switch for the whole operation so a second click can't
+        # desync the visual state from the in-flight apply.
+        if self._kiosk_switch:
+            self._kiosk_switch.setEnabled(False)
+        if self._kiosk_status:
+            self._kiosk_status.setText(t("settings_kiosk_applying"))
+        action = "enable" if enable else "disable"
+        status, output = await asyncio.to_thread(self._run_kiosk_helper, action)
+
+        if status == "ok":
+            if self._kiosk_status:
+                self._kiosk_status.setText(
+                    t("settings_kiosk_enabled_reboot") if enable else t("settings_kiosk_disabled_reboot")
+                )
+            self._kiosk_busy = False
+            if self._kiosk_switch:
+                self._kiosk_switch.setEnabled(True)
+            # Show the reboot prompt from the Qt loop (not inside this coroutine)
+            # so the modal's nested event loop runs at the top level.
+            QTimer.singleShot(0, self._prompt_kiosk_reboot)
+            return
+
+        # Failure: re-sync the switch to the *actual* system state (don't assume
+        # the operation left it untouched) and explain why.
+        actual_state = await asyncio.to_thread(self._read_kiosk_state)
+        self._set_kiosk_switch(actual_state)
+        if self._kiosk_status:
+            self._kiosk_status.setText(
+                t("settings_kiosk_active") if actual_state else t("settings_kiosk_inactive")
+            )
+        self._kiosk_busy = False
+        if self._kiosk_switch:
+            self._kiosk_switch.setEnabled(True)
+        if status == "need_sudo":
+            message = t("settings_kiosk_needs_bootstrap", path=str(self._kiosk_script_path()))
+        else:
+            detail = output.strip()[:600]
+            message = t("settings_kiosk_failed")
+            if detail:
+                message = f"{message}\n\n{detail}"
+        QTimer.singleShot(0, lambda m=message: show_error_dialog(self, t("settings_kiosk_title"), m))
+
+    def _prompt_kiosk_reboot(self) -> None:
+        if ask_yes_no_dialog(
+            self,
+            t("settings_kiosk_reboot_title"),
+            t("settings_kiosk_reboot_prompt"),
+            default_to_no=True,
+        ):
+            self._reboot_device()
+
+    def _reboot_device(self) -> str:
+        return self._run_command(["sudo", "-n", "systemctl", "reboot"], timeout=15)
 
     def _advanced_tab(self) -> QWidget:
         tab = QWidget()

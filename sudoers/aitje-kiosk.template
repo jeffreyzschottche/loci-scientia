@@ -1,0 +1,10 @@
+# AITJE kioskmodus — passwordless sudo voor de device-gebruiker.
+#
+# Een AITJE-kastje is een single-purpose appliance: lociscientia.sh draait
+# onbeheerd bij het opstarten en doet veel dat root vereist (apt installs,
+# hostnamectl, systemctl, setcap, Caddy op :80/:443). Zonder NOPASSWD zou de
+# boot blijven hangen op een wachtwoordprompt. Deze regel wordt geïnstalleerd
+# door scripts/aitje-kiosk-apply.sh (gevalideerd met visudo) als
+# /etc/sudoers.d/aitje-kiosk. __KIOSK_USER__ wordt vervangen door de eigenaar
+# van het project (meestal 'aitje').
+__KIOSK_USER__ ALL=(ALL) NOPASSWD: ALL

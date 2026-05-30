@@ -50,6 +50,12 @@ ensure_sudo_session() {
     fi
     if sudo -n true 2>/dev/null; then
         :
+    elif [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ] || [ ! -t 0 ]; then
+        # Onbeheerd (kioskmodus onder cage / geen interactieve terminal):
+        # een wachtwoordprompt kan niemand beantwoorden en zou de boot laten
+        # hangen. NOPASSWD moet vooraf staan (scripts/aitje-kiosk-apply.sh enable).
+        echo "⚠️  Geen passwordless sudo beschikbaar (NOPASSWD ontbreekt?); sudo-stappen worden overgeslagen."
+        return 1
     else
         echo "🔐 sudo-toegang vereist voor hostname/mDNS-aanpassingen."
         sudo -v || return 1
@@ -354,6 +360,129 @@ ensure_remote_support_service() {
         else
             sudo systemctl daemon-reload
         fi
+    fi
+}
+
+ensure_kiosk_dependencies() {
+    # Kioskmodus draait de frontend onder 'cage' (Wayland-kioskcompositor). Dat
+    # is de enige extra systeemdependency; installeer 'm zodat een vers kastje
+    # alles in huis heeft. Alleen relevant als de dev-toggle aanstaat
+    # (SHOW_KIOSK_TOGGLE=1) of als we al onder cage draaien (AITJE_KIOSK=1).
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+
+    if [ "$(_normalize_bool "${SHOW_KIOSK_TOGGLE:-0}")" != "1" ] \
+        && [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" != "1" ]; then
+        return 0
+    fi
+
+    if command -v cage >/dev/null 2>&1; then
+        echo "✅ cage (kioskcompositor) is al geïnstalleerd"
+        return 0
+    fi
+
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; 'cage' wordt niet automatisch geïnstalleerd."
+        return 0
+    fi
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get niet beschikbaar; sla 'cage' installatie over."
+        return 0
+    fi
+
+    echo "📦 cage (Wayland-kioskcompositor) installeren..."
+    if ! _wait_for_apt_lock 180; then
+        echo "⚠️  apt blijft bezet; 'cage' installatie overgeslagen."
+        return 0
+    fi
+    _disable_broken_apt_repos || true
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get install -y cage || echo "⚠️  cage installatie mislukt."
+    else
+        sudo apt-get install -y cage || echo "⚠️  cage installatie mislukt."
+    fi
+    _restore_disabled_apt_repos
+}
+
+ensure_base_dependencies() {
+    # Basispakketten die het opstartscript zelf nodig heeft op een vers kastje:
+    # python3-venv (anders faalt 'python3 -m venv'), pip, en een paar CLI-tools
+    # die elders in dit script gebruikt worden. Idempotent: alleen ontbrekende
+    # pakketten worden geïnstalleerd.
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    if ! command -v apt-get >/dev/null 2>&1; then
+        return 0
+    fi
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; basis-dependencies worden niet automatisch geïnstalleerd."
+        return 0
+    fi
+    local pkgs=(python3-venv python3-pip curl ca-certificates git lsof psmisc procps libcap2-bin)
+    local missing=()
+    local p=""
+    for p in "${pkgs[@]}"; do
+        if ! dpkg -s "$p" >/dev/null 2>&1; then
+            missing+=("$p")
+        fi
+    done
+    if [ "${#missing[@]}" -eq 0 ]; then
+        echo "✅ Basis-dependencies zijn al geïnstalleerd"
+        return 0
+    fi
+    echo "📦 Basis-dependencies installeren: ${missing[*]}"
+    if ! _wait_for_apt_lock 180; then
+        echo "⚠️  apt blijft bezet; basis-dependencies overgeslagen."
+        return 0
+    fi
+    _disable_broken_apt_repos || true
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get install -y "${missing[@]}" || echo "⚠️  Installatie basis-dependencies (deels) mislukt."
+    else
+        sudo apt-get install -y "${missing[@]}" || echo "⚠️  Installatie basis-dependencies (deels) mislukt."
+    fi
+    _restore_disabled_apt_repos
+}
+
+ensure_node() {
+    # Node.js + npm zijn nodig om de Nuxt webclient (/) en de embedder-SPA
+    # (/embedder/) te bouwen. Zonder deze stap werd dat alleen overgeslagen met
+    # een waarschuwing. We gebruiken de distro-pakketten (geen externe repo);
+    # heb je een specifieke Node-versie nodig, gebruik dan NodeSource.
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        echo "✅ Node.js/npm zijn al geïnstalleerd ($(node -v 2>/dev/null))"
+        return 0
+    fi
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get niet beschikbaar; Node.js/npm niet automatisch geïnstalleerd."
+        return 0
+    fi
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; Node.js/npm worden niet automatisch geïnstalleerd."
+        return 0
+    fi
+    echo "📦 Node.js + npm installeren (voor webclient & embedder SPA)..."
+    if ! _wait_for_apt_lock 180; then
+        echo "⚠️  apt blijft bezet; Node.js installatie overgeslagen."
+        return 0
+    fi
+    _disable_broken_apt_repos || true
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get install -y nodejs npm || echo "⚠️  Node.js/npm installatie mislukt; webclient/embedder worden niet gebouwd."
+    else
+        sudo apt-get install -y nodejs npm || echo "⚠️  Node.js/npm installatie mislukt; webclient/embedder worden niet gebouwd."
+    fi
+    _restore_disabled_apt_repos
+    if command -v node >/dev/null 2>&1; then
+        echo "✅ Node.js $(node -v 2>/dev/null) geïnstalleerd"
     fi
 }
 
@@ -1264,9 +1393,16 @@ ensure_bluetooth_support
 ensure_no_sleep_mode
 ensure_remote_support_dependencies
 ensure_remote_support_service
+ensure_kiosk_dependencies
 configure_hostname
 echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="
+echo
+
+echo "=== Basis-dependencies (Python venv, Node.js, CLI-tools) ==="
+ensure_base_dependencies
+ensure_node
+echo "============================================================"
 echo
 
 echo "=== Ollama Setup ==="
@@ -1627,5 +1763,13 @@ if ! curl -fs "$health_url" >/dev/null 2>&1; then
 fi
 
 python -m app.frontend.main
+
+# In kioskmodus beheert systemd (via cage) de levenscyclus: zodra de frontend
+# stopt of crasht, laten we dit script ook stoppen zodat de cleanup-trap draait
+# en systemd de hele stack opnieuw start. Buiten kiosk blijven we wachten op de
+# backend, zoals voorheen.
+if [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ]; then
+    exit 0
+fi
 
 wait "$backend_pid"
