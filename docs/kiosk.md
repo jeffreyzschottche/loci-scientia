@@ -18,7 +18,7 @@ Stroom aan → zwart scherm (geen logo) → weston (kiosk-shell) → ./lociscien
 | `scripts/aitje-kiosk-apply.sh` | Zet kiosk **aan/uit** (service + GDM + sudo + GRUB). Idempotent. `enable` weigert op een niet-device tenzij `/etc/aitje-device` bestaat of je `--force` geeft. |
 | `scripts/kiosk-test.sh` | **Veilige** test: draait weston GENEST als venster in je huidige desktop (raakt GDM/GRUB/systemd niet aan). `sanity` = minimaal Qt-venster, `frontend` = de echte UI. Ctrl+C of sluit het venster om te stoppen. |
 | `sudoers/aitje-kiosk.template` | `NOPASSWD: ALL` voor de device-gebruiker, zodat `lociscientia.sh` onbeheerd boot (apt, hostnamectl, systemctl, setcap, Caddy op :80/:443). |
-| GRUB | `splash` wordt verwijderd + `bgrt_disable` toegevoegd → zwarte boot zonder logo. Originele `/etc/default/grub` wordt geback-upt naar `/etc/default/grub.aitje-backup`. |
+| GRUB | `splash` wordt verwijderd + stille-boot-vlaggen toegevoegd (`bgrt_disable`, `systemd.show_status=0`, `udev.log_level=3`, `console=tty12`, …) → zwarte boot zonder logo én zonder `[ OK ]/[FAILED]`-bootregels of warnings op tty1. Originele `/etc/default/grub` wordt geback-upt naar `/etc/default/grub.aitje-backup`. |
 | GDM | Wordt uitgeschakeld zolang kiosk aanstaat (GNOME laadt niet). Bij uitzetten weer ingeschakeld. |
 
 ### Dependencies

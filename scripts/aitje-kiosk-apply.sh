@@ -135,7 +135,13 @@ with open(path) as fh:
 
 def fix(m):
     toks = [t for t in m.group(2).split() if t != "splash"]
-    for needed in ("quiet", "loglevel=0", "vt.global_cursor_default=0", "bgrt_disable"):
+    # quiet/loglevel=0 dempt de KERNEL; systemd.show_status + udev.log_level dempen
+    # de '[ OK ]/[FAILED]'-bootregels en udev-warnings; console=tty12 duwt resterende
+    # console-output naar VT12 zodat tty1 (waar weston tekent) zwart blijft;
+    # vt.global_cursor_default=0 verbergt de knipperende cursor.
+    for needed in ("quiet", "loglevel=0", "vt.global_cursor_default=0", "bgrt_disable",
+                   "systemd.show_status=0", "rd.systemd.show_status=0",
+                   "udev.log_level=3", "rd.udev.log_level=3", "console=tty12"):
         if needed not in toks:
             toks.append(needed)
     return '{}="{}"'.format(m.group(1), " ".join(toks))
@@ -145,7 +151,7 @@ if new != text:
     with open(path, "w") as fh:
         fh.write(new)
 PY
-    log "🌑 GRUB: 'splash' verwijderd (zwarte boot, geen Ubuntu-logo)."
+    log "🌑 GRUB: 'splash' verwijderd + stille boot (geen logo, geen boottekst/warnings)."
     update_grub
 }
 
