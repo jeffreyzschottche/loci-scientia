@@ -408,6 +408,51 @@ ensure_kiosk_dependencies() {
     _restore_disabled_apt_repos
 }
 
+ensure_kiosk_enabled() {
+    # Kiosk-ACTIVATIE-beleid (systemd-service, GDM uit, GRUB zwart, NOPASSWD, marker):
+    #   * SHOW_KIOSK_TOGGLE=1  → dev-/onderhoudskastje: NIET automatisch. Je zet de
+    #     kiosk handmatig aan via de Qt-toggle of 'aitje-kiosk-apply.sh'.
+    #   * anders (toggle verborgen) → echte appliance: kiosk wordt AUTOMATISCH
+    #     geactiveerd, zodat een vers kastje met enkel './lociscientia.sh' een kiosk
+    #     wordt (na een herstart).
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    # Draaien we al ÓNDER de kiosk (weston → kiosk-session.sh → hier)? Dan is alles
+    # al gezet; niets doen (anders draait elke boot opnieuw update-grub).
+    if [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ]; then
+        return 0
+    fi
+    # Dev-toggle zichtbaar → handmatig; hier niets automatisch doen.
+    if [ "$(_normalize_bool "${SHOW_KIOSK_TOGGLE:-0}")" = "1" ]; then
+        echo "ℹ️  SHOW_KIOSK_TOGGLE=1 → kiosk niet automatisch; gebruik de Qt-toggle."
+        return 0
+    fi
+
+    local apply="$PROJECT_ROOT/scripts/aitje-kiosk-apply.sh"
+    if [ ! -x "$apply" ]; then
+        echo "⚠️  $apply ontbreekt/niet uitvoerbaar; kioskmodus niet geactiveerd."
+        return 0
+    fi
+    # Al ingeschakeld? Niets doen (idempotent, geen onnodige update-grub per boot).
+    if systemctl is-enabled aitje-kiosk.service >/dev/null 2>&1; then
+        echo "✅ Kiosk-service is al ingeschakeld"
+        return 0
+    fi
+
+    echo "🖥  Geen dev-toggle (SHOW_KIOSK_TOGGLE≠1) → kioskmodus automatisch activeren…"
+    if [ "$(id -u)" -eq 0 ]; then
+        "$apply" enable --force || echo "⚠️  kiosk-activatie mislukte."
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$apply" enable --force || echo "⚠️  kiosk-activatie mislukte (sudo)."
+    else
+        echo "⚠️  Geen root/sudo beschikbaar; draai eenmalig: sudo $apply enable --force"
+        return 0
+    fi
+    echo "🔁 Kioskmodus ingeschakeld — HERSTART om te activeren (sudo reboot)."
+}
+
 ensure_base_dependencies() {
     # Basispakketten die het opstartscript zelf nodig heeft op een vers kastje:
     # python3-venv (anders faalt 'python3 -m venv'), pip, en een paar CLI-tools
@@ -1396,6 +1441,7 @@ ensure_no_sleep_mode
 ensure_remote_support_dependencies
 ensure_remote_support_service
 ensure_kiosk_dependencies
+ensure_kiosk_enabled
 configure_hostname
 echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="

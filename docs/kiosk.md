@@ -52,6 +52,21 @@ In kioskmodus (`AITJE_KIOSK=1`):
 - de frontend draait fullscreen en de afsluit/herstart-knop voert een **device**-`poweroff`/`reboot` uit i.p.v. de app te sluiten (anders blijf je op een zwart scherm hangen);
 - stopt of crasht de frontend, dan stopt `lociscientia.sh` ook en herstart systemd de hele stack.
 
+## Activatie-beleid: automatisch (appliance) vs. handmatig (dev)
+
+`lociscientia.sh` bepaalt aan de hand van **`SHOW_KIOSK_TOGGLE`** (in `.env`) of de
+kiosk zichzelf activeert:
+
+| `SHOW_KIOSK_TOGGLE` | Gedrag van `lociscientia.sh` |
+| --- | --- |
+| `1` (dev/onderhoud) | Doet **niets** automatisch aan de boot; je ziet de schakelaar in de UI en zet de kiosk handmatig aan/uit. Veilig op een werkmachine. |
+| `0` of afwezig (echte appliance) | **Activeert de kiosk automatisch** (`aitje-kiosk-apply.sh enable --force`): een vers kastje wordt met enkel `./lociscientia.sh` + herstart een kiosk. |
+
+De activatie is idempotent en slaat zichzelf over zodra de service aanstaat of als we
+al ónder de kiosk draaien (`AITJE_KIOSK=1`), dus er wordt niet bij elke boot opnieuw
+`update-grub` gedraaid. `.env.example` staat standaard op `1` (dev-veilig); zet `0`
+op een kastje dat je echt als kiosk wilt uitrollen.
+
 ## Veilig testen (op élke machine, ook je dev-laptop)
 
 Wil je zien of weston + de frontend renderen zónder iets aan de boot te veranderen,
