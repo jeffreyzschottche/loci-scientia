@@ -134,12 +134,16 @@ with open(path) as fh:
     text = fh.read()
 
 def fix(m):
-    toks = [t for t in m.group(2).split() if t != "splash"]
-    # quiet/loglevel=0 dempt de KERNEL; systemd.show_status + udev.log_level dempen
-    # de '[ OK ]/[FAILED]'-bootregels en udev-warnings; console=tty12 duwt resterende
-    # console-output naar VT12 zodat tty1 (waar weston tekent) zwart blijft;
-    # vt.global_cursor_default=0 verbergt de knipperende cursor.
-    for needed in ("quiet", "loglevel=0", "vt.global_cursor_default=0", "bgrt_disable",
+    # Strip 'splash' (geen logo) én elk bestaand loglevel= (we zetten 'm canoniek).
+    toks = [t for t in m.group(2).split()
+            if t != "splash" and not t.startswith("loglevel=")]
+    # loglevel=1: de kernel verwerpt loglevel=0 (ligt onder CONSOLE_LOGLEVEL_MIN=1),
+    # waardoor 'quiet' z'n default 4 blijft en ERR-meldingen (ACPI/nvidia/ucsi) tóch
+    # printen. loglevel=1 print alleen EMERGENCY → die boottekst verdwijnt.
+    # systemd.show_status + udev.log_level dempen de '[ OK ]/[FAILED]'-regels en
+    # udev-warnings; console=tty12 duwt resterende console-output naar VT12 zodat
+    # tty1 (waar weston tekent) zwart blijft; vt.global_cursor_default=0 = geen cursor.
+    for needed in ("quiet", "loglevel=1", "vt.global_cursor_default=0", "bgrt_disable",
                    "systemd.show_status=0", "rd.systemd.show_status=0",
                    "udev.log_level=3", "rd.udev.log_level=3", "console=tty12"):
         if needed not in toks:
