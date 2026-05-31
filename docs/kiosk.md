@@ -14,8 +14,9 @@ Stroom aan → zwart scherm (geen logo) → cage → ./lociscientia.sh → Qt-fr
 | Onderdeel | Rol |
 | --- | --- |
 | `systemd/aitje-kiosk.service` | Systemd-service die op tty1 **`cage`** start (de Wayland-kioskcompositor). `Restart=always` met start-limiet (max 5 starts/60s) en `WantedBy=multi-user.target`. |
-| `scripts/kiosk-session.sh` | Het enige commando dat cage draait. Exec't `lociscientia.sh` met `AITJE_KIOSK=1`. De frontend wordt zo het enige venster. |
-| `scripts/aitje-kiosk-apply.sh` | Zet kiosk **aan/uit** (service + GDM + sudo + GRUB). Idempotent. |
+| `scripts/kiosk-session.sh` | Het enige commando dat cage draait. Start `lociscientia.sh` met `AITJE_KIOSK=1`. De frontend wordt zo het enige venster. **Vangt boot-fouten af**: faalt de stack, dan toont het een leesbaar fullscreen-scherm (met de laatste regels uit `kiosk-session.log`) i.p.v. cage te laten crashen → geen knipperende cursor. |
+| `scripts/aitje-kiosk-apply.sh` | Zet kiosk **aan/uit** (service + GDM + sudo + GRUB). Idempotent. `enable` weigert op een niet-device tenzij `/etc/aitje-device` bestaat of je `--force` geeft. |
+| `scripts/kiosk-test.sh` | **Veilige** test: draait cage GENEST als venster in je huidige desktop (raakt GDM/GRUB/systemd niet aan). `sanity` = minimaal Qt-venster, `frontend` = de echte UI. Sluit het venster om te stoppen. |
 | `sudoers/aitje-kiosk.template` | `NOPASSWD: ALL` voor de device-gebruiker, zodat `lociscientia.sh` onbeheerd boot (apt, hostnamectl, systemctl, setcap, Caddy op :80/:443). |
 | GRUB | `splash` wordt verwijderd + `bgrt_disable` toegevoegd → zwarte boot zonder logo. Originele `/etc/default/grub` wordt geback-upt naar `/etc/default/grub.aitje-backup`. |
 | GDM | Wordt uitgeschakeld zolang kiosk aanstaat (GNOME laadt niet). Bij uitzetten weer ingeschakeld. |
@@ -42,19 +43,39 @@ In kioskmodus (`AITJE_KIOSK=1`):
 - de frontend draait fullscreen en de afsluit/herstart-knop voert een **device**-`poweroff`/`reboot` uit i.p.v. de app te sluiten (anders blijf je op een zwart scherm hangen);
 - stopt of crasht de frontend, dan stopt `lociscientia.sh` ook en herstart systemd de hele stack.
 
-## Eenmalige bootstrap (op het device)
+## Veilig testen (op élke machine, ook je dev-laptop)
 
-De allereerste keer is er nog geen passwordless sudo, dus draai dit één keer in een
-terminal op het kastje:
+Wil je zien of cage + de frontend renderen zónder iets aan de boot te veranderen,
+draai dan de geneste test binnen je normale desktop:
+
+```bash
+scripts/kiosk-test.sh sanity     # minimaal Qt-venster onder cage (bewijst render + GPU)
+scripts/kiosk-test.sh frontend   # de echte PySide6-frontend onder cage
+```
+
+cage opent dan een gewoon **venster** (het grijpt de tty niet over). Sluit het
+venster om te stoppen — geen herstel nodig. Werkt `sanity`, dan ligt een eventueel
+kiosk-probleem in de boot-stack (`lociscientia.sh`), niet in de compositor.
+
+> ⚠️  Draai `aitje-kiosk-apply.sh enable` **nooit** op een dev-/werkmachine — dat
+> schakelt je GDM uit en herschrijft GRUB. De `enable` weigert daarom standaard
+> tenzij `/etc/aitje-device` bestaat of je expliciet `--force` geeft.
+
+## Eenmalige bootstrap (op het echte device)
+
+De allereerste keer is er nog geen passwordless sudo en nog geen device-markering,
+dus draai dit één keer in een terminal op het kastje (`--force` markeert het meteen
+als device):
 
 ```bash
 cd /pad/naar/loci-scientia
-sudo scripts/aitje-kiosk-apply.sh enable
+sudo scripts/aitje-kiosk-apply.sh enable --force
 sudo reboot
 ```
 
-Daarna staat NOPASSWD geïnstalleerd en kun je kiosk aan/uit zetten **zonder
-wachtwoord** — ook vanuit de Qt-UI (zie hieronder).
+Daarna bestaat `/etc/aitje-device`, staat NOPASSWD geïnstalleerd en kun je kiosk
+aan/uit zetten **zonder wachtwoord en zonder `--force`** — ook vanuit de Qt-UI
+(zie hieronder).
 
 ## De dev-toggle in de Qt-UI
 
@@ -91,6 +112,7 @@ scripts/aitje-kiosk-apply.sh status
 # display_manager=enabled|disabled|absent
 # grub_splash=present|absent
 # sudoers=present|absent
+# device_marker=present|absent
 # kiosk=on|off
 ```
 

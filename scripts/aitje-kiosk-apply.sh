@@ -31,6 +31,9 @@ SESSION_SCRIPT="$PROJECT_ROOT/scripts/kiosk-session.sh"
 GRUB_FILE="/etc/default/grub"
 GRUB_BACKUP="/etc/default/grub.aitje-backup"
 DISPLAY_MANAGER="gdm3"
+# Markeerbestand dat zegt "dit is een echt AITJE-device". Zonder dit (of --force)
+# weigert 'enable' — zo bevries je nooit per ongeluk je eigen dev-laptop.
+DEVICE_MARKER="/etc/aitje-device"
 
 log() { printf '%s\n' "$*"; }
 err() { printf '%s\n' "$*" >&2; }
@@ -40,6 +43,21 @@ require_root() {
         err "❌ '$1' vereist root. Gebruik: sudo $0 $1"
         exit 1
     fi
+}
+
+# Bescherm tegen het per ongeluk inschakelen van kiosk op een dev-/werkmachine:
+# 'enable' is alleen toegestaan als het device-markeerbestand bestaat, of als er
+# expliciet --force (of AITJE_FORCE_KIOSK=1) is meegegeven. De allereerste keer op
+# een echt device geef je --force; dat zet meteen het markeerbestand zodat latere
+# enable/disable-cycli (ook via de UI-toggle) zonder --force werken.
+guard_is_target_device() {
+    [ -f "$DEVICE_MARKER" ] && return 0
+    [ "${AITJE_FORCE_KIOSK:-0}" = "1" ] && return 0
+    local a
+    for a in "$@"; do
+        [ "$a" = "--force" ] && return 0
+    done
+    return 1
 }
 
 detect_kiosk_user() {
@@ -168,10 +186,12 @@ cmd_status() {
         grub_splash=absent
     fi
     if [ -f "$SUDOERS_PATH" ]; then sudoers=present; else sudoers=absent; fi
+    local marker; if [ -f "$DEVICE_MARKER" ]; then marker=present; else marker=absent; fi
     log "kiosk_service=$svc"
     log "display_manager=$gdm"
     log "grub_splash=$grub_splash"
     log "sudoers=$sudoers"
+    log "device_marker=$marker"
     if [ "$svc" = "enabled" ]; then log "kiosk=on"; else log "kiosk=off"; fi
 }
 
@@ -207,6 +227,18 @@ ensure_kiosk_groups() {
 
 cmd_enable() {
     require_root enable
+    if ! guard_is_target_device "$@"; then
+        err "❌ Weigering: dit lijkt geen AITJE-device (geen $DEVICE_MARKER)."
+        err "   'enable' schakelt GDM uit, maskeert getty@tty1 en herschrijft GRUB —"
+        err "   op een ontwikkel-/werkmachine bevries je daarmee je eigen desktop."
+        err ""
+        err "   • Veilig testen zonder iets te wijzigen:  scripts/kiosk-test.sh sanity"
+        err "   • Dit IS het echte device? Forceer eenmalig:  sudo $0 enable --force"
+        exit 1
+    fi
+    # Guard gehaald (markeerbestand óf --force): leg vast dat dit een device is, zodat
+    # latere enable/disable (en de UI-toggle) geen --force meer nodig hebben.
+    touch "$DEVICE_MARKER" 2>/dev/null || true
     ensure_cage || true
     local user
     user="$(detect_kiosk_user)"
@@ -239,7 +271,7 @@ cmd_disable() {
 }
 
 case "${1:-}" in
-    enable) cmd_enable ;;
+    enable) shift; cmd_enable "$@" ;;
     disable) cmd_disable ;;
     status) cmd_status ;;
     *)
