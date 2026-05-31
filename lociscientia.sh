@@ -51,7 +51,7 @@ ensure_sudo_session() {
     if sudo -n true 2>/dev/null; then
         :
     elif [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ] || [ ! -t 0 ]; then
-        # Onbeheerd (kioskmodus onder cage / geen interactieve terminal):
+        # Onbeheerd (kioskmodus onder weston / geen interactieve terminal):
         # een wachtwoordprompt kan niemand beantwoorden en zou de boot laten
         # hangen. NOPASSWD moet vooraf staan (scripts/aitje-kiosk-apply.sh enable).
         echo "⚠️  Geen passwordless sudo beschikbaar (NOPASSWD ontbreekt?); sudo-stappen worden overgeslagen."
@@ -364,10 +364,11 @@ ensure_remote_support_service() {
 }
 
 ensure_kiosk_dependencies() {
-    # Kioskmodus draait de frontend onder 'cage' (Wayland-kioskcompositor). Dat
-    # is de enige extra systeemdependency; installeer 'm zodat een vers kastje
-    # alles in huis heeft. Alleen relevant als de dev-toggle aanstaat
-    # (SHOW_KIOSK_TOGGLE=1) of als we al onder cage draaien (AITJE_KIOSK=1).
+    # Kioskmodus draait de frontend onder 'weston' (Wayland-kioskcompositor met
+    # kiosk-shell). We gebruiken weston i.p.v. cage: cage 0.2.1 in Ubuntu is gelinkt
+    # tegen wlroots 0.19 en crasht op een Qt-surface. Installeer weston zodat een vers
+    # kastje alles in huis heeft. Alleen relevant als de dev-toggle aanstaat
+    # (SHOW_KIOSK_TOGGLE=1) of we al onder weston draaien (AITJE_KIOSK=1).
     case "$DEVICE_PLATFORM" in
         linux|jetson) ;;
         *) return 0 ;;
@@ -378,30 +379,31 @@ ensure_kiosk_dependencies() {
         return 0
     fi
 
-    if command -v cage >/dev/null 2>&1; then
-        echo "✅ cage (kioskcompositor) is al geïnstalleerd"
+    if command -v weston >/dev/null 2>&1 \
+        && find /usr/lib -name 'kiosk-shell.so' 2>/dev/null | grep -q .; then
+        echo "✅ weston (kioskcompositor + kiosk-shell) is al geïnstalleerd"
         return 0
     fi
 
     if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
-        echo "⚠️  Geen sudo/root; 'cage' wordt niet automatisch geïnstalleerd."
+        echo "⚠️  Geen sudo/root; 'weston' wordt niet automatisch geïnstalleerd."
         return 0
     fi
     if ! command -v apt-get >/dev/null 2>&1; then
-        echo "⚠️  apt-get niet beschikbaar; sla 'cage' installatie over."
+        echo "⚠️  apt-get niet beschikbaar; sla 'weston' installatie over."
         return 0
     fi
 
-    echo "📦 cage (Wayland-kioskcompositor) installeren..."
+    echo "📦 weston (Wayland-kioskcompositor) installeren..."
     if ! _wait_for_apt_lock 180; then
-        echo "⚠️  apt blijft bezet; 'cage' installatie overgeslagen."
+        echo "⚠️  apt blijft bezet; 'weston' installatie overgeslagen."
         return 0
     fi
     _disable_broken_apt_repos || true
     if [ "$(id -u)" -eq 0 ]; then
-        apt-get install -y cage || echo "⚠️  cage installatie mislukt."
+        apt-get install -y weston || echo "⚠️  weston installatie mislukt."
     else
-        sudo apt-get install -y cage || echo "⚠️  cage installatie mislukt."
+        sudo apt-get install -y weston || echo "⚠️  weston installatie mislukt."
     fi
     _restore_disabled_apt_repos
 }
@@ -1764,7 +1766,7 @@ fi
 
 python -m app.frontend.main
 
-# In kioskmodus beheert systemd (via cage) de levenscyclus: zodra de frontend
+# In kioskmodus beheert systemd (via weston) de levenscyclus: zodra de frontend
 # stopt of crasht, laten we dit script ook stoppen zodat de cleanup-trap draait
 # en systemd de hele stack opnieuw start. Buiten kiosk blijven we wachten op de
 # backend, zoals voorheen.

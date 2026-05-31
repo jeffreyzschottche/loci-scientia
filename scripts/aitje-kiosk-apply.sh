@@ -2,12 +2,18 @@
 # AITJE kioskmodus aan/uitzetten. Moet als root draaien (via sudo), behalve
 # `status` dat zonder root werkt.
 #
+#   sudo scripts/aitje-kiosk-apply.sh bootstrap # eenmalig: passwordless sudo + device-marker
 #   sudo scripts/aitje-kiosk-apply.sh enable    # device wordt een kiosk
 #   sudo scripts/aitje-kiosk-apply.sh disable   # normale GNOME-desktop terug
 #   scripts/aitje-kiosk-apply.sh status         # huidige staat (geen root nodig)
 #
+# `bootstrap` zet enkel passwordless sudo (NOPASSWD) + de device-marker neer, zónder
+# de kiosk aan te zetten. Daarna kun je in/uitschakelen vanuit de Qt-UI (de toggle
+# roept 'sudo -n … enable/disable'). Dit ene commando draai je met sudo, want
+# NOPASSWD kan zichzelf niet zonder wachtwoord installeren.
+#
 # `enable`:
-#   * installeert + enabled de cage-kiosk systemd-service (aitje-kiosk.service);
+#   * installeert + enabled de weston-kiosk systemd-service (aitje-kiosk.service);
 #   * geeft de device-gebruiker passwordless sudo (NOPASSWD: ALL);
 #   * schakelt GDM/GNOME uit zodat alleen de kiosk laadt;
 #   * haalt `splash` uit GRUB (+ bgrt_disable) voor een zwarte boot zonder
@@ -195,26 +201,30 @@ cmd_status() {
     if [ "$svc" = "enabled" ]; then log "kiosk=on"; else log "kiosk=off"; fi
 }
 
-ensure_cage() {
-    if command -v cage >/dev/null 2>&1; then
+ensure_weston() {
+    # weston (kiosk-shell) is de kioskcompositor. We gebruiken weston i.p.v. cage:
+    # cage 0.2.1 in Ubuntu is gelinkt tegen wlroots 0.19 en crasht op een Qt-surface.
+    # weston is volwassen + compatibel. Vereist vóór de eerste kioskboot.
+    if command -v weston >/dev/null 2>&1 \
+        && find /usr/lib -name 'kiosk-shell.so' 2>/dev/null | grep -q .; then
         return 0
     fi
-    log "📦 'cage' (Wayland-kioskcompositor) installeren…"
+    log "📦 'weston' (Wayland-kioskcompositor + kiosk-shell) installeren…"
     if command -v apt-get >/dev/null 2>&1; then
         apt-get update -y >/dev/null 2>&1 || true
-        if apt-get install -y cage; then
-            log "✅ cage geïnstalleerd."
+        if apt-get install -y weston; then
+            log "✅ weston geïnstalleerd."
             return 0
         fi
     fi
-    err "⚠️  Kon 'cage' niet automatisch installeren. Installeer handmatig: sudo apt-get install -y cage"
+    err "⚠️  Kon 'weston' niet automatisch installeren. Installeer handmatig: sudo apt-get install -y weston"
     return 1
 }
 
 ensure_kiosk_groups() {
     # Met een echte logind-seat regelt uaccess/ACL meestal toegang tot /dev/dri
     # en /dev/input. Lidmaatschap van video/input/render is een robuuste terugval
-    # zodat cage altijd GPU + invoer kan openen.
+    # zodat weston altijd GPU + invoer kan openen.
     local user="$1" grp
     for grp in video input render; do
         if getent group "$grp" >/dev/null 2>&1 && ! id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx "$grp"; then
@@ -223,6 +233,24 @@ ensure_kiosk_groups() {
             fi
         fi
     done
+}
+
+cmd_bootstrap() {
+    # Eenmalige voorbereiding zodat de kiosk daarna vanuit de Qt-UI aan/uit kan:
+    # installeert passwordless sudo (zodat de UI 'sudo -n' kan doen) en zet de
+    # device-marker (zodat 'enable' door de guard komt). Zet de kiosk NIET aan —
+    # raakt GDM/GRUB/getty/service niet aan. NOPASSWD kan zichzelf niet zonder
+    # wachtwoord installeren, dus dit ene commando draai je met sudo in een terminal.
+    require_root bootstrap
+    local user
+    user="$(detect_kiosk_user)"
+    log "🧰 Kiosk-bootstrap voor '$user' (passwordless sudo + device-markering, zónder kiosk aan te zetten)…"
+    install_sudoers "$user"
+    if touch "$DEVICE_MARKER" 2>/dev/null; then
+        log "🏷  Device gemarkeerd: $DEVICE_MARKER"
+    fi
+    ensure_weston || true
+    log "✅ Bootstrap klaar. Zet kiosk nu aan/uit via de Qt-UI (Instellingen → Systeem → Kioskmodus)."
 }
 
 cmd_enable() {
@@ -239,14 +267,14 @@ cmd_enable() {
     # Guard gehaald (markeerbestand óf --force): leg vast dat dit een device is, zodat
     # latere enable/disable (en de UI-toggle) geen --force meer nodig hebben.
     touch "$DEVICE_MARKER" 2>/dev/null || true
-    ensure_cage || true
+    ensure_weston || true
     local user
     user="$(detect_kiosk_user)"
     log "🖥  Kioskmodus inschakelen voor gebruiker '$user'…"
     install_sudoers "$user"
     install_service "$user"
     ensure_kiosk_groups "$user"
-    # Geen display-manager nodig: boot naar multi-user, cage pakt tty1 zelf.
+    # Geen display-manager nodig: boot naar multi-user, weston pakt tty1 zelf.
     systemctl set-default multi-user.target >/dev/null 2>&1 || true
     systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
     systemctl disable "$DISPLAY_MANAGER" >/dev/null 2>&1 || true
@@ -271,11 +299,12 @@ cmd_disable() {
 }
 
 case "${1:-}" in
+    bootstrap) cmd_bootstrap ;;
     enable) shift; cmd_enable "$@" ;;
     disable) cmd_disable ;;
     status) cmd_status ;;
     *)
-        err "Gebruik: $0 {enable|disable|status}"
+        err "Gebruik: $0 {bootstrap|enable|disable|status}"
         exit 2
         ;;
 esac

@@ -97,8 +97,8 @@ TRANSLATIONS = {
         "en": "The change only takes effect after a reboot. Restart the device now?",
     },
     "settings_kiosk_needs_bootstrap": {
-        "nl": "Passwordless sudo is nog niet ingesteld. Draai eenmalig in een terminal op het apparaat:\n\nsudo {path} enable",
-        "en": "Passwordless sudo isn't set up yet. Run once in a terminal on the device:\n\nsudo {path} enable",
+        "nl": "Passwordless sudo is nog niet ingesteld. Draai eenmalig in een terminal op het apparaat:\n\nsudo {path} bootstrap\n\nDaarna kun je de kiosk hier aan/uit zetten.",
+        "en": "Passwordless sudo isn't set up yet. Run once in a terminal on the device:\n\nsudo {path} bootstrap\n\nAfter that you can toggle kiosk mode here.",
     },
     "settings_kiosk_failed": {
         "nl": "Kioskmodus kon niet worden gewijzigd.",
