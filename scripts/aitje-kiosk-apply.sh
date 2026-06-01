@@ -36,6 +36,7 @@ SUDOERS_PATH="/etc/sudoers.d/aitje-kiosk"
 SESSION_SCRIPT="$PROJECT_ROOT/scripts/kiosk-session.sh"
 GRUB_FILE="/etc/default/grub"
 GRUB_BACKUP="/etc/default/grub.aitje-backup"
+STATE_FILE="/etc/aitje-kiosk-state.env"
 DISPLAY_MANAGER="gdm3"
 # Markeerbestand dat zegt "dit is een echt AITJE-device". Zonder dit (of --force)
 # weigert 'enable' — zo bevries je nooit per ongeluk je eigen dev-laptop.
@@ -43,6 +44,17 @@ DEVICE_MARKER="/etc/aitje-device"
 
 log() { printf '%s\n' "$*"; }
 err() { printf '%s\n' "$*" >&2; }
+
+is_truthy() {
+    case "${1:-}" in
+        1|true|TRUE|yes|YES|on|ON) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+is_kiosk_service_active() {
+    systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null
+}
 
 require_root() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -84,6 +96,112 @@ update_grub() {
         grub-mkconfig -o /boot/grub/grub.cfg
     else
         err "⚠️  update-grub/grub-mkconfig niet gevonden; bootloader niet herschreven."
+    fi
+}
+
+unit_exists() {
+    systemctl cat "$1" >/dev/null 2>&1
+}
+
+unit_file_exists() {
+    local unit="$1"
+    [ -f "/etc/systemd/system/$unit" ] \
+        || [ -f "/lib/systemd/system/$unit" ] \
+        || [ -f "/usr/lib/systemd/system/$unit" ]
+}
+
+unit_file_path() {
+    local unit="$1" path
+    for path in "/etc/systemd/system/$unit" "/lib/systemd/system/$unit" "/usr/lib/systemd/system/$unit"; do
+        if [ -f "$path" ]; then
+            printf '%s' "$path"
+            return 0
+        fi
+    done
+    return 1
+}
+
+detect_display_manager() {
+    local link target unit
+    link="/etc/systemd/system/display-manager.service"
+    if [ -L "$link" ]; then
+        target="$(readlink "$link" 2>/dev/null || true)"
+        unit="$(basename "$target")"
+        if [ -n "$unit" ] && { unit_exists "$unit" || unit_file_exists "$unit"; }; then
+            printf '%s' "$unit"
+            return 0
+        fi
+    fi
+
+    for unit in gdm3.service gdm.service lightdm.service sddm.service lxdm.service; do
+        if systemctl is-active --quiet "$unit" 2>/dev/null || systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+            printf '%s' "$unit"
+            return 0
+        fi
+    done
+
+    for unit in gdm3.service gdm.service lightdm.service sddm.service lxdm.service; do
+        if unit_exists "$unit"; then
+            printf '%s' "$unit"
+            return 0
+        fi
+    done
+
+    for unit in gdm3.service gdm.service lightdm.service sddm.service lxdm.service; do
+        if unit_file_exists "$unit"; then
+            printf '%s' "$unit"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+restore_display_manager_link() {
+    local dm="$1" link path
+    link="/etc/systemd/system/display-manager.service"
+    [ -n "$dm" ] || return 1
+
+    systemctl unmask display-manager.service >/dev/null 2>&1 || true
+    systemctl unmask "$dm" >/dev/null 2>&1 || true
+
+    # systemctl enable gdm3.service hoort de Alias=display-manager.service te
+    # maken. Op een half-herstelde kiosk kan die alias ontbreken; herstel hem dan
+    # expliciet, anders boot graphical.target zonder login-GUI en val je op tty.
+    systemctl enable "$dm" >/dev/null 2>&1 || true
+    systemctl enable display-manager.service >/dev/null 2>&1 || true
+    if [ ! -e "$link" ]; then
+        path="$(unit_file_path "$dm" || true)"
+        if [ -n "$path" ]; then
+            ln -s "$path" "$link" 2>/dev/null || true
+        fi
+    fi
+}
+
+save_pre_kiosk_state() {
+    local default_target dm tmp
+    default_target="$(systemctl get-default 2>/dev/null || printf 'graphical.target')"
+    dm="$(detect_display_manager || true)"
+    tmp="$(mktemp)"
+    {
+        printf 'PREVIOUS_DEFAULT_TARGET=%q\n' "$default_target"
+        printf 'DISPLAY_MANAGER_UNIT=%q\n' "$dm"
+    } > "$tmp"
+    install -D -m 0644 "$tmp" "$STATE_FILE"
+    rm -f "$tmp"
+    if [ -n "$dm" ]; then
+        log "🧾 Desktopstaat bewaard: default=$default_target, display-manager=$dm."
+    else
+        log "🧾 Desktopstaat bewaard: default=$default_target, display-manager onbekend."
+    fi
+}
+
+load_pre_kiosk_state() {
+    PREVIOUS_DEFAULT_TARGET=""
+    DISPLAY_MANAGER_UNIT=""
+    if [ -f "$STATE_FILE" ]; then
+        # shellcheck source=/dev/null
+        . "$STATE_FILE"
     fi
 }
 
@@ -195,7 +313,13 @@ cmd_status() {
     # stdout opvangen en alleen op 'absent' terugvallen als die echt leeg is —
     # niet via '|| echo absent', want dat plakt 'absent' achter een geldige status.
     svc="$(systemctl is-enabled "$SERVICE_NAME" 2>/dev/null)"; [ -n "$svc" ] || svc="absent"
-    gdm="$(systemctl is-enabled "$DISPLAY_MANAGER" 2>/dev/null)"; [ -n "$gdm" ] || gdm="absent"
+    local dm
+    dm="$(detect_display_manager || true)"
+    if [ -n "$dm" ]; then
+        gdm="$(systemctl is-enabled "$dm" 2>/dev/null)"; [ -n "$gdm" ] || gdm="absent"
+    else
+        gdm="absent"
+    fi
     if grep -Eq '(^|[" ])splash([ "]|$)' "$GRUB_FILE" 2>/dev/null; then
         grub_splash=present
     else
@@ -205,6 +329,7 @@ cmd_status() {
     local marker; if [ -f "$DEVICE_MARKER" ]; then marker=present; else marker=absent; fi
     log "kiosk_service=$svc"
     log "display_manager=$gdm"
+    log "display_manager_unit=${dm:-absent}"
     log "grub_splash=$grub_splash"
     log "sudoers=$sudoers"
     log "device_marker=$marker"
@@ -281,16 +406,23 @@ cmd_enable() {
     local user
     user="$(detect_kiosk_user)"
     log "🖥  Kioskmodus inschakelen voor gebruiker '$user'…"
+    save_pre_kiosk_state
     install_sudoers "$user"
     install_service "$user"
     ensure_kiosk_groups "$user"
     # Geen display-manager nodig: boot naar multi-user, weston pakt tty1 zelf.
     systemctl set-default multi-user.target >/dev/null 2>&1 || true
     systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
-    systemctl disable "$DISPLAY_MANAGER" >/dev/null 2>&1 || true
+    local dm
+    dm="$(detect_display_manager || true)"
+    if [ -n "$dm" ]; then
+        systemctl disable "$dm" >/dev/null 2>&1 || true
+    else
+        systemctl disable "$DISPLAY_MANAGER" >/dev/null 2>&1 || true
+    fi
     # Voorkom dat de getty tty1 terugpakt (naast Conflicts= in de unit).
     systemctl mask getty@tty1.service >/dev/null 2>&1 || true
-    log "🚫 $DISPLAY_MANAGER (GNOME-login) uitgeschakeld; getty@tty1 gemaskeerd."
+    log "🚫 Display-manager uitgeschakeld; getty@tty1 gemaskeerd."
     disable_splash
     log "✅ Kioskmodus ingeschakeld. Herstart om toe te passen."
 }
@@ -298,13 +430,43 @@ cmd_enable() {
 cmd_disable() {
     require_root disable
     log "🖥  Kioskmodus uitschakelen…"
+    load_pre_kiosk_state
+    local dm default_target
+    dm="${DISPLAY_MANAGER_UNIT:-}"
+    if [ -z "$dm" ] || ! { unit_exists "$dm" || unit_file_exists "$dm"; }; then
+        dm="$(detect_display_manager || true)"
+    fi
+    default_target="${PREVIOUS_DEFAULT_TARGET:-graphical.target}"
+    if [ "$default_target" = "multi-user.target" ] || [ -z "$default_target" ]; then
+        default_target="graphical.target"
+    fi
+
+    local kiosk_active=0
+    if is_truthy "${AITJE_KIOSK:-0}" || is_kiosk_service_active; then
+        kiosk_active=1
+    fi
+
     systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true
-    systemctl stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+    if [ "$kiosk_active" != "1" ]; then
+        systemctl stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+        rm -f "$SERVICE_PATH" 2>/dev/null || true
+    else
+        log "ℹ️  Actieve kiosk-sessie blijft draaien; wijziging geldt na herstart."
+    fi
+    systemctl daemon-reload >/dev/null 2>&1 || true
     systemctl unmask getty@tty1.service >/dev/null 2>&1 || true
-    systemctl enable "$DISPLAY_MANAGER" >/dev/null 2>&1 || true
-    systemctl set-default graphical.target >/dev/null 2>&1 || true
-    log "✅ $DISPLAY_MANAGER (GNOME-login) weer ingeschakeld; getty@tty1 hersteld."
+    if [ -n "$dm" ]; then
+        restore_display_manager_link "$dm"
+        log "✅ $dm weer ingeschakeld; getty@tty1 hersteld."
+    else
+        log "⚠️  Geen display-manager gevonden om opnieuw in te schakelen; getty@tty1 is wel hersteld."
+    fi
+    systemctl set-default "$default_target" >/dev/null 2>&1 || true
+    if [ -n "$dm" ] && [ "$kiosk_active" != "1" ]; then
+        systemctl start "$dm" >/dev/null 2>&1 || systemctl start display-manager.service >/dev/null 2>&1 || true
+    fi
     restore_splash
+    rm -f "$STATE_FILE" 2>/dev/null || true
     log "✅ Normale desktop hersteld. Herstart om toe te passen."
 }
 

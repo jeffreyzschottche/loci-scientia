@@ -19,7 +19,7 @@ Stroom aan → zwart scherm (geen logo) → weston (kiosk-shell) → ./lociscien
 | `scripts/kiosk-test.sh` | **Veilige** test: draait weston GENEST als venster in je huidige desktop (raakt GDM/GRUB/systemd niet aan). `sanity` = minimaal Qt-venster, `frontend` = de echte UI. Ctrl+C of sluit het venster om te stoppen. |
 | `sudoers/aitje-kiosk.template` | `NOPASSWD: ALL` voor de device-gebruiker, zodat `lociscientia.sh` onbeheerd boot (apt, hostnamectl, systemctl, setcap, Caddy op :80/:443). |
 | GRUB | `splash` wordt verwijderd + stille-boot-vlaggen toegevoegd (`bgrt_disable`, `systemd.show_status=0`, `udev.log_level=3`, `console=tty12`, …) → zwarte boot zonder logo én zonder `[ OK ]/[FAILED]`-bootregels of warnings op tty1. Originele `/etc/default/grub` wordt geback-upt naar `/etc/default/grub.aitje-backup`. |
-| GDM | Wordt uitgeschakeld zolang kiosk aanstaat (GNOME laadt niet). Bij uitzetten weer ingeschakeld. |
+| Display-manager | De huidige display-manager (`gdm3`, `lightdm`, `sddm`, …) wordt bij inschakelen bewaard en uitgeschakeld zolang kiosk aanstaat. Bij uitzetten wordt dezelfde display-manager weer ingeschakeld. |
 
 ### Dependencies
 
@@ -51,6 +51,11 @@ In kioskmodus (`AITJE_KIOSK=1`):
 
 - de frontend draait fullscreen en de afsluit/herstart-knop voert een **device**-`poweroff`/`reboot` uit i.p.v. de app te sluiten (anders blijf je op een zwart scherm hangen);
 - stopt of crasht de frontend, dan stopt `lociscientia.sh` ook en herstart systemd de hele stack.
+
+Weston erft de GNOME-schermschaal niet. Op HiDPI/4K-schermen kan de Qt-frontend
+daardoor kleiner ogen dan in de normale desktop. De kiosk zet standaard
+`QT_SCALE_FACTOR=1.8`; stel per kastje `KIOSK_QT_SCALE_FACTOR` in `.env` in als
+de UI nog te klein of juist te groot is.
 
 ## Activatie-beleid: automatisch (appliance) vs. handmatig (dev)
 
@@ -126,8 +131,9 @@ De schakelaar roept `scripts/aitje-kiosk-apply.sh enable|disable` aan via
 hierboven is nog niet gedaan), dan toont de UI welke commando je eenmalig moet
 draaien.
 
-- **Aan** → kiosk-service + sudo + GDM-uit + zwarte boot. Herstart om toe te passen.
-- **Uit** → GNOME-desktop terug, GRUB hersteld, kiosk-service uit. Herstart om toe te passen.
+- **Aan** → kiosk-service + sudo + display-manager uit + zwarte boot. Herstart om toe te passen.
+- **Uit** → desktop/display-manager terug, GRUB hersteld, kiosk-service uit. De
+  actieve kiosk-sessie wordt niet midden in de UI afgebroken; herstart om toe te passen.
 
 ## Handmatig terug naar een normale desktop
 

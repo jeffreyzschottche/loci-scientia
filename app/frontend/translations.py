@@ -61,8 +61,8 @@ TRANSLATIONS = {
         "en": "Enable kiosk mode",
     },
     "settings_kiosk_description": {
-        "nl": "Laat het apparaat rechtstreeks in de AITJE-app opstarten (zwart scherm, geen Ubuntu-logo, geen bureaublad). GNOME wordt uitgeschakeld. Zet uit om terug te keren naar de normale desktop. Herstart om wijzigingen toe te passen.",
-        "en": "Boot the device straight into the AITJE app (black screen, no Ubuntu logo, no desktop). GNOME is disabled. Turn off to return to the normal desktop. Reboot to apply changes.",
+        "nl": "Laat het apparaat rechtstreeks in de AITJE-app opstarten (zwart scherm, geen Ubuntu-logo, geen bureaublad). De normale display-manager wordt tijdelijk uitgeschakeld. Zet uit om terug te keren naar de normale desktop. Herstart om wijzigingen toe te passen.",
+        "en": "Boot the device straight into the AITJE app (black screen, no Ubuntu logo, no desktop). The normal display manager is temporarily disabled. Turn off to return to the normal desktop. Reboot to apply changes.",
     },
     "settings_kiosk_status_loading": {
         "nl": "Status laden…",

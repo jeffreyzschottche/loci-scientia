@@ -360,7 +360,7 @@ class MainWindow(QMainWindow):
 
         self.ws_client = WSClient(BACKEND_WS)
 
-        # In kioskmodus draait de frontend als enig venster onder cage; de
+        # In kioskmodus draait de frontend als enig venster onder weston; de
         # afsluit/herstart-knop moet dan het *device* afsluiten/herstarten in
         # plaats van alleen dit venster te sluiten (anders blijf je op een zwart
         # scherm hangen).

@@ -425,8 +425,10 @@ class SettingsPage(QWidget):
         if probe.returncode != 0:
             return ("need_sudo", "")
         try:
+            env = os.environ.copy()
+            kiosk_env = "1" if self._truthy(env.get("AITJE_KIOSK")) else "0"
             completed = subprocess.run(
-                ["sudo", "-n", str(script), action],
+                ["sudo", "-n", "env", f"AITJE_KIOSK={kiosk_env}", str(script), action],
                 capture_output=True,
                 text=True,
                 timeout=180,

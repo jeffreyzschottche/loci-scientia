@@ -35,9 +35,20 @@ export AITJE_KIOSK=1
 # geen runtime-dir/socket.
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
+# Weston draait los van GNOME en erft dus niet automatisch de GNOME fractional
+# scaling/DPI. Zonder expliciete Qt-schaal oogt de UI op HiDPI/4K-schermen alsof
+# hij is uitgezoomd. KIOSK_QT_SCALE_FACTOR kan in .env per kastje worden getuned.
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "$PROJECT_ROOT/.env"
+    set +a
+fi
+
 # Qt: native Wayland onder weston (proper compositor, dus geen cage-crash). weston
 # zet WAYLAND_DISPLAY voor dit script; de frontend erft die en verbindt als client.
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland}"
+export QT_SCALE_FACTOR="${QT_SCALE_FACTOR:-${KIOSK_QT_SCALE_FACTOR:-1.8}}"
 
 SESSION_LOG="$PROJECT_ROOT/kiosk-session.log"
 
