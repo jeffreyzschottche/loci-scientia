@@ -2,6 +2,8 @@
 
 AITJE remote support gebruikt een on-demand reverse SSH-tunnel naar een Hetzner jump server. De tunnel staat standaard uit en wordt alleen via de UI geopend voor 30, 60 of 120 minuten.
 
+Voor de praktische supportprocedure op de Hetzner VPS, zie ook [`shs-tunnel-handleiding.md`](shs-tunnel-handleiding.md).
+
 ## Device-side dependencies
 
 Installeer op het kastje:
