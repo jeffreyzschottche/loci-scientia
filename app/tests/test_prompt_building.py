@@ -65,7 +65,25 @@ from backend import apiAsk  # noqa: E402
 from backend.apiAsk import ParsedDocument  # noqa: E402
 from backend.chat_history import ChatHistoryStore  # noqa: E402
 from backend.devices_repo import DevicesRepository  # noqa: E402
+from backend.knowledge_repository import KnowledgeRepository  # noqa: E402
 from backend.schemas import ChatMessage, HistoryDocument  # noqa: E402
+
+
+class _FakePoint:
+    def __init__(self, payload):
+        self.payload = payload
+
+
+class _FakeScrollClient:
+    def __init__(self, payloads):
+        self._points = [_FakePoint(payload) for payload in payloads]
+        self._seen = False
+
+    def scroll(self, **_kwargs):
+        if self._seen:
+            return [], None
+        self._seen = True
+        return self._points, None
 
 
 class PromptBuildingTests(unittest.TestCase):
@@ -198,14 +216,51 @@ class PromptBuildingTests(unittest.TestCase):
             self.assertEqual(repo.search_devices("waar is mijn apparaat?"), [])
 
     def test_rag_min_context_score_default_matches_current_embeddings(self):
-        self.assertEqual(apiAsk.MIN_CONTEXT_SCORE, 0.15)
+        self.assertEqual(apiAsk.MIN_CONTEXT_SCORE, 0.35)
 
     def test_float_env_uses_override_and_ignores_invalid_values(self):
         with patch.dict("os.environ", {"RAG_MIN_CONTEXT_SCORE": "0.25"}):
-            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.15), 0.25)
+            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.35), 0.25)
 
         with patch.dict("os.environ", {"RAG_MIN_CONTEXT_SCORE": "nope"}):
-            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.15), 0.15)
+            self.assertEqual(apiAsk._float_env("RAG_MIN_CONTEXT_SCORE", 0.35), 0.35)
+
+    def test_keyword_hits_ignore_single_generic_overlap(self):
+        repo = KnowledgeRepository()
+        client = _FakeScrollClient([
+            {
+                "chunk_id": "hybride-werken",
+                "document_title": "Hybride werken",
+                "text": "Medewerkers mogen tijdelijk vanuit Nederland of Belgie werken.",
+            }
+        ])
+
+        hits = repo._keyword_hits(
+            client,
+            "Kan een banaan groeien in Nederland",
+            limit=5,
+            score_threshold=0.35,
+        )
+
+        self.assertEqual(hits, [])
+
+    def test_keyword_hits_keep_specific_multi_token_overlap(self):
+        repo = KnowledgeRepository()
+        payload = {
+            "chunk_id": "hybride-werken",
+            "document_title": "Hybride werken",
+            "text": "Het beleid voor hybride werken beschrijft thuiswerken en workations.",
+        }
+        client = _FakeScrollClient([payload])
+
+        hits = repo._keyword_hits(
+            client,
+            "beleid hybride werken",
+            limit=5,
+            score_threshold=0.35,
+        )
+
+        self.assertEqual(hits[0][0], payload)
 
     def test_augmented_prompt_includes_web_search_block_when_results_provided(self):
         from backend.web_search import WebSearchResult

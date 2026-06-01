@@ -41,7 +41,7 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
-MIN_CONTEXT_SCORE = _float_env("RAG_MIN_CONTEXT_SCORE", 0.15)
+MIN_CONTEXT_SCORE = _float_env("RAG_MIN_CONTEXT_SCORE", 0.35)
 KNOWLEDGE_SNIPPET_LENGTH = 999999  # Characters to include from each knowledge chunk
 PROMPT_TEMPLATE_PATH = Path(__file__).with_name("prompt.txt")
 PROMPT_TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")

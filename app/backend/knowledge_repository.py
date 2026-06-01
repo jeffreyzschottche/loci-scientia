@@ -50,7 +50,7 @@ class KnowledgeRepository:
         self,
         query: str,
         limit: int = 5,
-        score_threshold: float = 0.45,
+        score_threshold: float = 0.35,
     ) -> List[Tuple[Dict, float]]:
         if not query.strip():
             return []
@@ -77,7 +77,12 @@ class KnowledgeRepository:
                     score_threshold=score_threshold,
                 )
                 results = response.points if hasattr(response, "points") else []
-                keyword_results = self._keyword_hits(client, query, limit=limit)
+                keyword_results = self._keyword_hits(
+                    client,
+                    query,
+                    limit=limit,
+                    score_threshold=score_threshold,
+                )
         except Exception as exc:
             logger.warning("Querying Qdrant knowledge store failed: %s", exc)
             return []
@@ -97,12 +102,19 @@ class KnowledgeRepository:
 
         return sorted(merged.values(), key=lambda item: item[1], reverse=True)[:limit]
 
-    def _keyword_hits(self, client, query: str, limit: int) -> List[Tuple[Dict, float]]:
-        query_tokens = _content_tokens(query)
+    def _keyword_hits(
+        self,
+        client,
+        query: str,
+        limit: int,
+        score_threshold: float,
+    ) -> List[Tuple[Dict, float]]:
+        query_tokens = list(dict.fromkeys(_content_tokens(query)))
         if not query_tokens:
             return []
 
         query_phrase = " ".join(query_tokens)
+        min_matches = min(2, len(query_tokens))
         hits: list[tuple[Dict, float]] = []
         next_offset = None
         while True:
@@ -129,12 +141,19 @@ class KnowledgeRepository:
                 if not haystack_tokens:
                     continue
                 matched = sum(1 for token in query_tokens if token in haystack_tokens)
-                if matched <= 0:
+                has_exact_phrase = bool(query_phrase and query_phrase in haystack)
+                if matched < min_matches and not has_exact_phrase:
                     continue
-                score = 0.35 + min(0.45, matched / max(len(query_tokens), 1) * 0.45)
-                if query_phrase and query_phrase in haystack:
+                match_ratio = matched / max(len(query_tokens), 1)
+                if len(query_tokens) >= 3 and match_ratio < 0.40 and not has_exact_phrase:
+                    continue
+                score = 0.35 + min(0.45, match_ratio * 0.45)
+                if has_exact_phrase:
                     score += 0.2
-                hits.append((payload, min(score, 0.98)))
+                score = min(score, 0.98)
+                if score < score_threshold:
+                    continue
+                hits.append((payload, score))
             if not next_offset:
                 break
 

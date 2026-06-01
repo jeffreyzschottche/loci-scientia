@@ -168,6 +168,7 @@ class AutoSizingMarkdownView(QTextBrowser):
                 color:#111827;
                 font-size:14px;
                 line-height:1.55;
+                margin:0;
             }
             p {
                 margin:0 0 10px 0;
@@ -243,7 +244,7 @@ class AutoSizingMarkdownView(QTextBrowser):
             layout.documentSizeChanged.connect(self._queue_sync_height)
 
     def set_markdown_text(self, text: str, placeholder: str = "") -> None:
-        self._plain_text = text or ""
+        self._plain_text = (text or "").rstrip()
         if self._plain_text.strip():
             self.setMarkdown(self._plain_text)
             self._apply_markdown_block_highlights()
@@ -353,7 +354,7 @@ class AutoSizingMarkdownView(QTextBrowser):
             if abs(self.document().textWidth() - width) > 1:
                 self.document().setTextWidth(width)
             self.document().adjustSize()
-            height = int(self.document().size().height()) + 8
+            height = int(self.document().size().height()) + 2
             self.setFixedHeight(max(28, height))
             self.updateGeometry()
             parent = self.parentWidget()
@@ -678,7 +679,7 @@ class AssistantMessageWidget(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(4)
         self.setMinimumWidth(ASSISTANT_MIN_WIDTH)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
 

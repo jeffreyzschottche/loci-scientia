@@ -125,6 +125,31 @@ _wait_for_ollama() {
     return 1
 }
 
+_json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+_warm_ollama_model() {
+    local model_name="$1"
+    local ollama_host="$2"
+    local keep_alive="${OLLAMA_KEEP_ALIVE:-24h}"
+    local model_json keep_alive_json payload
+
+    model_json="$(_json_escape "$model_name")"
+    keep_alive_json="$(_json_escape "$keep_alive")"
+    payload="{\"model\":\"$model_json\",\"prompt\":\" \",\"stream\":false,\"keep_alive\":\"$keep_alive_json\",\"options\":{\"num_predict\":1}}"
+
+    echo "🔥 Model $model_name warm laden (keep_alive=$keep_alive)..."
+    if curl -fsS -X POST "$ollama_host/api/generate" \
+        -H "Content-Type: application/json" \
+        -d "$payload" >/dev/null; then
+        echo "✅ Model $model_name is warmgeladen"
+        return 0
+    fi
+    echo "⚠️  Model $model_name kon niet vooraf warmgeladen worden."
+    return 1
+}
+
 running_kernel_has_headers() {
     local kernel
     kernel="$(uname -r)"
@@ -911,6 +936,7 @@ start_ollama() {
         fi
     fi
 
+    export OLLAMA_HOST="$ollama_host"
     if pgrep -x "ollama" >/dev/null 2>&1; then
         restart_reason=""
         if [ -n "$kv_cache_type" ]; then
@@ -931,12 +957,12 @@ start_ollama() {
             fi
         else
             echo "✅ Ollama draait al"
+            _warm_ollama_model "$MODEL_NAME" "$ollama_host" || true
             return 0
         fi
     fi
 
     echo "⏳ Ollama server starten..."
-    export OLLAMA_HOST="$ollama_host"
     if [ -n "$kv_cache_type" ]; then
         export OLLAMA_KV_CACHE_TYPE="$kv_cache_type"
         echo "✅ OLLAMA_KV_CACHE_TYPE=$OLLAMA_KV_CACHE_TYPE"
@@ -969,6 +995,7 @@ start_ollama() {
     else
         echo "✅ Model $MODEL_NAME is al beschikbaar"
     fi
+    _warm_ollama_model "$MODEL_NAME" "$ollama_host" || true
     return 0
 }
 

@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QListView,
     QPlainTextEdit,
-    QProgressDialog,
+    QProgressBar,
     QPushButton,
     QSizePolicy,
     QTabWidget,
@@ -40,6 +40,59 @@ from ..config import BACKEND_BEARER_TOKEN, BACKEND_HTTP, OLLAMA_MODELS, PROMPT_M
 from ..translations import get_current_language, register_language_change_callback, set_language, t
 from .dialog_style import OverlayDialog, ask_yes_no_dialog, show_error_dialog
 from .ios_switch import IosSwitch
+
+
+class ModelSwitchProgressDialog(OverlayDialog):
+    """Niet-native modeldownload overlay zonder window controls voor kiosk mode."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent, width=520, height=230)
+        self.setWindowTitle(t("settings_ollama_busy"))
+        self._close_btn.hide()
+
+        title = QLabel(t("settings_ollama_busy"))
+        title.setStyleSheet("font-size:20px; font-weight:800; color:#171717;")
+        self.card_layout.addWidget(title)
+
+        self._label = QLabel("")
+        self._label.setWordWrap(True)
+        self._label.setStyleSheet("font-size:14px; color:#3f3f46;")
+        self.card_layout.addWidget(self._label)
+
+        self._progress = QProgressBar()
+        self._progress.setRange(0, 100)
+        self._progress.setValue(0)
+        self._progress.setTextVisible(True)
+        self._progress.setStyleSheet(
+            "QProgressBar {"
+            "  min-height:18px;"
+            "  border:1px solid #e7e0d4;"
+            "  border-radius:9px;"
+            "  background:#f7f3ea;"
+            "  color:#171717;"
+            "  text-align:center;"
+            "  font-weight:700;"
+            "}"
+            "QProgressBar::chunk {"
+            "  border-radius:8px;"
+            "  background:#facc15;"
+            "}"
+        )
+        self.card_layout.addWidget(self._progress)
+        self.card_layout.addStretch(1)
+
+    def setLabelText(self, text: str) -> None:
+        self._label.setText(text)
+
+    def setValue(self, value: int) -> None:
+        self._progress.setValue(max(0, min(100, value)))
+
+    def reject(self) -> None:
+        return
+
+    def mousePressEvent(self, event) -> None:
+        event.accept()
+
 
 class SettingsPage(QWidget):
     FIELD_STYLE = (
@@ -126,7 +179,7 @@ class SettingsPage(QWidget):
         self._ollama_status: QLabel | None = None
         self._current_model: str | None = None
         self._saved_model: str = ""
-        self._busy_dialog: QProgressDialog | None = None
+        self._busy_dialog: ModelSwitchProgressDialog | None = None
         self._support_status: QLabel | None = None
         self._support_enable: QPushButton | None = None
         self._support_disable: QPushButton | None = None
@@ -2108,17 +2161,11 @@ class SettingsPage(QWidget):
 
     def _show_busy(self, message: str) -> None:
         if self._busy_dialog is None:
-            self._busy_dialog = QProgressDialog(self)
-            self._busy_dialog.setWindowModality(Qt.ApplicationModal)
-            self._busy_dialog.setCancelButton(None)
-            self._busy_dialog.setRange(0, 100)
-            self._busy_dialog.setMinimumDuration(0)
-            self._busy_dialog.setWindowTitle(t("settings_ollama_busy"))
-            self._busy_dialog.setAutoClose(False)
-            self._busy_dialog.setAutoReset(False)
-            self._busy_dialog.setValue(0)
+            self._busy_dialog = ModelSwitchProgressDialog(self)
+        self._busy_dialog.setValue(0)
         self._busy_dialog.setLabelText(message)
         self._busy_dialog.show()
+        self._busy_dialog.raise_()
 
     def _hide_busy(self) -> None:
         if self._busy_dialog is not None:
