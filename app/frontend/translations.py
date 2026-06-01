@@ -50,6 +50,66 @@ TRANSLATIONS = {
     },
 
     # ============================================
+    # KIOSK MODE (Settings → System)
+    # ============================================
+    "settings_kiosk_title": {
+        "nl": "Kioskmodus",
+        "en": "Kiosk mode",
+    },
+    "settings_kiosk_switch_label": {
+        "nl": "Kioskmodus inschakelen",
+        "en": "Enable kiosk mode",
+    },
+    "settings_kiosk_description": {
+        "nl": "Laat het apparaat rechtstreeks in de AITJE-app opstarten (zwart scherm, geen Ubuntu-logo, geen bureaublad). De normale display-manager wordt tijdelijk uitgeschakeld. Zet uit om terug te keren naar de normale desktop. Herstart om wijzigingen toe te passen.",
+        "en": "Boot the device straight into the AITJE app (black screen, no Ubuntu logo, no desktop). The normal display manager is temporarily disabled. Turn off to return to the normal desktop. Reboot to apply changes.",
+    },
+    "settings_kiosk_status_loading": {
+        "nl": "Status laden…",
+        "en": "Loading status…",
+    },
+    "settings_kiosk_active": {
+        "nl": "Kioskmodus staat aan (actief vanaf de volgende herstart).",
+        "en": "Kiosk mode is on (active from the next reboot).",
+    },
+    "settings_kiosk_inactive": {
+        "nl": "Kioskmodus staat uit; het apparaat start normaal op.",
+        "en": "Kiosk mode is off; the device boots normally.",
+    },
+    "settings_kiosk_applying": {
+        "nl": "Bezig met toepassen…",
+        "en": "Applying…",
+    },
+    "settings_kiosk_enabled_reboot": {
+        "nl": "Kioskmodus ingeschakeld. Herstart om toe te passen.",
+        "en": "Kiosk mode enabled. Reboot to apply.",
+    },
+    "settings_kiosk_disabled_reboot": {
+        "nl": "Kioskmodus uitgeschakeld. Herstart om toe te passen.",
+        "en": "Kiosk mode disabled. Reboot to apply.",
+    },
+    "settings_kiosk_reboot_title": {
+        "nl": "Nu herstarten?",
+        "en": "Reboot now?",
+    },
+    "settings_kiosk_reboot_prompt": {
+        "nl": "De wijziging werkt pas na een herstart. Wil je het apparaat nu opnieuw opstarten?",
+        "en": "The change only takes effect after a reboot. Restart the device now?",
+    },
+    "settings_kiosk_needs_bootstrap": {
+        "nl": "Passwordless sudo is nog niet ingesteld. Draai eenmalig in een terminal op het apparaat:\n\nsudo {path} bootstrap\n\nDaarna kun je de kiosk hier aan/uit zetten.",
+        "en": "Passwordless sudo isn't set up yet. Run once in a terminal on the device:\n\nsudo {path} bootstrap\n\nAfter that you can toggle kiosk mode here.",
+    },
+    "settings_kiosk_failed": {
+        "nl": "Kioskmodus kon niet worden gewijzigd.",
+        "en": "Could not change kiosk mode.",
+    },
+    "settings_kiosk_linux_only": {
+        "nl": "Kioskmodus is alleen beschikbaar op het Linux-apparaat.",
+        "en": "Kiosk mode is only available on the Linux device.",
+    },
+
+    # ============================================
     # SIDEBAR
     # ============================================
     "sidebar_subtitle": {

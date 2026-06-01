@@ -1,0 +1,49 @@
+[Unit]
+Description=AITJE kiosk (Wayland/weston kiosk-shell)
+Documentation=file://__PROJECT_ROOT__/docs/kiosk.md
+# Pak tty1 af van de getty en start zodra logind/seat klaar is. plymouth-quit
+# zorgt dat de splash al weg is voor we de VT overnemen.
+After=systemd-user-sessions.service plymouth-quit-wait.service getty@tty1.service
+After=network-online.target
+Wants=network-online.target
+Conflicts=getty@tty1.service
+# Bij herhaalde crashes niet eindeloos in een strakke lus herstarten: na 5
+# starts in 60s laat systemd de unit 'failed' worden (geen CPU-spin / logspam).
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=__KIOSK_USER__
+# PAMName=login laat logind een echte (seat0/tty1) sessie aanmaken; weston heeft
+# die nodig voor DRM/KMS en libinput. Het zet ook XDG_RUNTIME_DIR voor ons.
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Environment=XDG_SESSION_TYPE=wayland
+Environment=AITJE_KIOSK=1
+WorkingDirectory=__PROJECT_ROOT__
+# weston (kiosk-shell) i.p.v. cage: cage 0.2.1 in Ubuntu is gelinkt tegen wlroots
+# 0.19 en crasht op een Qt-surface (assert in wlr_xdg_surface / xwm). weston is een
+# volwassen, compatibele compositor; kiosk-shell maakt de frontend fullscreen.
+# '--' draait kiosk-session.sh als sessie-client; weston stopt mee als die eindigt
+# (→ systemd herstart de hele kiosk). --continue-without-input: start ook als invoer
+# pas later verschijnt. Backend wordt auto-gekozen (DRM/KMS op tty1).
+ExecStart=/usr/bin/weston --shell=kiosk-shell.so --continue-without-input --log=__PROJECT_ROOT__/weston.log -- __PROJECT_ROOT__/scripts/kiosk-session.sh
+# Crasht of stopt de frontend, dan herstart systemd de hele kiosk.
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+
+[Install]
+# multi-user.target i.p.v. graphical.target: met GDM uitgeschakeld is er geen
+# display-manager, en weston neemt tty1 zelf over. Zo hangt de kiosk niet af van
+# graphical.target dat (deels) op een display-manager kan leunen.
+WantedBy=multi-user.target

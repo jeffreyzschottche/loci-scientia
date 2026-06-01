@@ -50,6 +50,12 @@ ensure_sudo_session() {
     fi
     if sudo -n true 2>/dev/null; then
         :
+    elif [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ] || [ ! -t 0 ]; then
+        # Onbeheerd (kioskmodus onder weston / geen interactieve terminal):
+        # een wachtwoordprompt kan niemand beantwoorden en zou de boot laten
+        # hangen. NOPASSWD moet vooraf staan (scripts/aitje-kiosk-apply.sh enable).
+        echo "⚠️  Geen passwordless sudo beschikbaar (NOPASSWD ontbreekt?); sudo-stappen worden overgeslagen."
+        return 1
     else
         echo "🔐 sudo-toegang vereist voor hostname/mDNS-aanpassingen."
         sudo -v || return 1
@@ -354,6 +360,176 @@ ensure_remote_support_service() {
         else
             sudo systemctl daemon-reload
         fi
+    fi
+}
+
+ensure_kiosk_dependencies() {
+    # Kioskmodus draait de frontend onder 'weston' (Wayland-kioskcompositor met
+    # kiosk-shell). We gebruiken weston i.p.v. cage: cage 0.2.1 in Ubuntu is gelinkt
+    # tegen wlroots 0.19 en crasht op een Qt-surface. Installeer weston zodat een vers
+    # kastje alles in huis heeft. Alleen relevant als de dev-toggle aanstaat
+    # (SHOW_KIOSK_TOGGLE=1) of we al onder weston draaien (AITJE_KIOSK=1).
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+
+    if [ "$(_normalize_bool "${SHOW_KIOSK_TOGGLE:-0}")" != "1" ] \
+        && [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" != "1" ]; then
+        return 0
+    fi
+
+    if command -v weston >/dev/null 2>&1 \
+        && find /usr/lib -name 'kiosk-shell.so' 2>/dev/null | grep -q .; then
+        echo "✅ weston (kioskcompositor + kiosk-shell) is al geïnstalleerd"
+        return 0
+    fi
+
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; 'weston' wordt niet automatisch geïnstalleerd."
+        return 0
+    fi
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get niet beschikbaar; sla 'weston' installatie over."
+        return 0
+    fi
+
+    echo "📦 weston (Wayland-kioskcompositor) installeren..."
+    if ! _wait_for_apt_lock 180; then
+        echo "⚠️  apt blijft bezet; 'weston' installatie overgeslagen."
+        return 0
+    fi
+    _disable_broken_apt_repos || true
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get install -y weston || echo "⚠️  weston installatie mislukt."
+    else
+        sudo apt-get install -y weston || echo "⚠️  weston installatie mislukt."
+    fi
+    _restore_disabled_apt_repos
+}
+
+ensure_kiosk_enabled() {
+    # Kiosk-ACTIVATIE-beleid (systemd-service, GDM uit, GRUB zwart, NOPASSWD, marker):
+    #   * SHOW_KIOSK_TOGGLE=1  → dev-/onderhoudskastje: NIET automatisch. Je zet de
+    #     kiosk handmatig aan via de Qt-toggle of 'aitje-kiosk-apply.sh'.
+    #   * anders (toggle verborgen) → echte appliance: kiosk wordt AUTOMATISCH
+    #     geactiveerd, zodat een vers kastje met enkel './lociscientia.sh' een kiosk
+    #     wordt (na een herstart).
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    # Draaien we al ÓNDER de kiosk (weston → kiosk-session.sh → hier)? Dan is alles
+    # al gezet; niets doen (anders draait elke boot opnieuw update-grub).
+    if [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ]; then
+        return 0
+    fi
+    # Dev-toggle zichtbaar → handmatig; hier niets automatisch doen.
+    if [ "$(_normalize_bool "${SHOW_KIOSK_TOGGLE:-0}")" = "1" ]; then
+        echo "ℹ️  SHOW_KIOSK_TOGGLE=1 → kiosk niet automatisch; gebruik de Qt-toggle."
+        return 0
+    fi
+
+    local apply="$PROJECT_ROOT/scripts/aitje-kiosk-apply.sh"
+    if [ ! -x "$apply" ]; then
+        echo "⚠️  $apply ontbreekt/niet uitvoerbaar; kioskmodus niet geactiveerd."
+        return 0
+    fi
+    # Al ingeschakeld? Niets doen (idempotent, geen onnodige update-grub per boot).
+    if systemctl is-enabled aitje-kiosk.service >/dev/null 2>&1; then
+        echo "✅ Kiosk-service is al ingeschakeld"
+        return 0
+    fi
+
+    echo "🖥  Geen dev-toggle (SHOW_KIOSK_TOGGLE≠1) → kioskmodus automatisch activeren…"
+    if [ "$(id -u)" -eq 0 ]; then
+        "$apply" enable --force || echo "⚠️  kiosk-activatie mislukte."
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$apply" enable --force || echo "⚠️  kiosk-activatie mislukte (sudo)."
+    else
+        echo "⚠️  Geen root/sudo beschikbaar; draai eenmalig: sudo $apply enable --force"
+        return 0
+    fi
+    echo "🔁 Kioskmodus ingeschakeld — HERSTART om te activeren (sudo reboot)."
+}
+
+ensure_base_dependencies() {
+    # Basispakketten die het opstartscript zelf nodig heeft op een vers kastje:
+    # python3-venv (anders faalt 'python3 -m venv'), pip, en een paar CLI-tools
+    # die elders in dit script gebruikt worden. Idempotent: alleen ontbrekende
+    # pakketten worden geïnstalleerd.
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    if ! command -v apt-get >/dev/null 2>&1; then
+        return 0
+    fi
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; basis-dependencies worden niet automatisch geïnstalleerd."
+        return 0
+    fi
+    local pkgs=(python3-venv python3-pip curl ca-certificates git lsof psmisc procps libcap2-bin)
+    local missing=()
+    local p=""
+    for p in "${pkgs[@]}"; do
+        if ! dpkg -s "$p" >/dev/null 2>&1; then
+            missing+=("$p")
+        fi
+    done
+    if [ "${#missing[@]}" -eq 0 ]; then
+        echo "✅ Basis-dependencies zijn al geïnstalleerd"
+        return 0
+    fi
+    echo "📦 Basis-dependencies installeren: ${missing[*]}"
+    if ! _wait_for_apt_lock 180; then
+        echo "⚠️  apt blijft bezet; basis-dependencies overgeslagen."
+        return 0
+    fi
+    _disable_broken_apt_repos || true
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get install -y "${missing[@]}" || echo "⚠️  Installatie basis-dependencies (deels) mislukt."
+    else
+        sudo apt-get install -y "${missing[@]}" || echo "⚠️  Installatie basis-dependencies (deels) mislukt."
+    fi
+    _restore_disabled_apt_repos
+}
+
+ensure_node() {
+    # Node.js + npm zijn nodig om de Nuxt webclient (/) en de embedder-SPA
+    # (/embedder/) te bouwen. Zonder deze stap werd dat alleen overgeslagen met
+    # een waarschuwing. We gebruiken de distro-pakketten (geen externe repo);
+    # heb je een specifieke Node-versie nodig, gebruik dan NodeSource.
+    case "$DEVICE_PLATFORM" in
+        linux|jetson) ;;
+        *) return 0 ;;
+    esac
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        echo "✅ Node.js/npm zijn al geïnstalleerd ($(node -v 2>/dev/null))"
+        return 0
+    fi
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "⚠️  apt-get niet beschikbaar; Node.js/npm niet automatisch geïnstalleerd."
+        return 0
+    fi
+    if [ "$HAVE_SUDO" -ne 1 ] && [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️  Geen sudo/root; Node.js/npm worden niet automatisch geïnstalleerd."
+        return 0
+    fi
+    echo "📦 Node.js + npm installeren (voor webclient & embedder SPA)..."
+    if ! _wait_for_apt_lock 180; then
+        echo "⚠️  apt blijft bezet; Node.js installatie overgeslagen."
+        return 0
+    fi
+    _disable_broken_apt_repos || true
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get install -y nodejs npm || echo "⚠️  Node.js/npm installatie mislukt; webclient/embedder worden niet gebouwd."
+    else
+        sudo apt-get install -y nodejs npm || echo "⚠️  Node.js/npm installatie mislukt; webclient/embedder worden niet gebouwd."
+    fi
+    _restore_disabled_apt_repos
+    if command -v node >/dev/null 2>&1; then
+        echo "✅ Node.js $(node -v 2>/dev/null) geïnstalleerd"
     fi
 }
 
@@ -1264,9 +1440,17 @@ ensure_bluetooth_support
 ensure_no_sleep_mode
 ensure_remote_support_dependencies
 ensure_remote_support_service
+ensure_kiosk_dependencies
+ensure_kiosk_enabled
 configure_hostname
 echo "🌐 Publieke hostnaam: ${DEVICE_MDNS}"
 echo "============================="
+echo
+
+echo "=== Basis-dependencies (Python venv, Node.js, CLI-tools) ==="
+ensure_base_dependencies
+ensure_node
+echo "============================================================"
 echo
 
 echo "=== Ollama Setup ==="
@@ -1627,5 +1811,13 @@ if ! curl -fs "$health_url" >/dev/null 2>&1; then
 fi
 
 python -m app.frontend.main
+
+# In kioskmodus beheert systemd (via weston) de levenscyclus: zodra de frontend
+# stopt of crasht, laten we dit script ook stoppen zodat de cleanup-trap draait
+# en systemd de hele stack opnieuw start. Buiten kiosk blijven we wachten op de
+# backend, zoals voorheen.
+if [ "$(_normalize_bool "${AITJE_KIOSK:-0}")" = "1" ]; then
+    exit 0
+fi
 
 wait "$backend_pid"

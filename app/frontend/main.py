@@ -1,5 +1,6 @@
 import os
 import asyncio
+import subprocess
 import sys
 from typing import Optional
 
@@ -359,6 +360,14 @@ class MainWindow(QMainWindow):
 
         self.ws_client = WSClient(BACKEND_WS)
 
+        # In kioskmodus draait de frontend als enig venster onder weston; de
+        # afsluit/herstart-knop moet dan het *device* afsluiten/herstarten in
+        # plaats van alleen dit venster te sluiten (anders blijf je op een zwart
+        # scherm hangen).
+        self._kiosk_runtime = os.environ.get("AITJE_KIOSK", "").strip().lower() in {
+            "1", "true", "yes", "on", "enable", "enabled",
+        }
+
         root = QWidget()
         root.setObjectName("RootWidget")
         self.setCentralWidget(root)
@@ -522,12 +531,27 @@ class MainWindow(QMainWindow):
             settings_page.open_tab(tab_key)
 
     def _shutdown_app(self) -> None:
+        if self._kiosk_runtime:
+            self._device_power(["systemctl", "poweroff"])
+            return
         self._restart_on_close = False
         self.close()
 
     def _restart_app(self) -> None:
+        if self._kiosk_runtime:
+            self._device_power(["systemctl", "reboot"])
+            return
         self._restart_on_close = True
         self.close()
+
+    @staticmethod
+    def _device_power(args: list) -> None:
+        """Poweroff/reboot the whole device (kiosk only). Relies on the
+        NOPASSWD sudoers rule installed by scripts/aitje-kiosk-apply.sh."""
+        try:
+            subprocess.Popen(["sudo", "-n", *args])
+        except Exception:
+            pass
 
     def closeEvent(self, event):
         asyncio.create_task(self.ws_client.close())

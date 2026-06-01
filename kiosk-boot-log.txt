@@ -1,0 +1,30 @@
+2026-06-01 11:56 - Start herstel kiosk/GUI.
+
+Context van gebruiker:
+- Na eerdere kiosk-toggle wijzigingen komt het device opnieuw in Ubuntu CLI zonder GUI.
+- De kiosk-tekst/schaal is nog te klein; 1.5x is niet genoeg.
+- Dit bestand moet na reboot gelezen worden zodat de volgende sessie weet wat er is gedaan.
+
+Plan nu:
+1. Bestaande kiosk-bestanden lezen zonder user-wijzigingen terug te draaien.
+2. `scripts/aitje-kiosk-apply.sh disable` robuuster maken:
+   - niet afhankelijk zijn van alleen de bewaarde display-manager unit;
+   - bekende display-managers zoeken via bestanden op disk als systemd-status niet bereikbaar/leeg is;
+   - kiosk-service disablen, stoppen en waar mogelijk unitbestand verwijderen;
+   - `getty@tty1` unmasken;
+   - terug naar `graphical.target`;
+   - display-manager en `display-manager.service` opnieuw enablen/starten.
+3. Kiosk-schaal verhogen boven 1.5:
+   - default in `scripts/kiosk-session.sh` en `.env.example` naar 2.0 zetten;
+   - huidige `.env` aanvullen/zetten met `KIOSK_QT_SCALE_FACTOR=2.0`.
+4. Daarna met sudo `scripts/aitje-kiosk-apply.sh disable` draaien om dit systeem direct terug richting GUI te zetten.
+5. Als systemd/GUI-start lukt: reboot is daarna de normale bevestiging.
+
+Uitgevoerd:
+- `scripts/aitje-kiosk-apply.sh` aangepast zodat `disable` ook zonder goede
+  bewaarde staat een display-manager zoekt via systemd-unitbestanden.
+- `disable` zet `graphical.target` terug, unmaskt `getty@tty1`, enabled
+  `display-manager.service`, en start de display-manager direct wanneer we niet
+  onder de actieve kiosk-sessie draaien.
+- Kiosk-schaal verhoogd naar `KIOSK_QT_SCALE_FACTOR=2.0` in `.env`, `.env.example`
+  en de fallback van `scripts/kiosk-session.sh`.
