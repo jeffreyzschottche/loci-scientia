@@ -1,8 +1,11 @@
-.venv
 .venv/
+app/.venv/
 venv/
 *.pyc
 __pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 app/maps/europe.pmtilesx
 app/maps/europe.pmtilesb
 app/maps/europe.pmtilesp
@@ -16,29 +19,64 @@ gemma2:2b,gemma3:1b,gemma3:4b/
 
 .env
 .env.*
+!.env.example
+!**/.env.example
 
 *.log
-backend.log
-ollama.log
-pmtiles.log
-promptlog.log
+*.pid
 
 *.pmtiles
 
-ollama.pid
-caddy.pid
-
-# Per-device Caddy state — includes the internal CA *private key*, must never
-# be committed.
+# Per-device state: tokens, stats, Caddy TLS/CA, embedder DB/uploads, sync state.
+devices_db/*
+!devices_db/.gitkeep
 devices_db/caddy/
-# Mirrored CA public cert + generated Caddyfile (regenerated each boot).
 devices_db/tls/
-
+devices_db/*token*.json
+devices_db/*snapshot*.json
+devices_db/*history*.json
 devices_db/kennisbank_sync_state.json
 devices_db/embedder.db
 devices_db/embedder.db-journal
 devices_db/embedder_tokens.json
 devices_db/embedder_uploads/
+
+# Knowledge-base runtime/export data. The old kennisbank_repo git workflow is
+# historical; LAN push/import now owns this data per device.
+kennisbank_cache.db
+kennisbank_repo/
+.kennisbank_chunk_hashes.json
+knowledge_base/
+
+# Local service config/backups.
+searxng_data/
+searxng_data.local-backup/
+searxng_data.local-backup.blocked/
+
+# Frontend dependencies and generated output. Source files, package.json and
+# lockfiles stay tracked.
+node_modules/
+.nuxt/
+.output/
+dist/
+app/webclient/node_modules/
+app/webclient/.nuxt/
+app/webclient/.output/
+app/webclient/dist/
+app/embedder/frontend/node_modules/
+app/embedder/frontend/.nuxt/
+app/embedder/frontend/.output/
+app/embedder/frontend/dist/
+
+# Local agent/editor cache and OS files.
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+.codex/
+.DS_Store
+**/.DS_Store
+kiosk-boot-log.txt
+
 app/embedder/backend/bootstrap/cache/*.php
 app/embedder/backend/storage/logs/*.log
 app/embedder/backend/storage/framework/cache/data/*
@@ -50,7 +88,4 @@ app/embedder/backend/storage/app/public/*
 app/embedder/backend/database/database.sqlite
 app/embedder/backend/.env
 app/embedder/backend/composer.phar
-app/embedder/frontend/node_modules/
-app/embedder/frontend/.nuxt/
-app/embedder/frontend/.output/
 app/embedder/frontend/.env
