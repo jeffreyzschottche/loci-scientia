@@ -1031,6 +1031,17 @@ start_ollama() {
             fi
         else
             echo "✅ Ollama draait al"
+            if ! _run_ollama list | grep -qi "$MODEL_NAME"; then
+                echo "📥 Model $MODEL_NAME downloaden (dit kan even duren bij eerste keer)..."
+                if _run_ollama pull "$MODEL_NAME"; then
+                    echo "✅ Model $MODEL_NAME gedownload"
+                else
+                    echo "⚠️  Model download mislukt. Check netwerk verbinding."
+                    return 1
+                fi
+            else
+                echo "✅ Model $MODEL_NAME is al beschikbaar"
+            fi
             _warm_ollama_model "$MODEL_NAME" "$ollama_host" || true
             return 0
         fi
@@ -1063,7 +1074,7 @@ start_ollama() {
         echo "⚠️  Ollama kwam niet op tijd op."
         return 1
     fi
-    if ! _run_ollama list | grep -q "$MODEL_NAME"; then
+    if ! _run_ollama list | grep -qi "$MODEL_NAME"; then
         echo "📥 Model $MODEL_NAME downloaden (dit kan even duren bij eerste keer)..."
         if _run_ollama pull "$MODEL_NAME"; then
             echo "✅ Model $MODEL_NAME gedownload"

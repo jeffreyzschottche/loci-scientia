@@ -604,6 +604,16 @@ async def _pull_ollama_model(model: str) -> None:
         raise HTTPException(status_code=502, detail="Ollama pull beeindigd zonder succes-status")
 
 
+async def _ollama_model_is_available(model: str) -> bool:
+    ollama_url = f"{settings.ollama_base_url}/api/show"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(ollama_url, json={"model": model})
+    except httpx.HTTPError:
+        return False
+    return response.status_code < 400
+
+
 async def _stream_ollama_pull(model: str):
     ollama_url = f"{settings.ollama_base_url}/api/pull"
     payload = {"name": model}
@@ -726,7 +736,7 @@ async def set_ollama_model(req: OllamaModelRequest, _: TokenRecord = Depends(req
         raise HTTPException(status_code=400, detail="model niet toegestaan")
 
     async with ollama_switch_lock:
-        if model != settings.ollama_model:
+        if model != settings.ollama_model or not await _ollama_model_is_available(model):
             await _pull_ollama_model(model)
             _persist_ollama_model(model)
             settings.ollama_model = model
@@ -747,7 +757,7 @@ async def set_ollama_model_stream(
 
     async def event_stream():
         async with ollama_switch_lock:
-            if model == settings.ollama_model:
+            if model == settings.ollama_model and await _ollama_model_is_available(model):
                 payload = json.dumps(
                     {"progress": 100, "status": "Model is al actief", "done": True, "current": model}
                 )

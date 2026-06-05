@@ -154,6 +154,7 @@ class AutoSizingMarkdownView(QTextBrowser):
         self.setOpenLinks(False)
         self.setFrameShape(QFrame.NoFrame)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setMinimumHeight(0)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setLineWrapMode(QTextBrowser.WidgetWidth)
@@ -252,10 +253,14 @@ class AutoSizingMarkdownView(QTextBrowser):
             self.setHtml(f"<p>{html.escape(placeholder)}</p>")
         else:
             self.setHtml("")
+        self._sync_height()
         self._queue_sync_height()
 
     def plain_text(self) -> str:
         return self._plain_text
+
+    def sync_height_now(self) -> None:
+        self._sync_height()
 
     def _apply_markdown_block_highlights(self) -> None:
         highlighted_lines = self._markdown_highlight_lines(self._plain_text)
@@ -350,11 +355,13 @@ class AutoSizingMarkdownView(QTextBrowser):
             return
         self._syncing_height = True
         try:
-            width = max(0, self.viewport().width() - 4)
+            width = max(0, self.width() - 4)
+            if width < 32:
+                return
             if abs(self.document().textWidth() - width) > 1:
                 self.document().setTextWidth(width)
             self.document().adjustSize()
-            height = int(self.document().size().height()) + 2
+            height = int(self.document().documentLayout().documentSize().height()) + 2
             self.setFixedHeight(max(28, height))
             self.updateGeometry()
             parent = self.parentWidget()
@@ -757,6 +764,9 @@ class AssistantMessageWidget(QWidget):
         self.feedback_label.hide()
         self.response_view.show()
         self.response_view.set_markdown_text(self._response_text)
+
+    def sync_response_height(self) -> None:
+        self.response_view.sync_height_now()
 
     def set_citations(self, citations: list) -> None:
         self.citations_card.set_citations(list(citations or []))
@@ -1579,12 +1589,14 @@ class ChatPage(QWidget):
             self.current_response_text = token
             widget.set_response_text(token)
             widget.set_thinking_text("")
+            QTimer.singleShot(0, widget.sync_response_height)
             return
 
         self._dismiss_queue_label()
         self.current_response_text += token
         widget = self._ensure_current_reply_widget()
         widget.set_response_text(self.current_response_text)
+        QTimer.singleShot(0, widget.sync_response_height)
         if should_stick:
             self._scroll_to_bottom()
 
@@ -1618,6 +1630,7 @@ class ChatPage(QWidget):
         self.current_response_text = message or self.current_response_text
         widget.set_thinking_text(self.current_thinking_text)
         widget.set_response_text(self.current_response_text)
+        QTimer.singleShot(0, widget.sync_response_height)
         if should_stick:
             self._scroll_to_bottom()
 
@@ -1770,9 +1783,11 @@ class ChatPage(QWidget):
             self.current_reply_widget = self._append_message("assistant", "")
             self.current_reply_widget.set_thinking_text(self.current_thinking_text)
             self.current_reply_widget.set_response_text(assistant_text)
+            QTimer.singleShot(0, self.current_reply_widget.sync_response_height)
         if self.current_reply_widget and not assistant_text:
             fallback = t("chat_no_response")
             self.current_reply_widget.set_response_text(fallback)
+            QTimer.singleShot(0, self.current_reply_widget.sync_response_height)
             assistant_text = fallback
         self.current_response_text = ""
         self.current_thinking_text = ""
@@ -1870,6 +1885,7 @@ class ChatPage(QWidget):
         if role == "assistant":
             content_widget = AssistantMessageWidget()
             content_widget.set_response_text(text)
+            QTimer.singleShot(0, content_widget.sync_response_height)
         else:
             label = QLabel()
             label.setWordWrap(True)
