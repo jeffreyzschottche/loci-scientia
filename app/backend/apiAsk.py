@@ -66,6 +66,10 @@ THINKING_MODEL_MARKERS = (
     "deepseek_r1",
     "deepseek-v3.1",
     "gpt-oss",
+    # Gemma 4 (e2b/e4b/12b) heeft configureerbare thinking-modes; Ollama accepteert het
+    # `think`-veld. Zonder dit bleef de denkfase ongebruikt en kreeg de UI geen
+    # thinking-output terug.
+    "gemma4",
 )
 _KNOWN_BAD_OUTPUT_FRAGMENTS = (
     "receptor model ad aanpassingen",
