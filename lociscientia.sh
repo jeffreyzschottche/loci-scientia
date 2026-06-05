@@ -890,21 +890,93 @@ case "$DEVICE_PLATFORM" in
         ;;
 esac
 
+_ollama_installed_version() {
+    # Print de kale versie ("0.30.5") of niets als ollama ontbreekt.
+    command -v ollama >/dev/null 2>&1 || return 1
+    ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
+}
+
+_version_lt() {
+    # _version_lt A B → waar (0) als A strikt kleiner is dan B (semver via sort -V).
+    [ "$1" = "$2" ] && return 1
+    local lowest
+    lowest="$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)"
+    [ "$lowest" = "$1" ]
+}
+
+_run_ollama_installer() {
+    # Installeert/upgradet Ollama en pint op $OLLAMA_PIN_VERSION via OLLAMA_VERSION
+    # (install.sh leest die env var: regel `VER_PARAM="${OLLAMA_VERSION:+?version=...}"`).
+    # De installer upgradet in-place: hij ruimt de oude lib/ollama op en herinstalleert.
+    curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION="$OLLAMA_PIN_VERSION" sh
+}
+
 install_ollama() {
-    if ! command -v ollama >/dev/null 2>&1; then
-        echo "📦 Ollama niet gevonden, proberen te installeren..."
-        if curl -fsSL https://ollama.com/install.sh | sh; then
-            echo "✅ Ollama geïnstalleerd"
+    # Vanaf Ollama 0.30.0 (PR #16031) is de Go-"new engine" voor GGUF-modellen verwijderd
+    # en draait ALLES via llama-server (upstream llama.cpp). Daarmee verdwijnt de bug waarbij
+    # gemma4:e2b/e4b (en gemma3n) onzin produceerden op de Vulkan-iGPU — die zat in de oude
+    # new-engine Vulkan-kernels. Daarom forceren we minstens 0.30.x.
+    OLLAMA_MIN_VERSION="${OLLAMA_MIN_VERSION:-0.30.0}"
+    # Versie die we installeren/naartoe upgraden. Overschrijfbaar via OLLAMA_VERSION in .env.
+    OLLAMA_PIN_VERSION="${OLLAMA_VERSION:-0.30.5}"
+
+    local current=""
+    current="$(_ollama_installed_version || true)"
+
+    if [ -z "$current" ]; then
+        echo "📦 Ollama niet gevonden, installeren (v$OLLAMA_PIN_VERSION)..."
+        if _run_ollama_installer; then
+            echo "✅ Ollama v$(_ollama_installed_version) geïnstalleerd"
         else
             echo "⚠️  Ollama installatie mislukt. Mogelijk netwerk restrictie."
             echo "    Installeer Ollama handmatig: https://ollama.com/download"
             echo "    Of gebruik de mock mode voor testing."
             return 1
         fi
+        return 0
+    fi
+
+    if _version_lt "$current" "$OLLAMA_MIN_VERSION"; then
+        echo "♻️  Ollama $current is ouder dan $OLLAMA_MIN_VERSION → upgraden naar v$OLLAMA_PIN_VERSION"
+        echo "    (op <0.30 geven gemma4/gemma3n onzin op de Vulkan-iGPU; 0.30 lost dit op via llama-server)."
+        _stop_ollama || true
+        if _run_ollama_installer; then
+            echo "✅ Ollama geüpgraded naar v$(_ollama_installed_version)"
+        else
+            echo "⚠️  Ollama upgrade mislukt; huidige versie ($current) blijft actief."
+            echo "    Probeer handmatig: curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=$OLLAMA_PIN_VERSION sh"
+            return 1
+        fi
     else
-        echo "✅ Ollama is al geïnstalleerd"
+        echo "✅ Ollama $current is up-to-date (≥ $OLLAMA_MIN_VERSION)"
     fi
     return 0
+}
+
+_disable_ollama_systemd_service() {
+    # install.sh maakt+enablet een systemd 'ollama'-service (luistert op :11434 met
+    # Restart=always). Dit project draait ollama echter ZELF op :11435 met eigen env
+    # (Vulkan/iGPU/KV-cache). De systemd-unit is dus niet alleen overbodig maar vecht
+    # door Restart=always tegen onze eigen lifecycle: start_ollama doet pkill om
+    # KV/Vulkan toe te passen, waarna systemd 'm meteen weer opstart op 11434 → twee
+    # servers en mogelijk niets op 11435. We zetten 'm daarom uit zodat onze serve op
+    # :11435 de enige bron is. Idempotent.
+    command -v systemctl >/dev/null 2>&1 || return 0
+    systemctl list-unit-files ollama.service >/dev/null 2>&1 || return 0
+    if ! systemctl is-enabled ollama >/dev/null 2>&1 && ! systemctl is-active ollama >/dev/null 2>&1; then
+        return 0
+    fi
+    local sysctl=(systemctl)
+    if [ "$(id -u)" -ne 0 ]; then
+        if [ "$HAVE_SUDO" -eq 1 ]; then
+            sysctl=(sudo systemctl)
+        else
+            echo "ℹ️  systemd 'ollama'-service staat aan (poort 11434) maar geen sudo om 'm uit te zetten; dit project gebruikt 11435."
+            return 0
+        fi
+    fi
+    echo "🛑 systemd 'ollama'-service uitschakelen — dit project beheert ollama zelf op 11435."
+    "${sysctl[@]}" disable --now ollama >/dev/null 2>&1 || true
 }
 
 ollama_pid=""
@@ -913,6 +985,8 @@ start_ollama() {
         echo "⚠️  Ollama niet beschikbaar, overslaan..."
         return 1
     fi
+
+    _disable_ollama_systemd_service
 
     report_gpu_runtime_status || true
 
@@ -926,15 +1000,15 @@ start_ollama() {
         *) kv_cache_type="";;
     esac
 
+    # OLLAMA_VULKAN-semantiek op Ollama ≥0.30: Vulkan is standaard AAN (auto-detect) en
+    # gemma4/gemma3n draaien nu via llama-server, dus geen onzin meer op de iGPU. We forceren
+    # daarom niets in auto-modus; alleen een EXPLICIETE waarde uit .env wordt doorgegeven:
+    #   OLLAMA_VULKAN=""  → auto: Ollama kiest zelf (CUDA/ROCm-dGPU indien aanwezig, anders iGPU)
+    #   OLLAMA_VULKAN=1   → Vulkan forceren
+    #   OLLAMA_VULKAN=0   → escape-hatch: Vulkan UIT (CPU/CUDA/ROCm) als een iGPU tóch hapert
+    # Belangrijk: op 0.30 móét je voor "uit" expliciet OLLAMA_VULKAN=0 exporteren — alleen
+    # unsetten laat Vulkan aan, want dat is de nieuwe default.
     vulkan_pref="$(_normalize_bool "${OLLAMA_VULKAN:-}")"
-    if [ -z "$vulkan_pref" ]; then
-        if _detect_vulkan_runtime; then
-            vulkan_pref="1"
-            echo "🟣 Vulkan runtime gedetecteerd → OLLAMA_VULKAN=1 (auto)"
-        else
-            vulkan_pref="0"
-        fi
-    fi
 
     export OLLAMA_HOST="$ollama_host"
     if pgrep -x "ollama" >/dev/null 2>&1; then
@@ -942,11 +1016,11 @@ start_ollama() {
         if [ -n "$kv_cache_type" ]; then
             restart_reason="OLLAMA_KV_CACHE_TYPE=$kv_cache_type"
         fi
-        if [ "$vulkan_pref" = "1" ]; then
+        if [ -n "$vulkan_pref" ]; then
             if [ -n "$restart_reason" ]; then
-                restart_reason="$restart_reason, OLLAMA_VULKAN=1"
+                restart_reason="$restart_reason, OLLAMA_VULKAN=$vulkan_pref"
             else
-                restart_reason="OLLAMA_VULKAN=1"
+                restart_reason="OLLAMA_VULKAN=$vulkan_pref"
             fi
         fi
         if [ -n "$restart_reason" ]; then
@@ -969,11 +1043,16 @@ start_ollama() {
     else
         unset OLLAMA_KV_CACHE_TYPE
     fi
-    if [ "$vulkan_pref" = "1" ]; then
-        export OLLAMA_VULKAN=1
-        echo "✅ OLLAMA_VULKAN=1 (Vulkan backend ingeschakeld)"
+    if [ -n "$vulkan_pref" ]; then
+        export OLLAMA_VULKAN="$vulkan_pref"
+        if [ "$vulkan_pref" = "1" ]; then
+            echo "✅ OLLAMA_VULKAN=1 (Vulkan geforceerd)"
+        else
+            echo "✅ OLLAMA_VULKAN=0 (Vulkan uit → CPU/CUDA/ROCm)"
+        fi
     else
         unset OLLAMA_VULKAN
+        echo "🟣 OLLAMA_VULKAN niet gezet → Ollama auto-detect (Vulkan standaard aan op ≥0.30; iGPU wordt gepakt indien nodig)"
     fi
     echo "✅ OLLAMA_HOST=$OLLAMA_HOST"
     _run_ollama serve > "$PROJECT_ROOT/ollama.log" 2>&1 &
