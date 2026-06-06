@@ -1,5 +1,5 @@
 from PySide6.QtCore import QEvent, QEventLoop, QTimer, Qt
-from PySide6.QtGui import QColor, QMouseEvent, QPainter
+from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -116,11 +116,14 @@ class OverlayDialog(QDialog):
         root_parent = self._overlay_parent(parent)
         super().__init__(root_parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Widget)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_OpaquePaintEvent)
+        self.setAutoFillBackground(False)
         self.setWindowModality(Qt.ApplicationModal)
         self._card_width = width
         self._card_height = height
         self._watched_window = None
+        self._overlay_source = root_parent
+        self._background_snapshot: QPixmap | None = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -159,6 +162,8 @@ class OverlayDialog(QDialog):
 
     def exec(self) -> int:
         self.setResult(0)
+        self._sync_to_parent_window()
+        self._capture_background_snapshot()
         self.show()
         self.raise_()
         self.activateWindow()
@@ -166,6 +171,11 @@ class OverlayDialog(QDialog):
         self.finished.connect(loop.quit)
         loop.exec()
         return self.result()
+
+    def show(self) -> None:
+        self._sync_to_parent_window()
+        self._capture_background_snapshot()
+        super().show()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -188,14 +198,14 @@ class OverlayDialog(QDialog):
         return super().eventFilter(watched, event)
 
     def _install_parent_window_filter(self) -> None:
-        parent = self.parent()
-        if parent is None:
+        source = self._overlay_source
+        if source is None:
             return
-        if parent is self._watched_window:
+        if source is self._watched_window:
             return
         self._remove_parent_window_filter()
-        self._watched_window = parent
-        parent.installEventFilter(self)
+        self._watched_window = source
+        source.installEventFilter(self)
 
     def _remove_parent_window_filter(self) -> None:
         if self._watched_window is not None:
@@ -203,13 +213,24 @@ class OverlayDialog(QDialog):
             self._watched_window = None
 
     def _sync_to_parent_window(self) -> None:
-        parent = self.parent()
-        if parent is not None:
-            self.setGeometry(parent.rect())
+        source = self._overlay_source
+        if source is not None:
+            self.setGeometry(source.rect())
+
+    def _capture_background_snapshot(self) -> None:
+        source = self._overlay_source
+        if source is None or not source.isVisible():
+            self._background_snapshot = None
+            return
+        self._background_snapshot = source.grab()
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor(0, 0, 0, 120))
+        if self._background_snapshot is not None and not self._background_snapshot.isNull():
+            painter.drawPixmap(self.rect(), self._background_snapshot, self._background_snapshot.rect())
+            painter.fillRect(self.rect(), QColor(0, 0, 0, 120))
+        else:
+            painter.fillRect(self.rect(), QColor(135, 135, 135))
         painter.end()
 
     def mousePressEvent(self, event: QMouseEvent):

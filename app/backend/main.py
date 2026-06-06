@@ -1077,11 +1077,9 @@ async def sse_stream_generator(
     )
 
     assistant_chunks: list[str] = []
-    pending_assistant_chunks: list[str] = []
     thinking_chunks: list[str] = []
     error_message: Optional[str] = None
     mock_response: Optional[str] = None
-    assistant_stream_started = False
     eval_count: Optional[float] = None
     eval_duration_seconds: Optional[float] = None
 
@@ -1132,30 +1130,16 @@ async def sse_stream_generator(
                         if "response" in data:
                             token = data["response"]
                             if token:  # Only send non-empty tokens
-                                pending_assistant_chunks.append(token)
-                                partial_text = "".join(assistant_chunks + pending_assistant_chunks).strip()
+                                partial_text = "".join(assistant_chunks + [token]).strip()
                                 if is_invalid_model_output(partial_text):
                                     assistant_chunks = [invalid_model_output_message()]
-                                    pending_assistant_chunks = []
                                     break
-                                should_flush_pending = assistant_stream_started or len("".join(pending_assistant_chunks)) >= 120 or data.get("done", False)
-                                if should_flush_pending:
-                                    assistant_stream_started = True
-                                    for pending_token in pending_assistant_chunks:
-                                        assistant_chunks.append(pending_token)
-                                        event_data = json.dumps({"token": pending_token, "done": False})
-                                        yield f"data: {event_data}\n\n"
-                                    pending_assistant_chunks = []
+                                assistant_chunks.append(token)
+                                event_data = json.dumps({"token": token, "done": False})
+                                yield f"data: {event_data}\n\n"
 
                         # Check if done
                         if data.get("done", False):
-                            if pending_assistant_chunks:
-                                assistant_stream_started = True
-                                for pending_token in pending_assistant_chunks:
-                                    assistant_chunks.append(pending_token)
-                                    event_data = json.dumps({"token": pending_token, "done": False})
-                                    yield f"data: {event_data}\n\n"
-                                pending_assistant_chunks = []
                             if isinstance(data.get("eval_count"), (int, float)):
                                 eval_count = float(data["eval_count"])
                             if isinstance(data.get("eval_duration"), (int, float)) and data.get("eval_duration"):
@@ -1308,8 +1292,9 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
         ),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         }
     )
 

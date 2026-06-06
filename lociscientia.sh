@@ -1505,10 +1505,19 @@ http://:${CADDY_HTTP_PORT} {
 
 https://${DEVICE_MDNS}:${CADDY_HTTPS_PORT} {
     tls internal
-    encode zstd gzip
-    reverse_proxy 127.0.0.1:${BACKEND_PORT:-8000} {
-        header_up X-Forwarded-Proto https
-        header_up X-Forwarded-Host {host}
+    @sse path /api/v1/ask/stream
+    handle @sse {
+        reverse_proxy 127.0.0.1:${BACKEND_PORT:-8000} {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
+        }
+    }
+    handle {
+        encode zstd gzip
+        reverse_proxy 127.0.0.1:${BACKEND_PORT:-8000} {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
+        }
     }
 }
 EOF

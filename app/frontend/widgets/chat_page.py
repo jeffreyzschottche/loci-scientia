@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QLayout,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -142,6 +143,8 @@ class TypingDotsWidget(QWidget):
 
 
 class AutoSizingMarkdownView(QTextBrowser):
+    HEIGHT_SYNC_INTERVAL_MS = 40
+
     def __init__(self):
         super().__init__()
         self._plain_text = ""
@@ -244,6 +247,14 @@ class AutoSizingMarkdownView(QTextBrowser):
         if layout is not None:
             layout.documentSizeChanged.connect(self._queue_sync_height)
 
+    def set_content_width(self, width: int) -> None:
+        width = max(32, int(width))
+        self.setMinimumWidth(width)
+        self.setMaximumWidth(width)
+        if abs(self.document().textWidth() - width) > 1:
+            self.document().setTextWidth(width)
+        self._queue_sync_height()
+
     def set_markdown_text(self, text: str, placeholder: str = "") -> None:
         self._plain_text = (text or "").rstrip()
         if self._plain_text.strip():
@@ -253,7 +264,14 @@ class AutoSizingMarkdownView(QTextBrowser):
             self.setHtml(f"<p>{html.escape(placeholder)}</p>")
         else:
             self.setHtml("")
-        self._sync_height()
+        self._queue_sync_height()
+
+    def set_stream_text(self, text: str) -> None:
+        self._plain_text = (text or "").rstrip()
+        if self._plain_text:
+            self.setPlainText(self._plain_text)
+        else:
+            self.setPlainText("")
         self._queue_sync_height()
 
     def plain_text(self) -> str:
@@ -348,7 +366,7 @@ class AutoSizingMarkdownView(QTextBrowser):
     def _queue_sync_height(self, *_args) -> None:
         if self._syncing_height:
             return
-        self._height_sync_timer.start(0)
+        self._height_sync_timer.start(self.HEIGHT_SYNC_INTERVAL_MS)
 
     def _sync_height(self) -> None:
         if self._syncing_height:
@@ -367,7 +385,6 @@ class AutoSizingMarkdownView(QTextBrowser):
             parent = self.parentWidget()
             if parent is not None:
                 parent.updateGeometry()
-                parent.adjustSize()
         finally:
             self._syncing_height = False
 
@@ -687,6 +704,7 @@ class AssistantMessageWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
+        layout.setSizeConstraint(QLayout.SetMinAndMaxSize)
         self.setMinimumWidth(ASSISTANT_MIN_WIDTH)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
 
@@ -732,8 +750,14 @@ class AssistantMessageWidget(QWidget):
         thinking_layout.addWidget(self.thinking_view)
         layout.addWidget(self.thinking_card)
 
-        self.response_view = AutoSizingMarkdownView()
-        self.response_view.setStyleSheet("background:transparent; border:none; color:#111827;")
+        self.response_view = QLabel()
+        self.response_view.setWordWrap(True)
+        self.response_view.setTextFormat(Qt.PlainText)
+        self.response_view.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.response_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.response_view.setStyleSheet(
+            "background:transparent; border:none; color:#111827; font-size:14px; line-height:1.55;"
+        )
         layout.addWidget(self.response_view)
 
         self.feedback_label = QLabel()
@@ -755,7 +779,13 @@ class AssistantMessageWidget(QWidget):
         self.set_thinking_text("")
         self.set_response_text("")
 
-    def set_response_text(self, text: str) -> None:
+    def set_content_width(self, width: int) -> None:
+        self.setMinimumWidth(width)
+        self.setMaximumWidth(width)
+        self.response_view.setMinimumWidth(width)
+        self.response_view.setMaximumWidth(width)
+
+    def set_response_text(self, text: str, *, markdown: bool = True) -> None:
         self._response_text = text or ""
         self.typing_dots.hide()
         self.typing_dots.stop()
@@ -763,10 +793,13 @@ class AssistantMessageWidget(QWidget):
         self._feedback_mode = False
         self.feedback_label.hide()
         self.response_view.show()
-        self.response_view.set_markdown_text(self._response_text)
+        self.response_view.setText(self._response_text)
+        self.response_view.adjustSize()
+        self.response_view.updateGeometry()
 
     def sync_response_height(self) -> None:
-        self.response_view.sync_height_now()
+        self.response_view.adjustSize()
+        self.response_view.updateGeometry()
 
     def set_citations(self, citations: list) -> None:
         self.citations_card.set_citations(list(citations or []))
@@ -788,7 +821,7 @@ class AssistantMessageWidget(QWidget):
         self._feedback_mode = False
         self.feedback_label.hide()
         self.response_view.hide()
-        self.response_view.set_markdown_text("")
+        self.response_view.setText("")
         self.typing_dots.show()
         self.typing_dots.start()
         self._showing_typing = True
@@ -874,6 +907,12 @@ class ChatPage(QWidget):
         self._active_request_id: int | None = None
         self._conversation_id = uuid.uuid4().hex
         self._chat_epoch = 0
+        self._response_render_pending = False
+        self._response_should_stick = False
+        self._response_render_timer = QTimer(self)
+        self._response_render_timer.setSingleShot(True)
+        self._response_render_timer.setInterval(50)
+        self._response_render_timer.timeout.connect(self._flush_response_render)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -1228,6 +1267,10 @@ class ChatPage(QWidget):
                 bubble.setMaximumWidth(assistant_width)
                 bubble.setMinimumWidth(assistant_min_width)
                 bubble.updateGeometry()
+        content_width = max(32, assistant_width - 36)
+        for widget in self.history_container.findChildren(AssistantMessageWidget):
+            widget.set_content_width(content_width)
+            widget.updateGeometry()
         for container in self.history_container.findChildren(QWidget):
             role = container.property("chat_role")
             if role == "assistant":
@@ -1250,6 +1293,9 @@ class ChatPage(QWidget):
         self._stop_requested = False
         self._is_generating = False
         self._active_request_id = None
+        self._response_render_timer.stop()
+        self._response_render_pending = False
+        self._response_should_stick = False
         self._conversation_id = uuid.uuid4().hex
         self.input.clear()
         self.input.setPlaceholderText(t("chat_placeholder"))
@@ -1281,6 +1327,9 @@ class ChatPage(QWidget):
         self.current_response_text = ""
         self.current_thinking_text = ""
         self.current_reply_widget = None
+        self._response_render_timer.stop()
+        self._response_render_pending = False
+        self._response_should_stick = False
         self.input.setPlaceholderText(t("chat_placeholder"))
         self._show_typing_indicator()
         self._schedule_task(
@@ -1577,7 +1626,7 @@ class ChatPage(QWidget):
             return ""
         return str(detail)
 
-    @Slot(str)
+    @Slot(int, str)
     def _on_response_token(self, request_id: int, token: str):
         if request_id != self._active_request_id:
             return
@@ -1594,13 +1643,26 @@ class ChatPage(QWidget):
 
         self._dismiss_queue_label()
         self.current_response_text += token
-        widget = self._ensure_current_reply_widget()
-        widget.set_response_text(self.current_response_text)
-        QTimer.singleShot(0, widget.sync_response_height)
-        if should_stick:
-            self._scroll_to_bottom()
+        self._response_should_stick = self._response_should_stick or should_stick
+        self._queue_response_render()
 
-    @Slot(str)
+    def _queue_response_render(self) -> None:
+        self._response_render_pending = True
+        if not self._response_render_timer.isActive():
+            self._response_render_timer.start()
+
+    def _flush_response_render(self) -> None:
+        if not self._response_render_pending:
+            return
+        self._response_render_pending = False
+        widget = self._ensure_current_reply_widget()
+        widget.set_response_text(self.current_response_text, markdown=False)
+        widget.sync_response_height()
+        if self._response_should_stick:
+            self._scroll_to_bottom()
+        self._response_should_stick = False
+
+    @Slot(int, str)
     def _on_thinking_token(self, request_id: int, token: str):
         if request_id != self._active_request_id:
             return
@@ -1616,7 +1678,7 @@ class ChatPage(QWidget):
         if should_stick:
             self._scroll_to_bottom()
 
-    @Slot(str, str)
+    @Slot(int, str, str)
     def _on_final_payload(self, request_id: int, thinking: str, message: str):
         if request_id != self._active_request_id:
             return
@@ -1628,6 +1690,9 @@ class ChatPage(QWidget):
         widget = self._ensure_current_reply_widget()
         self.current_thinking_text = thinking or self.current_thinking_text
         self.current_response_text = message or self.current_response_text
+        self._response_render_timer.stop()
+        self._response_render_pending = False
+        self._response_should_stick = False
         widget.set_thinking_text(self.current_thinking_text)
         widget.set_response_text(self.current_response_text)
         QTimer.singleShot(0, widget.sync_response_height)
@@ -1769,6 +1834,7 @@ class ChatPage(QWidget):
         """Finalize the current message."""
         if request_id != self._active_request_id:
             return
+        self._flush_response_render()
         self._is_generating = False
         self._active_request_id = None
         self._sync_send_button()
@@ -1782,6 +1848,9 @@ class ChatPage(QWidget):
         if assistant_text and self.current_reply_widget is None:
             self.current_reply_widget = self._append_message("assistant", "")
             self.current_reply_widget.set_thinking_text(self.current_thinking_text)
+            self.current_reply_widget.set_response_text(assistant_text)
+            QTimer.singleShot(0, self.current_reply_widget.sync_response_height)
+        elif assistant_text and self.current_reply_widget is not None:
             self.current_reply_widget.set_response_text(assistant_text)
             QTimer.singleShot(0, self.current_reply_widget.sync_response_height)
         if self.current_reply_widget and not assistant_text:
@@ -1867,6 +1936,7 @@ class ChatPage(QWidget):
         bubble_layout = QVBoxLayout(bubble)
         bubble_layout.setContentsMargins(18, 14, 18, 14)
         bubble_layout.setSpacing(8)
+        bubble_layout.setSizeConstraint(QLayout.SetMinAndMaxSize)
 
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
@@ -1884,6 +1954,8 @@ class ChatPage(QWidget):
 
         if role == "assistant":
             content_widget = AssistantMessageWidget()
+            content_width = max(32, assistant_width - 36)
+            content_widget.set_content_width(content_width)
             content_widget.set_response_text(text)
             QTimer.singleShot(0, content_widget.sync_response_height)
         else:
@@ -1943,6 +2015,9 @@ class ChatPage(QWidget):
         self._stop_requested = True
         self._is_generating = False
         self._active_request_id = None
+        self._response_render_timer.stop()
+        self._response_render_pending = False
+        self._response_should_stick = False
         self.current_response_text = ""
         self.current_thinking_text = ""
         if self.current_reply_widget is not None and show_feedback:
