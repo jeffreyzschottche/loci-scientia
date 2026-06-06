@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo, available_timezones
 
 import requests
 from PySide6.QtCore import QDate, QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QPainter
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -210,6 +211,17 @@ class SettingsPage(QWidget):
         self._system_reset_button: QPushButton | None = None
         self._kiosk_switch: IosSwitch | None = None
         self._kiosk_status: QLabel | None = None
+        self._kiosk_lock_status: QLabel | None = None
+        self._kiosk_password_input: QLineEdit | None = None
+        self._kiosk_password_repeat_input: QLineEdit | None = None
+        self._kiosk_password_visibility_button: QToolButton | None = None
+        self._kiosk_reminder_question_input: QLineEdit | None = None
+        self._kiosk_reminder_hint_input: QLineEdit | None = None
+        self._kiosk_notes_input: QPlainTextEdit | None = None
+        self._kiosk_lock_save_button: QPushButton | None = None
+        self._password_field_labels: dict[str, QLabel] = {}
+        self._kiosk_lock_configured = False
+        self._password_visible = False
         self._kiosk_busy = False
         self._saved_timezone: str = ""
         self._saved_language: str = ""
@@ -247,6 +259,7 @@ class SettingsPage(QWidget):
         self._tabs = QTabWidget()
         self._tabs.setObjectName("SettingsTabs")
         self._tabs.addTab(self._system_tab(), t("settings_tab_system"))
+        self._tabs.addTab(self._password_tab(), t("settings_tab_password"))
         self._tabs.addTab(self._advanced_tab(), t("settings_tab_advanced"))
         self._tabs.addTab(self._ssh_tab(), t("settings_tab_ssh"))
         self._tabs.addTab(self._wifi_tab(), t("settings_tab_wifi"))
@@ -258,6 +271,7 @@ class SettingsPage(QWidget):
 
         QTimer.singleShot(0, self._load_models)
         QTimer.singleShot(0, self._load_support_status)
+        QTimer.singleShot(0, self._load_kiosk_lock)
         QTimer.singleShot(0, self._refresh_wifi_status)
         QTimer.singleShot(0, self._refresh_bluetooth_status)
         self._support_refresh_timer.start()
@@ -429,6 +443,169 @@ class SettingsPage(QWidget):
         card.layout().addWidget(body)
         return card
 
+    def _password_tab(self) -> QWidget:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        layout.addWidget(self._password_card())
+        layout.addStretch(1)
+        return tab
+
+    def _password_card(self) -> QFrame:
+        card = self._settings_card(t("settings_password_title"))
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(10)
+
+        description = QLabel(t("settings_password_description"))
+        description.setWordWrap(True)
+        description.setStyleSheet("color:#6b7280; font-size:13px; line-height:1.45;")
+        body_layout.addWidget(description)
+
+        self._kiosk_lock_status = QLabel(t("settings_kiosk_status_loading"))
+        self._kiosk_lock_status.setWordWrap(True)
+        self._kiosk_lock_status.setStyleSheet("color:#6b7280; font-size:12px;")
+        body_layout.addWidget(self._kiosk_lock_status)
+
+        self._kiosk_password_input = self._kiosk_line_edit(password=True)
+        self._kiosk_password_repeat_input = self._kiosk_line_edit(
+            password=True,
+        )
+        password_row = QHBoxLayout()
+        password_row.setContentsMargins(0, 0, 0, 0)
+        password_row.setSpacing(10)
+        password_row.addWidget(
+            self._password_labeled_field(
+                "settings_password_value",
+                self._password_visibility_field(self._kiosk_password_input),
+            ),
+            1,
+        )
+        password_row.addWidget(
+            self._password_labeled_field("settings_password_repeat", self._kiosk_password_repeat_input),
+            1,
+        )
+        body_layout.addLayout(password_row)
+
+        self._kiosk_reminder_question_input = self._kiosk_line_edit()
+        body_layout.addWidget(
+            self._password_labeled_field("settings_password_reminder_question", self._kiosk_reminder_question_input)
+        )
+        self._kiosk_reminder_hint_input = self._kiosk_line_edit()
+        body_layout.addWidget(
+            self._password_labeled_field("settings_password_reminder_hint", self._kiosk_reminder_hint_input)
+        )
+
+        self._kiosk_notes_input = QPlainTextEdit()
+        self._kiosk_notes_input.setPlaceholderText("")
+        self._kiosk_notes_input.setFixedHeight(72)
+        self._kiosk_notes_input.setStyleSheet(self._kiosk_input_style())
+        body_layout.addWidget(self._password_labeled_field("settings_password_notes", self._kiosk_notes_input))
+
+        save_row = QHBoxLayout()
+        save_row.setContentsMargins(0, 0, 0, 0)
+        save_row.addStretch(1)
+        self._kiosk_lock_save_button = QPushButton(t("settings_password_save"))
+        self._kiosk_lock_save_button.setStyleSheet(self._action_button_style("primary"))
+        self._kiosk_lock_save_button.clicked.connect(self._save_kiosk_lock)
+        save_row.addWidget(self._kiosk_lock_save_button)
+        body_layout.addLayout(save_row)
+
+        card.layout().addWidget(body)
+        return card
+
+    def _password_labeled_field(self, label_key: str, field: QWidget) -> QWidget:
+        wrapper = QWidget()
+        layout = QVBoxLayout(wrapper)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        label = QLabel(t(label_key))
+        label.setStyleSheet("color:#3f3a33; font-size:12px; font-weight:700;")
+        layout.addWidget(label)
+        layout.addWidget(field)
+        self._password_field_labels[label_key] = label
+        return wrapper
+
+    def _password_visibility_field(self, field: QLineEdit) -> QWidget:
+        wrapper = QWidget()
+        layout = QHBoxLayout(wrapper)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(field, 1)
+        self._kiosk_password_visibility_button = QToolButton()
+        self._kiosk_password_visibility_button.setCheckable(True)
+        self._kiosk_password_visibility_button.setCursor(Qt.PointingHandCursor)
+        self._kiosk_password_visibility_button.setIcon(self._eye_icon(False))
+        self._kiosk_password_visibility_button.setToolTip(t("settings_password_show"))
+        self._kiosk_password_visibility_button.setStyleSheet(
+            "QToolButton {"
+            "  width:42px;"
+            "  min-width:42px;"
+            "  height:42px;"
+            "  border:1px solid #e7e0d4;"
+            "  border-radius:14px;"
+            "  background:#fffdf8;"
+            "}"
+            "QToolButton:hover { border-color:#f0c94c; background:#ffffff; }"
+        )
+        self._kiosk_password_visibility_button.toggled.connect(self._set_password_visible)
+        layout.addWidget(self._kiosk_password_visibility_button)
+        return wrapper
+
+    def _kiosk_line_edit(self, placeholder: str = "", *, password: bool = False) -> QLineEdit:
+        field = QLineEdit()
+        field.setPlaceholderText(placeholder)
+        if password:
+            field.setEchoMode(QLineEdit.Password)
+        field.setStyleSheet(self._kiosk_input_style())
+        return field
+
+    @staticmethod
+    def _kiosk_input_style() -> str:
+        return (
+            "QLineEdit, QPlainTextEdit {"
+            "  background:#fffdf8;"
+            "  border:1px solid #e7e0d4;"
+            "  border-radius:14px;"
+            "  padding:10px 12px;"
+            "  color:#171717;"
+            "  font-size:13px;"
+            "}"
+            "QLineEdit:focus, QPlainTextEdit:focus { border:2px solid #facc15; background:#ffffff; }"
+        )
+
+    @staticmethod
+    def _eye_icon(slashed: bool) -> QIcon:
+        pixmap = QPixmap(22, 22)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(QColor("#3f3a33"), 2)
+        painter.setPen(pen)
+        painter.drawEllipse(4, 7, 14, 8)
+        painter.setBrush(QColor("#3f3a33"))
+        painter.drawEllipse(9, 10, 4, 4)
+        if slashed:
+            painter.setPen(QPen(QColor("#3f3a33"), 2))
+            painter.drawLine(5, 17, 17, 5)
+        painter.end()
+        return QIcon(pixmap)
+
+    def _set_password_visible(self, visible: bool) -> None:
+        self._password_visible = visible
+        mode = QLineEdit.Normal if visible else QLineEdit.Password
+        if self._kiosk_password_input:
+            self._kiosk_password_input.setEchoMode(mode)
+        if self._kiosk_password_repeat_input:
+            self._kiosk_password_repeat_input.setEchoMode(mode)
+        if self._kiosk_password_visibility_button:
+            self._kiosk_password_visibility_button.setIcon(self._eye_icon(visible))
+            self._kiosk_password_visibility_button.setToolTip(
+                t("settings_password_hide") if visible else t("settings_password_show")
+            )
+
     def _set_kiosk_switch(self, state: bool) -> None:
         if not self._kiosk_switch:
             return
@@ -448,6 +625,51 @@ class SettingsPage(QWidget):
             return
         self._schedule_task(self._refresh_kiosk_state_async())
 
+    def _load_kiosk_lock(self) -> None:
+        if not self._kiosk_lock_status:
+            return
+        self._schedule_task(self._load_kiosk_lock_async())
+
+    async def _load_kiosk_lock_async(self) -> None:
+        try:
+            response = await asyncio.to_thread(
+                requests.get,
+                f"{BACKEND_HTTP}/api/v1/kiosk-lock",
+                timeout=8,
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            if self._kiosk_lock_status:
+                self._kiosk_lock_status.setText(f"{t('settings_password_load_failed')} {exc}")
+            return
+        self._apply_kiosk_lock_payload(payload)
+
+    def _apply_kiosk_lock_payload(self, payload: dict) -> None:
+        self._kiosk_lock_configured = bool(payload.get("configured"))
+        password = str(payload.get("password") or "")
+        if self._kiosk_lock_status:
+            self._kiosk_lock_status.setText(
+                t("settings_password_not_configured")
+                if not self._kiosk_lock_configured
+                else (
+                    t("settings_password_configured")
+                    if password
+                    else t("settings_password_configured_not_visible")
+                )
+            )
+        if self._kiosk_password_input:
+            self._kiosk_password_input.setText(password)
+        if self._kiosk_password_repeat_input:
+            self._kiosk_password_repeat_input.setText(password)
+        if self._kiosk_reminder_question_input:
+            self._kiosk_reminder_question_input.setText(str(payload.get("reminder_question") or ""))
+        if self._kiosk_reminder_hint_input:
+            self._kiosk_reminder_hint_input.setText(str(payload.get("reminder_hint") or ""))
+        if self._kiosk_notes_input:
+            self._kiosk_notes_input.setPlainText(str(payload.get("notes") or ""))
+
     async def _refresh_kiosk_state_async(self) -> None:
         state = await asyncio.to_thread(self._read_kiosk_state)
         self._set_kiosk_switch(state)
@@ -459,7 +681,71 @@ class SettingsPage(QWidget):
     def _on_kiosk_toggled(self, checked: bool) -> None:
         if self._kiosk_busy:
             return
+        if checked and not self._kiosk_lock_configured:
+            self._set_kiosk_switch(False)
+            show_error_dialog(
+                self,
+                t("settings_kiosk_title"),
+                t("settings_password_required_for_kiosk_enable"),
+            )
+            return
         self._schedule_task(self._apply_kiosk_async(bool(checked)))
+
+    def _save_kiosk_lock(self) -> None:
+        self._schedule_task(self._save_kiosk_lock_async())
+
+    async def _save_kiosk_lock_async(self) -> None:
+        password = self._kiosk_password_input.text() if self._kiosk_password_input else ""
+        repeat = self._kiosk_password_repeat_input.text() if self._kiosk_password_repeat_input else ""
+        if len(password) < 4:
+            show_error_dialog(self, t("settings_password_title"), t("settings_password_required"))
+            return
+        if password != repeat:
+            show_error_dialog(self, t("settings_password_title"), t("settings_password_mismatch"))
+            return
+        payload = {
+            "password": password,
+            "reminder_question": (
+                self._kiosk_reminder_question_input.text()
+                if self._kiosk_reminder_question_input
+                else ""
+            ),
+            "reminder_hint": (
+                self._kiosk_reminder_hint_input.text()
+                if self._kiosk_reminder_hint_input
+                else ""
+            ),
+            "notes": (
+                self._kiosk_notes_input.toPlainText()
+                if self._kiosk_notes_input
+                else ""
+            ),
+        }
+        if self._kiosk_lock_save_button:
+            self._kiosk_lock_save_button.setEnabled(False)
+        try:
+            response = await asyncio.to_thread(
+                requests.post,
+                f"{BACKEND_HTTP}/api/v1/kiosk-lock",
+                json=payload,
+                timeout=8,
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            saved = response.json()
+        except Exception as exc:
+            show_error_dialog(
+                self,
+                t("settings_password_title"),
+                f"{t('settings_password_save_failed')} {exc}",
+            )
+            return
+        finally:
+            if self._kiosk_lock_save_button:
+                self._kiosk_lock_save_button.setEnabled(True)
+        self._apply_kiosk_lock_payload(saved)
+        if self._kiosk_lock_status:
+            self._kiosk_lock_status.setText(t("settings_password_saved"))
 
     def _run_kiosk_helper(self, action: str) -> tuple[str, str]:
         """Run the privileged helper. Returns (status, output) where status is
@@ -1431,11 +1717,12 @@ class SettingsPage(QWidget):
     def open_tab(self, key: str) -> None:
         tab_map = {
             "system": 0,
-            "advanced": 1,
-            "support": 2,
-            "ssh": 2,
-            "wifi": 3,
-            "bluetooth": 4,
+            "password": 1,
+            "advanced": 2,
+            "support": 3,
+            "ssh": 3,
+            "wifi": 4,
+            "bluetooth": 5,
         }
         index = tab_map.get(key)
         if index is not None and hasattr(self, "_tabs"):
@@ -2361,10 +2648,11 @@ class SettingsPage(QWidget):
         """Update all translatable UI elements when language changes."""
         if hasattr(self, "_tabs"):
             self._tabs.setTabText(0, t("settings_tab_system"))
-            self._tabs.setTabText(1, t("settings_tab_advanced"))
-            self._tabs.setTabText(2, t("settings_tab_ssh"))
-            self._tabs.setTabText(3, t("settings_tab_wifi"))
-            self._tabs.setTabText(4, t("settings_tab_bluetooth"))
+            self._tabs.setTabText(1, t("settings_tab_password"))
+            self._tabs.setTabText(2, t("settings_tab_advanced"))
+            self._tabs.setTabText(3, t("settings_tab_ssh"))
+            self._tabs.setTabText(4, t("settings_tab_wifi"))
+            self._tabs.setTabText(5, t("settings_tab_bluetooth"))
         if hasattr(self, "_timezone_label"):
             self._timezone_label.setText(t("settings_timezone"))
         if hasattr(self, "_application_language_label"):
@@ -2397,6 +2685,25 @@ class SettingsPage(QWidget):
             self._system_save_button.setText(t("settings_save"))
         if hasattr(self, "_system_reset_button") and self._system_reset_button:
             self._system_reset_button.setText(t("settings_reset"))
+        if hasattr(self, "_kiosk_password_input") and self._kiosk_password_input:
+            self._kiosk_password_input.setPlaceholderText("")
+        if hasattr(self, "_kiosk_password_repeat_input") and self._kiosk_password_repeat_input:
+            self._kiosk_password_repeat_input.setPlaceholderText("")
+        if hasattr(self, "_kiosk_reminder_question_input") and self._kiosk_reminder_question_input:
+            self._kiosk_reminder_question_input.setPlaceholderText("")
+        if hasattr(self, "_kiosk_reminder_hint_input") and self._kiosk_reminder_hint_input:
+            self._kiosk_reminder_hint_input.setPlaceholderText("")
+        if hasattr(self, "_kiosk_notes_input") and self._kiosk_notes_input:
+            self._kiosk_notes_input.setPlaceholderText("")
+        if hasattr(self, "_kiosk_lock_save_button") and self._kiosk_lock_save_button:
+            self._kiosk_lock_save_button.setText(t("settings_password_save"))
+        if hasattr(self, "_password_field_labels"):
+            for key, label in self._password_field_labels.items():
+                label.setText(t(key))
+        if hasattr(self, "_kiosk_password_visibility_button") and self._kiosk_password_visibility_button:
+            self._kiosk_password_visibility_button.setToolTip(
+                t("settings_password_hide") if self._password_visible else t("settings_password_show")
+            )
         if hasattr(self, "_wifi_intro"):
             self._wifi_intro.setText(t("settings_wifi_intro"))
         if hasattr(self, "_wifi_open_button") and self._wifi_open_button:

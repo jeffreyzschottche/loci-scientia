@@ -30,6 +30,7 @@ from fastapi.exception_handlers import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth_tokens import BearerTokenStore, TokenRecord
@@ -65,6 +66,7 @@ from .chat_history import ChatHistoryStore
 from .admin_access import AdminTokenManager
 from .devices_repo import DevicesRepository
 from .kennisbank_sync import read_sync_state
+from .kiosk_lock import KioskLockStore
 from .knowledge_library import get_library_overview, load_document_detail
 from .schemas import (
     BearerTokenResponse,
@@ -117,6 +119,7 @@ admin_tokens = AdminTokenManager(
     admin_usernames=settings.admin_usernames,
 )
 admin_tokens.ensure()
+kiosk_lock_store = KioskLockStore()
 summary_task: Optional[asyncio.Task] = None
 last_prompt_at: Optional[datetime] = None
 last_idle_summary_at: Optional[datetime] = None
@@ -147,6 +150,17 @@ class ActiveGeneration:
 
 
 active_generations: dict[str, ActiveGeneration] = {}
+
+
+class KioskLockConfigureRequest(BaseModel):
+    password: str
+    reminder_question: str = ""
+    reminder_hint: str = ""
+    notes: str = ""
+
+
+class KioskLockVerifyRequest(BaseModel):
+    password: str
 
 
 class DevicePresenceTracker:
@@ -592,6 +606,48 @@ def api_stats_snapshot(_: TokenRecord = Depends(require_admin_token)):
 @app.get("/api/stats/history")
 def api_stats_history_snapshot(_: TokenRecord = Depends(require_admin_token)):
     return api_stats_history.snapshot()
+
+
+@app.get("/api/v1/kiosk-lock")
+def kiosk_lock_status(_: TokenRecord = Depends(require_admin_token)):
+    return kiosk_lock_store.snapshot()
+
+
+@app.post("/api/v1/kiosk-lock")
+def configure_kiosk_lock(
+    req: KioskLockConfigureRequest,
+    _: TokenRecord = Depends(require_admin_token),
+):
+    try:
+        return kiosk_lock_store.configure(
+            password=req.password,
+            reminder_question=req.reminder_question,
+            reminder_hint=req.reminder_hint,
+            notes=req.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/kiosk-lock/verify")
+def verify_kiosk_lock(
+    req: KioskLockVerifyRequest,
+    _: TokenRecord = Depends(require_admin_token),
+):
+    return {"ok": kiosk_lock_store.verify_password(req.password)}
+
+
+@app.post("/api/v1/kiosk-lock/forgot/verify")
+def verify_kiosk_lock_forgot(
+    req: KioskLockVerifyRequest,
+    _: TokenRecord = Depends(require_admin_token),
+):
+    return {
+        "ok": kiosk_lock_store.verify_override_password(
+            req.password,
+            settings.overrule_if_pw_forgot,
+        )
+    }
 
 
 async def _pull_ollama_model(model: str) -> None:

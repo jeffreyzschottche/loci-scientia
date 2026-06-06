@@ -66,6 +66,7 @@ class Settings(BaseModel):
     embedder_admin_name: str = "Aitje Admin"
     embedder_db_path: Optional[Path] = None
     embedder_upload_dir: Optional[Path] = None
+    overrule_if_pw_forgot: Optional[str] = None
 
 
 def get_settings() -> "Settings":
@@ -138,6 +139,7 @@ def get_settings() -> "Settings":
     embedder_admin_email = (os.environ.get("EMBEDDER_USER_EMAIL") or "").strip() or None
     embedder_admin_password = os.environ.get("EMBEDDER_USER_PASSWORD") or None
     embedder_admin_name = (os.environ.get("EMBEDDER_USER_NAME") or "").strip() or "Aitje Admin"
+    overrule_if_pw_forgot = os.environ.get("OVERRULE_IF_PW_FORGOT") or None
 
     return Settings(
         offline_assets_dir=offline_assets_dir,
@@ -160,6 +162,7 @@ def get_settings() -> "Settings":
         embedder_admin_name=embedder_admin_name,
         embedder_db_path=embedder_db_path,
         embedder_upload_dir=embedder_upload_dir,
+        overrule_if_pw_forgot=overrule_if_pw_forgot,
     )
 
 

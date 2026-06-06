@@ -7,7 +7,7 @@ from typing import Optional
 _boot_video_mode = os.environ.get("LOCI_BOOT_VIDEO", "auto").strip().lower()
 _boot_video_enabled = _boot_video_mode not in {"0", "false", "no", "off"}
 
-from PySide6.QtCore import QProcess, Qt, QTimer
+from PySide6.QtCore import QProcess, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
     QIcon,
@@ -34,10 +34,13 @@ else:  # pragma: no cover - boot video disabled by platform/env
     QVideoWidget = None
 from PySide6.QtWidgets import (
     QApplication,
+    QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QProgressBar,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QStackedLayout,
@@ -45,6 +48,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qasync import QEventLoop
+
+from app.backend.kiosk_lock import KioskLockStore
+from app.backend.settings import settings as backend_settings
 
 from .config import BACKEND_WS
 from .net.ws_client import WSClient
@@ -57,6 +63,10 @@ from .widgets.knowledge_page import KnowledgePage
 from .widgets.network_page import NetworkStatusPage
 from .widgets.sidebar import Sidebar
 from .widgets.settings_page import SettingsPage
+
+
+def _truthy(value: object) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "enable", "enabled"}
 
 
 class RoundedProgressBar(QProgressBar):
@@ -352,6 +362,182 @@ class BootScreen(QWidget):
         QTimer.singleShot(120, self.close)
 
 
+class KioskLockScreen(QWidget):
+    unlocked = Signal()
+
+    def __init__(self, store: KioskLockStore):
+        super().__init__()
+        self._store = store
+        self._snapshot = store.snapshot()
+        self._forgot_mode = False
+        self._failed_attempts = 0
+
+        self.setWindowTitle(t("kiosk_lock_title"))
+        self.setObjectName("KioskLockScreen")
+        self.setStyleSheet(
+            "QWidget#KioskLockScreen { background:#111111; }"
+            "QFrame#LockCard { background:#ffffff; border-radius:24px; }"
+            "QLineEdit {"
+            "  min-height:44px;"
+            "  border:1px solid #d4d4d8;"
+            "  border-radius:14px;"
+            "  padding:0 14px;"
+            "  font-size:16px;"
+            "  color:#171717;"
+            "  background:#fffdf8;"
+            "}"
+            "QLineEdit:focus { border:2px solid #facc15; background:#ffffff; }"
+            "QPushButton {"
+            "  min-height:42px;"
+            "  border-radius:14px;"
+            "  padding:0 18px;"
+            "  background:#facc15;"
+            "  color:#111111;"
+            "  font-weight:800;"
+            "}"
+            "QPushButton:hover { background:#111111; color:#facc15; }"
+            "QPushButton#ForgotButton { background:#fffaf0; border:1px solid #e5dccd; color:#473f34; }"
+            "QPushButton#ForgotButton:hover { background:#fff4cf; color:#111111; }"
+        )
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(36, 36, 36, 36)
+        root.addStretch(1)
+
+        card = QFrame()
+        card.setObjectName("LockCard")
+        card.setMinimumSize(440, 330)
+        card.setMaximumWidth(720)
+        card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._card = card
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(36, 32, 36, 32)
+        card_layout.setSpacing(14)
+
+        title = QLabel(t("kiosk_lock_title"))
+        title.setStyleSheet("font-size:28px; font-weight:900; color:#111111;")
+        card_layout.addWidget(title)
+
+        self._subtitle = QLabel(t("kiosk_lock_subtitle"))
+        self._subtitle.setWordWrap(True)
+        self._subtitle.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._subtitle.setStyleSheet("font-size:15px; color:#52525b;")
+        card_layout.addWidget(self._subtitle)
+
+        self._message = QLabel("")
+        self._message.setWordWrap(True)
+        self._message.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._message.setStyleSheet("font-size:14px; color:#991b1b; font-weight:700;")
+        card_layout.addWidget(self._message)
+
+        self._reminder = QLabel("")
+        self._reminder.setWordWrap(True)
+        self._reminder.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._reminder.setStyleSheet("font-size:13px; color:#3f3f46;")
+        self._reminder.hide()
+        card_layout.addWidget(self._reminder)
+
+        self._password = QLineEdit()
+        self._password.setEchoMode(QLineEdit.Password)
+        self._password.setPlaceholderText(t("kiosk_lock_password"))
+        self._password.returnPressed.connect(self._submit)
+        card_layout.addWidget(self._password)
+
+        button_row = QHBoxLayout()
+        button_row.setContentsMargins(0, 0, 0, 0)
+        button_row.setSpacing(10)
+        self._forgot_button = QPushButton(t("kiosk_lock_forgot"))
+        self._forgot_button.setObjectName("ForgotButton")
+        self._forgot_button.clicked.connect(self._toggle_forgot_mode)
+        button_row.addWidget(self._forgot_button)
+        button_row.addStretch(1)
+        self._unlock_button = QPushButton(t("kiosk_lock_unlock"))
+        self._unlock_button.clicked.connect(self._submit)
+        button_row.addWidget(self._unlock_button)
+        card_layout.addLayout(button_row)
+
+        root.addWidget(card, 0, Qt.AlignCenter)
+        root.addStretch(1)
+
+    def _toggle_forgot_mode(self) -> None:
+        if self._forgot_mode:
+            self._exit_forgot_mode()
+            return
+        self._enter_forgot_mode()
+
+    def _enter_forgot_mode(self) -> None:
+        self._forgot_mode = True
+        self._card.setMinimumSize(520, 400)
+        self._message.setStyleSheet("font-size:14px; color:#3f3f46; font-weight:700;")
+        self._message.setText(t("kiosk_lock_recovery_intro"))
+        self._password.clear()
+        self._password.setPlaceholderText(t("kiosk_lock_recovery_code"))
+        self._unlock_button.setText(t("kiosk_lock_recovery_unlock"))
+        self._forgot_button.setText(t("kiosk_lock_back_to_password"))
+        self._show_reminder()
+        self._password.setFocus(Qt.OtherFocusReason)
+
+    def _exit_forgot_mode(self) -> None:
+        self._forgot_mode = False
+        self._card.setMinimumSize(440, 330)
+        self._message.setStyleSheet("font-size:14px; color:#991b1b; font-weight:700;")
+        self._message.clear()
+        self._reminder.hide()
+        self._password.clear()
+        self._password.setPlaceholderText(t("kiosk_lock_password"))
+        self._unlock_button.setText(t("kiosk_lock_unlock"))
+        self._forgot_button.setText(t("kiosk_lock_forgot"))
+        self._password.setFocus(Qt.OtherFocusReason)
+
+    def _submit(self) -> None:
+        value = self._password.text()
+        if self._forgot_mode:
+            ok = self._store.verify_override_password(value, backend_settings.overrule_if_pw_forgot)
+            if ok:
+                self.unlocked.emit()
+                return
+            self._mark_failed(t("kiosk_lock_recovery_wrong"))
+            return
+
+        if self._store.verify_password(value):
+            self.unlocked.emit()
+            return
+        self._mark_failed(t("kiosk_lock_wrong"))
+
+    def _mark_failed(self, message: str) -> None:
+        self._failed_attempts += 1
+        self._message.setStyleSheet("font-size:14px; color:#991b1b; font-weight:700;")
+        self._message.setText(message)
+        self._password.clear()
+        self._show_reminder()
+        if self._failed_attempts >= 5:
+            self._unlock_button.setEnabled(False)
+            self._password.setEnabled(False)
+            QTimer.singleShot(10_000, self._release_rate_limit)
+
+    def _release_rate_limit(self) -> None:
+        self._unlock_button.setEnabled(True)
+        self._password.setEnabled(True)
+        self._password.setFocus(Qt.OtherFocusReason)
+
+    def _show_reminder(self) -> None:
+        parts = []
+        question = str(self._snapshot.get("reminder_question") or "").strip()
+        hint = str(self._snapshot.get("reminder_hint") or "").strip()
+        notes = str(self._snapshot.get("notes") or "").strip()
+        if question:
+            parts.append(t("kiosk_lock_reminder_question", value=question))
+        if hint:
+            parts.append(t("kiosk_lock_reminder_hint", value=hint))
+        if notes:
+            parts.append(t("kiosk_lock_notes", value=notes))
+        if not parts:
+            self._reminder.hide()
+            return
+        self._reminder.setText("\n".join(parts))
+        self._reminder.show()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -364,9 +550,7 @@ class MainWindow(QMainWindow):
         # afsluit/herstart-knop moet dan het *device* afsluiten/herstarten in
         # plaats van alleen dit venster te sluiten (anders blijf je op een zwart
         # scherm hangen).
-        self._kiosk_runtime = os.environ.get("AITJE_KIOSK", "").strip().lower() in {
-            "1", "true", "yes", "on", "enable", "enabled",
-        }
+        self._kiosk_runtime = _truthy(os.environ.get("AITJE_KIOSK"))
 
         root = QWidget()
         root.setObjectName("RootWidget")
@@ -598,6 +782,10 @@ def main():
     asyncio.set_event_loop(loop)
 
     window = MainWindow()
+    kiosk_runtime = _truthy(os.environ.get("AITJE_KIOSK"))
+    kiosk_lock_store = KioskLockStore()
+    kiosk_lock_configured = bool(kiosk_lock_store.snapshot().get("configured"))
+    startup_widgets: dict[str, QWidget] = {}
 
     def on_boot_finished():
         window.showFullScreen()
@@ -605,12 +793,29 @@ def main():
         window.activateWindow()
         app.processEvents()
 
-    boot_screen = BootScreen(
-        logo_path=boot_logo_path,
-        duration_ms=5000,
-        on_finished=on_boot_finished,
-    )
-    boot_screen.show()
+    def start_boot_screen():
+        lock_screen = startup_widgets.pop("lock", None)
+        if lock_screen is not None:
+            lock_screen.close()
+        boot_screen = BootScreen(
+            logo_path=boot_logo_path,
+            duration_ms=5000,
+            on_finished=on_boot_finished,
+        )
+        startup_widgets["boot"] = boot_screen
+        boot_screen.showFullScreen()
+        boot_screen.raise_()
+        boot_screen.activateWindow()
+
+    if kiosk_runtime and kiosk_lock_configured:
+        lock_screen = KioskLockScreen(kiosk_lock_store)
+        lock_screen.unlocked.connect(start_boot_screen)
+        startup_widgets["lock"] = lock_screen
+        lock_screen.showFullScreen()
+        lock_screen.raise_()
+        lock_screen.activateWindow()
+    else:
+        start_boot_screen()
 
     with loop:
         loop.run_forever()

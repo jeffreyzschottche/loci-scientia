@@ -108,6 +108,82 @@ TRANSLATIONS = {
         "nl": "Kioskmodus is alleen beschikbaar op het Linux-apparaat.",
         "en": "Kiosk mode is only available on the Linux device.",
     },
+    "settings_password_title": {
+        "nl": "Wachtwoord",
+        "en": "Password",
+    },
+    "settings_password_description": {
+        "nl": "Bekijk of wijzig hier het wachtwoord waarmee de lokale admin UI wordt ontgrendeld.",
+        "en": "View or change the password used to unlock the local admin UI.",
+    },
+    "settings_password_value": {
+        "nl": "Wachtwoord",
+        "en": "Password",
+    },
+    "settings_password_repeat": {
+        "nl": "Herhaal wachtwoord",
+        "en": "Repeat password",
+    },
+    "settings_password_reminder_question": {
+        "nl": "Herinneringsvraag",
+        "en": "Reminder question",
+    },
+    "settings_password_reminder_hint": {
+        "nl": "Hint of geheugensteun",
+        "en": "Hint or memory aid",
+    },
+    "settings_password_notes": {
+        "nl": "Notities",
+        "en": "Notes",
+    },
+    "settings_password_save": {
+        "nl": "Wachtwoord opslaan",
+        "en": "Save password",
+    },
+    "settings_password_show": {
+        "nl": "Wachtwoord tonen",
+        "en": "Show password",
+    },
+    "settings_password_hide": {
+        "nl": "Wachtwoord verbergen",
+        "en": "Hide password",
+    },
+    "settings_password_saved": {
+        "nl": "Wachtwoord opgeslagen.",
+        "en": "Password saved.",
+    },
+    "settings_password_not_configured": {
+        "nl": "Nog geen wachtwoord ingesteld.",
+        "en": "No password set yet.",
+    },
+    "settings_password_configured": {
+        "nl": "Wachtwoord is ingesteld.",
+        "en": "Password is set.",
+    },
+    "settings_password_configured_not_visible": {
+        "nl": "Wachtwoord is ingesteld, maar deze oudere opslag bevat alleen een hash. Voer het wachtwoord opnieuw in en sla op om het hier zichtbaar te maken.",
+        "en": "Password is set, but this older storage only contains a hash. Enter the password again and save it to make it visible here.",
+    },
+    "settings_password_required": {
+        "nl": "Vul een wachtwoord van minimaal 4 tekens in.",
+        "en": "Enter a password of at least 4 characters.",
+    },
+    "settings_password_mismatch": {
+        "nl": "De wachtwoorden komen niet overeen.",
+        "en": "The passwords do not match.",
+    },
+    "settings_password_save_failed": {
+        "nl": "Wachtwoord kon niet worden opgeslagen.",
+        "en": "Could not save password.",
+    },
+    "settings_password_load_failed": {
+        "nl": "Wachtwoordstatus kon niet worden geladen.",
+        "en": "Could not load password status.",
+    },
+    "settings_password_required_for_kiosk_enable": {
+        "nl": "Stel eerst een wachtwoord in voordat je kioskmodus inschakelt.",
+        "en": "Set a password before enabling kiosk mode.",
+    },
 
     # ============================================
     # SIDEBAR
@@ -183,6 +259,62 @@ TRANSLATIONS = {
     "boot_subtitle": {
         "nl": "",
         "en": "",
+    },
+    "kiosk_lock_title": {
+        "nl": "AITJE is vergrendeld",
+        "en": "AITJE is locked",
+    },
+    "kiosk_lock_subtitle": {
+        "nl": "Voer je wachtwoord in om de lokale admin UI te openen.",
+        "en": "Enter your password to open the local admin UI.",
+    },
+    "kiosk_lock_password": {
+        "nl": "Wachtwoord",
+        "en": "Password",
+    },
+    "kiosk_lock_unlock": {
+        "nl": "Ontgrendelen",
+        "en": "Unlock",
+    },
+    "kiosk_lock_wrong": {
+        "nl": "Wachtwoord onjuist.",
+        "en": "Password incorrect.",
+    },
+    "kiosk_lock_forgot": {
+        "nl": "Wachtwoord vergeten",
+        "en": "Forgot password",
+    },
+    "kiosk_lock_back_to_password": {
+        "nl": "Terug naar wachtwoord",
+        "en": "Back to password",
+    },
+    "kiosk_lock_recovery_intro": {
+        "nl": "Ben je je wachtwoord vergeten? Kijk in de instructiemail van je AITJE voor de herstelcode.",
+        "en": "Forgot your password? Check your AITJE instruction email for the recovery code.",
+    },
+    "kiosk_lock_recovery_code": {
+        "nl": "Herstelcode",
+        "en": "Recovery code",
+    },
+    "kiosk_lock_recovery_unlock": {
+        "nl": "Herstel en ontgrendel",
+        "en": "Recover and unlock",
+    },
+    "kiosk_lock_recovery_wrong": {
+        "nl": "Herstelcode onjuist.",
+        "en": "Recovery code incorrect.",
+    },
+    "kiosk_lock_reminder_question": {
+        "nl": "Herinneringsvraag: {value}",
+        "en": "Reminder question: {value}",
+    },
+    "kiosk_lock_reminder_hint": {
+        "nl": "Hint: {value}",
+        "en": "Hint: {value}",
+    },
+    "kiosk_lock_notes": {
+        "nl": "Notities: {value}",
+        "en": "Notes: {value}",
     },
 
     # ============================================
@@ -311,6 +443,10 @@ TRANSLATIONS = {
     "settings_tab_system": {
         "nl": "Systeem",
         "en": "System",
+    },
+    "settings_tab_password": {
+        "nl": "Wachtwoord",
+        "en": "Password",
     },
     "settings_tab_advanced": {
         "nl": "Chat Voorkeuren",
