@@ -35,7 +35,12 @@
               </div>
               <div>{{ message.thinking }}</div>
             </div>
-            <div v-if="hasAnswer" class="chat-content prose prose-sm max-w-none text-gray-800" v-html="renderedContent"></div>
+            <div
+              v-if="hasAnswer"
+              class="chat-content prose prose-sm max-w-none text-gray-800"
+              v-html="renderedContent"
+              @click="handleContentClick"
+            ></div>
             <div v-if="hasWebSources" class="mt-3 border-t border-gray-100 pt-2">
               <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
                 {{ t('chat.webSearch.sourcesHeading') }}
@@ -130,9 +135,42 @@ const sourceHostname = (url: string) => {
   }
 }
 
+const escapeHtml = (value: string) => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+const createMarkdownRenderer = () => {
+  const renderer = new marked.Renderer()
+
+  renderer.code = ({ text, lang }) => {
+    const language = (lang || '').trim().split(/\s+/)[0]
+    const languageLabel = language ? `<span class="code-block-language">${escapeHtml(language)}</span>` : '<span></span>'
+
+    return `
+      <div class="code-block">
+        <div class="code-block-header">
+          ${languageLabel}
+          <button class="code-block-copy" type="button">${escapeHtml(t('message.copy'))}</button>
+        </div>
+        <pre><code>${escapeHtml(text)}</code></pre>
+      </div>
+    `
+  }
+
+  return renderer
+}
+
 const renderedContent = computed(() => {
   if (props.message.role === 'assistant') {
-    return marked.parse(props.message.content, { breaks: true })
+    return marked.parse(props.message.content, {
+      breaks: true,
+      renderer: createMarkdownRenderer(),
+    })
   }
   return props.message.content
 })
@@ -154,6 +192,31 @@ const copyMessage = async () => {
     }, 2000)
   } catch (err) {
     console.error('Failed to copy:', err)
+  }
+}
+
+const handleContentClick = async (event: MouseEvent) => {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+
+  const button = target.closest<HTMLButtonElement>('.code-block-copy')
+  if (!button) return
+
+  const codeBlock = button.closest('.code-block')
+  const code = codeBlock?.querySelector('code')?.textContent
+  if (!code) return
+
+  try {
+    await navigator.clipboard.writeText(code)
+    const originalLabel = button.textContent || t('message.copy')
+    button.textContent = t('message.copied')
+    button.disabled = true
+    setTimeout(() => {
+      button.textContent = originalLabel
+      button.disabled = false
+    }, 1600)
+  } catch (err) {
+    console.error('Failed to copy code block:', err)
   }
 }
 
@@ -200,6 +263,66 @@ const printMessage = () => {
 .chat-content :deep(pre) {
   overflow-x: auto;
   white-space: pre-wrap;
+}
+
+.chat-content :deep(.code-block) {
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  background: #111827;
+}
+
+.chat-content :deep(.code-block-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid #1f2937;
+  background: #0b1220;
+}
+
+.chat-content :deep(.code-block-language) {
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.chat-content :deep(.code-block-copy) {
+  flex: 0 0 auto;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.chat-content :deep(.code-block-copy:hover:not(:disabled)) {
+  background: #facc15;
+  border-color: #eab308;
+}
+
+.chat-content :deep(.code-block-copy:disabled) {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.chat-content :deep(.code-block pre) {
+  margin: 0;
+  padding: 0.85rem;
+  background: transparent;
+  color: #f8fafc;
+}
+
+.chat-content :deep(.code-block code) {
+  background: transparent;
+  color: inherit;
+  padding: 0;
 }
 
 .chat-content :deep(code) {

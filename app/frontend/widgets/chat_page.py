@@ -793,6 +793,7 @@ class AssistantMessageWidget(QWidget):
         self._feedback_mode = False
         self.feedback_label.hide()
         self.response_view.show()
+        self.response_view.setTextFormat(Qt.MarkdownText if markdown else Qt.PlainText)
         self.response_view.setText(self._response_text)
         self.response_view.adjustSize()
         self.response_view.updateGeometry()
@@ -1656,7 +1657,7 @@ class ChatPage(QWidget):
             return
         self._response_render_pending = False
         widget = self._ensure_current_reply_widget()
-        widget.set_response_text(self.current_response_text, markdown=False)
+        widget.set_response_text(self.current_response_text)
         widget.sync_response_height()
         if self._response_should_stick:
             self._scroll_to_bottom()
@@ -2088,7 +2089,7 @@ class ChatPage(QWidget):
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QPrintDialog.Accepted:
             doc = QTextDocument()
-            doc.setPlainText(text)
+            doc.setMarkdown(text)
             doc.print_(printer)
 
     def _set_label_text(self, label: QLabel, text: str):
