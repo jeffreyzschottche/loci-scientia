@@ -239,7 +239,7 @@ def login(body: LoginRequest) -> dict:
     try:
         record, user = issue_token(body.email, body.password)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Deze inloggegevens kloppen niet.")
+        raise HTTPException(status_code=422, detail="Deze inloggegevens kloppen niet.") from None
     return {"token": record.token, "user": user}
 
 
@@ -401,7 +401,7 @@ def process_document_route(
         raise HTTPException(
             status_code=500,
             detail={"message": "Verwerking mislukt", "error": str(exc)},
-        )
+        ) from exc
 
     try:
         from . import sync as embedder_sync

@@ -9,7 +9,7 @@ from collections.abc import Coroutine
 
 import requests
 from datetime import datetime
-from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -887,9 +887,8 @@ class AssistantMessageWidget(QWidget):
 class ChatPage(QWidget):
     open_settings_tab_requested = Signal(str)
 
-    def __init__(self, ws_client):
+    def __init__(self):
         super().__init__()
-        self.ws_client = ws_client
         self.signals = ChatSignals()
         self.current_response_text = ""
         self.current_thinking_text = ""

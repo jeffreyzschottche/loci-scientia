@@ -30,14 +30,6 @@ def _default_setup_url(host: str) -> str:
     return f"http://{host}:{port}/connect"
 
 
-def _http_to_ws(url: str) -> str:
-    if url.startswith("https://"):
-        return "wss://" + url[len("https://") :]
-    if url.startswith("http://"):
-        return "ws://" + url[len("http://") :]
-    return url
-
-
 def _load_local_admin_token() -> str:
     token_path = Path(__file__).resolve().parents[2] / "devices_db" / "admin_token.json"
     try:
@@ -73,7 +65,6 @@ else:
     BACKEND_HOST = "127.0.0.1"
 BACKEND_PORT = int(os.environ.get("BACKEND_PORT", "8000"))
 BACKEND_HTTP = os.environ.get("BACKEND_HTTP", _default_backend_http(BACKEND_HOST, BACKEND_PORT)).rstrip("/")
-BACKEND_WS = os.environ.get("BACKEND_WS") or _http_to_ws(BACKEND_HTTP)
 BACKEND_TIMEOUT = int(os.environ.get("BACKEND_TIMEOUT", "6"))
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", _default_public_base(DEVICE_MDNS)).rstrip("/")
 SETUP_URL = os.environ.get("SETUP_URL", _default_setup_url(DEVICE_MDNS)).rstrip("/")

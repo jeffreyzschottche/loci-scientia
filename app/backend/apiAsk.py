@@ -195,7 +195,7 @@ def log_api_request(entry: ApiLogEntry) -> None:
         if entry.error:
             lines.extend([
                 "",
-                f"--- ERROR ---",
+                "--- ERROR ---",
                 entry.error,
             ])
 
@@ -899,26 +899,6 @@ def build_augmented_prompt_with_details(
     return "\n".join(base_lines).strip(), context_details
 
 
-def prepare_prompt(
-    req: ChatRequest,
-    history: Optional[Sequence[ChatMessage]] = None,
-    documents: Optional[Sequence[ParsedDocument]] = None,
-    web_results: Optional[Sequence[WebSearchResult]] = None,
-) -> tuple[str, list[str]]:
-    """Normalize request payload and return the prompt used for context checks."""
-    history_to_use = req.history if history is None else history
-    normalized_images = normalize_images(req.images)
-    prompt = build_augmented_prompt(
-        req.prompt,
-        history=history_to_use,
-        images_count=len(normalized_images),
-        documents=documents,
-        mode=req.mode,
-        web_results=web_results,
-    )
-    return prompt, normalized_images
-
-
 def estimate_prompt_tokens(text: str) -> int:
     if not text:
         return 0
@@ -932,8 +912,9 @@ def estimate_prompt_tokens(text: str) -> int:
 def log_prompt(final_prompt: str) -> None:
     try:
         PROMPT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         with PROMPT_LOG_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(f"[{datetime.utcnow().isoformat()}Z]\n{final_prompt}\n\n")
+            handle.write(f"[{timestamp}]\n{final_prompt}\n\n")
     except OSError:
         pass
 

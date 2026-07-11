@@ -52,8 +52,6 @@ from qasync import QEventLoop
 from app.backend.kiosk_lock import KioskLockStore
 from app.backend.settings import settings as backend_settings
 
-from .config import BACKEND_WS
-from .net.ws_client import WSClient
 from .theme import AITJE_QSS
 from .translations import t, register_language_change_callback
 from .widgets.chat_page import ChatPage
@@ -544,8 +542,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("AITJE Dashboard")
         self.resize(1200, 800)
 
-        self.ws_client = WSClient(BACKEND_WS)
-
         # In kioskmodus draait de frontend als enig venster onder weston; de
         # afsluit/herstart-knop moet dan het *device* afsluiten/herstarten in
         # plaats van alleen dit venster te sluiten (anders blijf je op een zwart
@@ -570,7 +566,7 @@ class MainWindow(QMainWindow):
         self._restart_on_close = False
 
         self.pages = {
-            "chat": ChatPage(self.ws_client),
+            "chat": ChatPage(),
             "kb": KnowledgePage(),
             "net": NetworkStatusPage(),
             "devices": DevicesPage(),
@@ -738,7 +734,6 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
-        asyncio.create_task(self.ws_client.close())
         if self._restart_on_close:
             QProcess.startDetached(sys.executable, ["-m", "app.frontend.main"])
         event.accept()

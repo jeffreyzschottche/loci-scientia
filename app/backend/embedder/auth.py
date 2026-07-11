@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Header, HTTPException
 
 from app.backend.auth_tokens import BearerTokenStore, TokenRecord
 from app.backend.devices_repo import DevicesRepository

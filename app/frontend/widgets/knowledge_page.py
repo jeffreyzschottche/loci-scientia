@@ -7,6 +7,7 @@ from pathlib import Path
 
 import requests
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -688,11 +689,6 @@ class KnowledgePage(QWidget):
             )
 
     def _update_vector_view(self, stats: dict | None, qdrant: dict | None) -> None:
-        total_docs = max(
-            len(self._documents_data),
-            int((stats or {}).get("document_count") or 0),
-            int((stats or {}).get("total_documents") or 0),
-        )
         total_chunks = max(
             int((stats or {}).get("chunk_count") or 0),
             int((stats or {}).get("total_chunks") or 0),

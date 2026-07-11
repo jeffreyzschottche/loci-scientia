@@ -12,15 +12,10 @@ import httpx
 from fastapi import (
     Depends,
     FastAPI,
-    File,
     Header,
     HTTPException,
     Request,
-    UploadFile,
-    WebSocket,
-    WebSocketDisconnect,
 )
-from fastapi.concurrency import run_in_threadpool
 from typing import Optional
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import (
@@ -52,7 +47,6 @@ from .apiAsk import (
     normalize_documents,
     normalize_images,
     normalize_model_response,
-    prepare_prompt,
     summarize_history,
 )
 from .web_search import (
@@ -954,11 +948,17 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_chat_r
             web_search_error = str(exc)
             logger.warning("Web search unavailable: %s", exc)
     try:
-        final_prompt, images = prepare_prompt(
-            req, history=history, documents=documents, web_results=web_results
-        )
+        images = normalize_images(req.images)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    final_prompt, context_details = build_augmented_prompt_with_details(
+        req.prompt,
+        history=history,
+        images_count=len(images),
+        documents=documents,
+        mode=req.mode,
+        web_results=web_results,
+    )
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         history_key,
@@ -971,16 +971,6 @@ async def api_ask(req: ChatRequest, record: TokenRecord = Depends(require_chat_r
     # Generate IDs for tracking
     request_id = generate_request_id()
     conversation_id = req.conversation_id or generate_conversation_id(record.token)
-
-    # Build prompt with details for logging
-    final_prompt, context_details = build_augmented_prompt_with_details(
-        req.prompt,
-        history=history,
-        images_count=len(images),
-        documents=documents,
-        mode=req.mode,
-        web_results=web_results,
-    )
 
     # Create API log entry
     log_entry = ApiLogEntry(
@@ -1056,6 +1046,7 @@ async def sse_stream_generator(
     conversation_id: str,
     generation: ActiveGeneration,
     final_prompt: Optional[str] = None,
+    context_details: Optional[dict] = None,
     images: Optional[list[str]] = None,
     web_results: Optional[list[WebSearchResult]] = None,
     web_search_error: Optional[str] = None,
@@ -1092,21 +1083,18 @@ async def sse_stream_generator(
     elif web_results is None:
         web_results = []
 
-    # Build prompt with details for logging (web_results may shift the prompt,
-    # so we always rebuild here and ignore any pre-built final_prompt when
-    # web search produced extra context).
-    logged_prompt, context_details = build_augmented_prompt_with_details(
-        req.prompt,
-        history=history,
-        images_count=len(current_images),
-        documents=documents,
-        mode=req.mode,
-        web_results=web_results,
-    )
-    if web_results:
-        final_prompt = logged_prompt
-    else:
-        final_prompt = final_prompt or logged_prompt
+    # Web-resultaten schuiven de prompt op; alleen dan (of als de route geen
+    # prompt meegaf) bouwen we hier opnieuw. Anders hergebruiken we de prompt
+    # + context van de route en blijft de RAG-zoektocht beperkt tot één keer.
+    if web_results or final_prompt is None or context_details is None:
+        final_prompt, context_details = build_augmented_prompt_with_details(
+            req.prompt,
+            history=history,
+            images_count=len(current_images),
+            documents=documents,
+            mode=req.mode,
+            web_results=web_results,
+        )
     log_prompt(final_prompt)
 
     # Create API log entry
@@ -1315,9 +1303,16 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
 
     history = chat_history.get(history_key)
     try:
-        final_prompt, images = prepare_prompt(req, history=history, documents=documents)
+        images = normalize_images(req.images)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    final_prompt, context_details = build_augmented_prompt_with_details(
+        req.prompt,
+        history=history,
+        images_count=len(images),
+        documents=documents,
+        mode=req.mode,
+    )
     _ensure_prompt_within_context(final_prompt)
     chat_history.append(
         history_key,
@@ -1344,6 +1339,7 @@ async def api_ask_stream(req: ChatRequest, record: TokenRecord = Depends(require
             conversation_id,
             generation,
             final_prompt=final_prompt,
+            context_details=context_details,
             images=images,
         ),
         media_type="text/event-stream",
@@ -1399,7 +1395,7 @@ def patch_device(
     try:
         return devices_repo.update_device(device_id, patch)
     except ValueError:
-        raise HTTPException(status_code=404, detail="device not found")
+        raise HTTPException(status_code=404, detail="device not found") from None
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -1415,26 +1411,6 @@ def delete_device(
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"status": "ok"}
-
-
-@app.websocket(settings.ws_path)
-async def ws_endpoint(ws: WebSocket):
-    await ws.accept()
-    try:
-        while True:
-            payload = await ws.receive_text()
-            try:
-                data = json.loads(payload)
-                prompt = data.get("prompt", "")
-            except json.JSONDecodeError:
-                prompt = payload
-            message = f"Echo: {prompt}"
-            for ch in message:
-                await ws.send_json({"token": ch, "done": False})
-                await asyncio.sleep(0.005)
-            await ws.send_json({"done": True})
-    except WebSocketDisconnect:
-        return
 
 
 # ---- LAN embedder app (FastAPI router + Nuxt SPA) ---------------------------

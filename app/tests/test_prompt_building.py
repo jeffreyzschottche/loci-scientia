@@ -98,9 +98,13 @@ class PromptBuildingTests(unittest.TestCase):
         valid = "Ik zie geen directe fout in je vraag. Kun je het exacte antwoord van het model delen?"
         self.assertFalse(apiAsk.is_invalid_model_output(valid))
 
-    def test_all_prompt_templates_start_with_required_prefix(self):
-        required_prefix = "Je bent een behulpzame assistent."
-        template_paths = [apiAsk.PROMPT_TEMPLATE_PATH, *sorted(apiAsk.PROMPT_TEMPLATE_DIR.glob("*.txt"))]
+    def test_default_and_configured_mode_templates_establish_aitje_identity(self):
+        required_prefix = "You are AITJE"
+        template_paths = [apiAsk.PROMPT_TEMPLATE_PATH]
+        for mode in apiAsk.settings.prompt_modes:
+            filename = apiAsk._mode_filename(mode)
+            self.assertTrue(filename, f"mode '{mode}' levert geen bestandsnaam op")
+            template_paths.append(apiAsk.PROMPT_TEMPLATE_DIR / filename)
 
         for template_path in template_paths:
             text = Path(template_path).read_text(encoding="utf-8")
@@ -129,7 +133,7 @@ class PromptBuildingTests(unittest.TestCase):
                 mode="Developer",
             )
 
-        self.assertTrue(prompt.startswith("Je bent een behulpzame assistent."))
+        self.assertTrue(prompt.startswith("You are AITJE in Developer focus mode."))
         self.assertIn("> bijlagen:", prompt)
         self.assertIn("Er zijn 2 afbeeldingen meegestuurd.", prompt)
         self.assertIn("- Document 1: contract.pdf [pdf]", prompt)

@@ -45,7 +45,6 @@ def _map_max_context(models: list[str], values: list[str]) -> dict[str, Optional
 class Settings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8000
-    ws_path: str = "/ws"
     offline_assets_dir: Optional[Path] = None
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "gemma3:4b"

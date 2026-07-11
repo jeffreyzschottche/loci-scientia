@@ -327,7 +327,6 @@ def _merge_metadata(*sources: Optional[dict]) -> dict:
 
 
 def _embedding_metadata() -> dict:
-    import os
     return {
         "model": _embedding_model_name(),
         "vector_dimension": _int_env("EMBEDDING_VECTOR_DIMENSION", 768),

@@ -2273,42 +2273,6 @@ TRANSLATIONS = {
         "nl": "{used} GB gebruikt ({percent}%)",
         "en": "{used} GB used ({percent}%)",
     },
-    "kb_vector_db_title": {
-        "nl": "Vector Database Status",
-        "en": "Vector Database Status",
-    },
-    "kb_table_document": {
-        "nl": "Document",
-        "en": "Document",
-    },
-    "kb_table_type": {
-        "nl": "Type",
-        "en": "Type",
-    },
-    "kb_table_size": {
-        "nl": "Grootte",
-        "en": "Size",
-    },
-    "kb_table_status": {
-        "nl": "Status",
-        "en": "Status",
-    },
-    "kb_table_vectors": {
-        "nl": "Vectors",
-        "en": "Vectors",
-    },
-    "kb_table_upload_date": {
-        "nl": "Upload Datum",
-        "en": "Upload Date",
-    },
-    "kb_status_indexed": {
-        "nl": "Geïndexeerd",
-        "en": "Indexed",
-    },
-    "kb_status_processing": {
-        "nl": "Verwerken…",
-        "en": "Processing…",
-    },
 
     # ============================================
     # MAPS PAGE

@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QSizePolicy,
     QTabWidget,
     QToolButton,
     QVBoxLayout,
